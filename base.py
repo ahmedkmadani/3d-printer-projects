@@ -12,26 +12,29 @@ import params as P
 
 EXT_CTR_Y = (P.IN_Y_MIN + P.IN_Y_MAX) / 2          # exterior/interior Y center
 IN_R = max(P.EDGE_FILLET_R - P.WALL_T, 0.6)        # cavity corner radius
+SKIRT_X_LIMIT = P.OUT_W / 2 - P.EDGE_FILLET_R      # rebate/skirt stops at the
+                                                   # +X corner arcs (17.75)
 
 
 def _shell() -> Part:
-    """Two-tier outer shell (lower full, upper rebated) minus cavity."""
-    lower = extrude(
-        Plane.XY.offset(-P.FLOOR_T)
-        * Pos(0, EXT_CTR_Y)
-        * RectangleRounded(P.OUT_W, P.OUT_L, P.EDGE_FILLET_R),
-        P.FLOOR_T + P.RIM_Z - P.SKIRT_DEPTH,
-    )
-    upper = extrude(
+    """Outer shell, rebated on three sides only. The +X (button/SD) wall
+    stays full thickness with no lid skirt over it: a plunger cap passing
+    through the skirt would lock the lid in place."""
+    full_fp = Pos(0, EXT_CTR_Y) * RectangleRounded(P.OUT_W, P.OUT_L, P.EDGE_FILLET_R)
+    lower = extrude(Plane.XY.offset(-P.FLOOR_T) * full_fp, P.FLOOR_T + P.RIM_Z)
+    # rebate band: perimeter ring, upper SKIRT_DEPTH, only where x <= SKIRT_X_LIMIT
+    ring = extrude(
         Plane.XY.offset(P.RIM_Z - P.SKIRT_DEPTH)
-        * Pos(0, EXT_CTR_Y)
-        * RectangleRounded(
-            P.OUT_W - 2 * P.REBATE, P.OUT_L - 2 * P.REBATE,
-            P.EDGE_FILLET_R - P.REBATE,
-        ),
+        * (full_fp
+           - Pos(0, EXT_CTR_Y)
+           * RectangleRounded(P.OUT_W - 2 * P.REBATE, P.OUT_L - 2 * P.REBATE,
+                              P.EDGE_FILLET_R - P.REBATE)),
         P.SKIRT_DEPTH,
     )
-    shell = lower + upper
+    ring = ring & Pos(-50 + SKIRT_X_LIMIT, EXT_CTR_Y, P.RIM_Z - P.SKIRT_DEPTH / 2) * Box(
+        100, 200, P.SKIRT_DEPTH + 2
+    )
+    shell = lower - ring
     cavity = extrude(
         Plane.XY * Pos(0, EXT_CTR_Y) * RectangleRounded(P.IN_W, P.IN_L, IN_R),
         P.RIM_Z,
@@ -189,11 +192,17 @@ def _openings() -> list[Part]:
         Pos(P.IN_W / 2 + 1.2, P.SD_CTR_Y, P.SD_CTR_Z)
         * Box(4.0, P.SD_SLOT_L, P.SD_SLOT_H)
     )
-    # button bores: +X wall — bore through wall, flange recess into boss
+    # button bores: +X wall (full thickness — no skirt on this side).
+    # Tiers: cap recess into the outer face, bore through, flange recess in boss.
     for y in (P.BTN1_CTR_Y, P.BTN2_CTR_Y):
         cuts.append(
             Pos(P.OUT_W / 2, y, P.BTN_CTR_Z)
             * Rot(0, 90, 0) * Cylinder(P.BTN_BORE_D / 2, 12.0)
+        )
+        cuts.append(
+            Pos(P.OUT_W / 2 - P.BTN_CAP_RECESS_DEPTH / 2, y, P.BTN_CTR_Z)
+            * Rot(0, 90, 0)
+            * Cylinder(P.BTN_CAP_RECESS_D / 2, P.BTN_CAP_RECESS_DEPTH)
         )
         cuts.append(
             Pos(P.SWITCH_TIP_X + P.BTN_FLANGE_RECESS_DEPTH / 2, y, P.BTN_CTR_Z)
