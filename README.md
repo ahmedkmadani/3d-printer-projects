@@ -167,10 +167,20 @@ change — flagged here rather than worked around silently:
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python params.py       # parameter sanity + arithmetic
-python validate.py     # full validation suite (must pass)
-python export.py       # base/lid/plunger .stl + .step
-python render.py       # renders/*.png
+python src/params.py     # parameter sanity + arithmetic
+python src/validate.py   # full validation suite (must pass)
+python src/export.py     # -> models/stl/*.stl + models/step/*.step
+python src/render.py     # -> renders/*.png
+```
+
+## Layout
+
+```
+src/          all Python (params, components, base, lid, validate, export, render)
+models/stl/   print-oriented base.stl, lid.stl, plunger.stl
+models/step/  base.step, lid.step, plunger.step  (FreeCAD)
+renders/      isometric + exploded PNG previews
+docs/         original project brief
 ```
 
 ## Validation output

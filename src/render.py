@@ -17,8 +17,9 @@ import components as C
 from base import build_base
 from lid import build_lid, build_plunger
 
-OUT = "renders"
 import os
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(ROOT, "renders")
 os.makedirs(OUT, exist_ok=True)
 
 

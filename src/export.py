@@ -9,6 +9,7 @@ Print orientation (stated per part):
   plunger : cap face on the bed (as modeled). Pure vertical extrusion.
 """
 
+import os
 import numpy as np
 from build123d import Axis, export_step, export_stl
 
@@ -17,7 +18,11 @@ import components as C
 from base import build_base
 from lid import build_lid, build_plunger
 
-OUT = "."
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STL = os.path.join(ROOT, "models", "stl")
+STEP = os.path.join(ROOT, "models", "step")
+os.makedirs(STL, exist_ok=True)
+os.makedirs(STEP, exist_ok=True)
 
 
 def orient_lid(lid):
@@ -33,17 +38,19 @@ def main():
     plunger = build_plunger()
 
     # STEP (assembled coordinates, for FreeCAD)
-    export_step(base, f"{OUT}/base.step")
-    export_step(lid, f"{OUT}/lid.step")
-    export_step(plunger, f"{OUT}/plunger.step")
+    export_step(base, os.path.join(STEP, "base.step"))
+    export_step(lid, os.path.join(STEP, "lid.step"))
+    export_step(plunger, os.path.join(STEP, "plunger.step"))
 
     # STL (print-oriented)
-    export_stl(base, f"{OUT}/base.stl", tolerance=0.02, angular_tolerance=0.15)
-    export_stl(orient_lid(lid), f"{OUT}/lid.stl", tolerance=0.02,
+    export_stl(base, os.path.join(STL, "base.stl"), tolerance=0.02,
                angular_tolerance=0.15)
-    export_stl(plunger, f"{OUT}/plunger.stl", tolerance=0.01,
+    export_stl(orient_lid(lid), os.path.join(STL, "lid.stl"), tolerance=0.02,
+               angular_tolerance=0.15)
+    export_stl(plunger, os.path.join(STL, "plunger.stl"), tolerance=0.01,
                angular_tolerance=0.1)
-    print("wrote base/lid/plunger .step and .stl")
+    print(f"wrote base/lid/plunger .step -> {STEP}")
+    print(f"wrote base/lid/plunger .stl  -> {STL}")
 
 
 if __name__ == "__main__":
