@@ -15,10 +15,9 @@ that covers the whole list and ships to KSA). Currency: SAR pegged ~3.75 to USD.
 | 2 | **503035 LiPo 3.7 V ~500 mAh** — *get the JST PH 1.25 mm connector version* | Powers the device; drops into the floor bay | ~$4.50 | ~17 | [AliExpress](https://www.aliexpress.com/item/32816711041.html) |
 | 3 | **microSD card 32 GB** (SanDisk / Samsung) | Stores the recorded audio (slot is on the board) | ~$4.50 | ~17 | [AliExpress microSD](https://www.aliexpress.com/w/wholesale-sandisk-32gb-micro-sd.html) |
 | 4 | *(Optional)* **Mini 8 Ω 1 W speaker, JST PH 1.25 mm** | Only if you want audio **playback** (recording works without it) | ~$2.00 | ~8 | [AliExpress 8Ω mini speaker](https://es.aliexpress.com/w/wholesale-8-ohm-mini-speaker.html) |
-| 5 | *(Optional)* **TP4056 USB-C charger module** | NOT needed — the board already charges the LiPo over USB-C. Only buy if you want to charge loose cells outside the case | ~$1.00 | ~4 | [AliExpress TP4056](https://www.aliexpress.com/w/wholesale-tp4056-type-c.html) |
 
 > **Charging:** the board has a built-in LiPo charger — plug USB-C into the
-> device to charge the battery. No separate charger needed for normal use.
+> device to charge the battery. No separate charger needed.
 
 ## Totals
 
