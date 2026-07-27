@@ -81,6 +81,7 @@ MIC_CTR_X = -8.15         # mic pinhole on the bottom edge
 LED_CTR_X = 8.8           # LED light-pipe hole on the bottom edge
 PINHOLE = 2.0             # [case-meas] 2x2 square in reference; we use round d=2
 SPK_CTR_X = 0.8           # speaker pocket center (X), just beyond the +Y PCB edge
+SPK_CTR_Y = 23.75         # speaker seated against the grille wall, behind the rib
 SPK_L = 16.0              # [case-meas] oval speaker pocket
 SPK_W = 5.0
 SPK_GRILL_SLOTS = 4       # [case-meas] 0.8 x 4.0 slits in the wall

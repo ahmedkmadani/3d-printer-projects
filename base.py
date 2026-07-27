@@ -138,10 +138,10 @@ def _supports() -> Part:
     parts.append(Pos(14.5 + 0.6, -6.0, 2.0) * Box(1.2, 14.0, 4.0))
     parts.append(Pos(-4.0, -17.75 - 0.6, 2.0) * Box(12.0, 1.2, 4.0))
 
-    # --- speaker pocket ribs
-    parts.append(Pos(-8.05, 23.55, 4.0) * Box(1.2, 6.4, 8.0))   # left rib
-    parts.append(Pos(9.65, 23.55, 4.0) * Box(1.2, 6.4, 8.0))    # right rib
-    parts.append(Pos(0.8, 20.35, 4.0) * Box(18.9, 1.2, 8.0))    # front rib
+    # --- speaker pocket ribs (envelope 16x5 centered at y=23.75, z 0..9)
+    parts.append(Pos(-8.65, 23.75, 4.0) * Box(1.2, 5.0, 8.0))   # left rib
+    parts.append(Pos(10.25, 23.75, 4.0) * Box(1.2, 5.0, 8.0))   # right rib
+    parts.append(Pos(0.8, 20.5, 4.0) * Box(18.9, 1.2, 8.0))     # front rib (y<21.25)
 
     out = parts[0]
     for p_ in parts[1:]:

@@ -23,19 +23,22 @@ def pcb() -> Part:
 
 
 def display() -> Part:
-    """Display module block: panel outline, from PCB front to panel front."""
+    """Display module block: panel outline, from PCB front to panel front.
+
+    The panel is centered on the PCB it is bonded to (0,0); the ACTIVE area
+    is offset within it (that offset drives the lid window, not this block)."""
     z = (P.PCB_FRONT_Z + P.PANEL_FRONT_Z) / 2
-    # panel centered on the active-area center (border differences are inside
-    # the block; the block already spans the full panel outline)
-    return Pos(P.ACTIVE_CTR_X, P.ACTIVE_CTR_Y, z) * Box(
+    return Pos(0, 0, z) * Box(
         P.PANEL_W, P.PANEL_L, P.PANEL_FRONT_Z - P.PCB_FRONT_Z
     )
 
 
 def back_mid_keepout() -> Part:
-    """Small parts under the PCB, over the battery zone."""
+    """Small parts under the PCB, over the battery zone. Kept clear of the
+    outer PCB_CORNER_GRIP band where the seat ledges reach under the board."""
     z = P.PCB_BACK_Z - P.BACK_CLEAR_MID / 2
-    return Pos(0, 0, z) * Box(P.PCB_W - 4, P.PCB_L - 8, P.BACK_CLEAR_MID)
+    inset = 2 * (P.PCB_CORNER_GRIP + 0.5)
+    return Pos(0, 0, z) * Box(P.PCB_W - inset, P.PCB_L - inset, P.BACK_CLEAR_MID)
 
 
 def usb_keepout() -> Part:
@@ -55,9 +58,9 @@ def sd_keepout() -> Part:
 
 
 def speaker() -> Part:
-    """Oval speaker unit in its bay beyond the +Y PCB edge."""
-    y = P.PCB_L / 2 + P.CLEARANCE + P.SPK_W / 2 + 1.0
-    return Pos(P.SPK_CTR_X, y, 4.5) * Box(P.SPK_L, P.SPK_W, 9.0)
+    """Oval speaker unit in its bay beyond the +Y PCB edge, seated against
+    the grille wall (behind the front retaining rib)."""
+    return Pos(P.SPK_CTR_X, P.SPK_CTR_Y, 4.5) * Box(P.SPK_L, P.SPK_W, 9.0)
 
 
 def switches() -> list[Part]:
