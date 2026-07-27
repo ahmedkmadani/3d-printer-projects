@@ -154,14 +154,21 @@ SKIRT_DEPTH = 8.0
 REBATE = SKIRT_T + CLEARANCE
 REBATED_WALL = WALL_T - REBATE            # 0.95 >= MIN_FEATURE
 
-SNAP_BARB_H = 0.5
+SNAP_BARB_H = 0.75        # barb proudness off the rebated wall face
+SNAP_DEFLECT = SNAP_BARB_H - CLEARANCE    # 0.5 — skirt clearance eats the rest;
+                                          # barb still penetrates the window 0.5
 SNAP_BARB_L = 8.0
 SNAP_WINDOW_H = 1.8
 SNAP_WINDOW_L = SNAP_BARB_L + 2 * CLEARANCE
 SNAP_ENGAGE_DEPTH = 7.0                   # cantilever length L
 SNAP_PANEL_L = 18.0
 SNAP_SLOT_W = 1.2
-SNAP_STRAIN = 1.5 * SKIRT_T * SNAP_BARB_H / SNAP_ENGAGE_DEPTH**2
+SNAP_STRAIN = 1.5 * SKIRT_T * SNAP_DEFLECT / SNAP_ENGAGE_DEPTH**2
+
+# Snap locations: (wall, center along that wall). The -Y wall gets none —
+# its center belongs to the USB opening (that edge is the natural thumb-
+# opening point). Positions chosen clear of the speaker grille slits.
+SNAPS = [("-X", -7.0), ("-X", 12.0), ("+Y", -11.0), ("+Y", 11.0)]
 
 # ---------------------------------------------------------------------------
 # Lid window: opening = active area + reveal; bezel overlaps the panel border
@@ -184,6 +191,18 @@ BTN_FLANGE_RECESS_D = 5.8
 BTN_FLANGE_RECESS_DEPTH = 0.8
 BTN_BOSS_T = 3.2          # local wall thickening for the bore tiers
 BTN_CTR_Z = PCB_BACK_Z - 1.0   # GUESS: switch bodies on the PCB back edge
+SWITCH_TIP_X = 17.05      # GUESS: side-switch plunger tip ~0.55 beyond PCB edge.
+                          # Drives plunger pin length — adjust after a test fit.
+
+# Derived opening heights (interfaces live relative to the PCB planes)
+MIC_CTR_Z = 9.0           # [case-meas] pinhole straddles the PCB front plane
+LED_CTR_Z = 9.0           # [case-meas]
+SD_CTR_Z = PCB_BACK_Z - 0.8    # [case-meas] SD holder on the PCB back face
+
+# Interior Y extents (asymmetric: speaker bay beyond the +Y PCB edge)
+IN_Y_MIN = -(PCB_L / 2 + CLEARANCE + 1.6)
+IN_Y_MAX = PCB_L / 2 + CLEARANCE + SPK_BAY
+BARB_CATCH_Z = RIM_Z - SNAP_ENGAGE_DEPTH   # flat catch face height on the base
 
 def sanity() -> list[str]:
     lines = []
@@ -194,8 +213,9 @@ def sanity() -> list[str]:
     lines.append(f"Interior: {IN_W:.1f} x {IN_L:.1f}, depth {RIM_Z:.2f} mm")
 
     lines.append(
-        f"Snap strain eps = 1.5*t*y/L^2 = 1.5*{SKIRT_T}*{SNAP_BARB_H}/{SNAP_ENGAGE_DEPTH}^2 "
-        f"= {SNAP_STRAIN*100:.2f} %  (limit 2 %)")
+        f"Snap strain eps = 1.5*t*y/L^2 = 1.5*{SKIRT_T}*{SNAP_DEFLECT}/{SNAP_ENGAGE_DEPTH}^2 "
+        f"= {SNAP_STRAIN*100:.2f} %  (limit 2 %; deflection = barb {SNAP_BARB_H} "
+        f"- clearance {CLEARANCE})")
     ok &= SNAP_STRAIN < 0.02
 
     lines.append(f"Rebated wall = {REBATED_WALL:.2f} mm (min feature {MIN_FEATURE})")
