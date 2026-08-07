@@ -204,11 +204,7 @@ def _openings() -> list[Part]:
             * Rot(0, 90, 0)
             * Cylinder(P.BTN_CAP_RECESS_D / 2, P.BTN_CAP_RECESS_DEPTH)
         )
-        cuts.append(
-            Pos(P.SWITCH_TIP_X + P.BTN_FLANGE_RECESS_DEPTH / 2, y, P.BTN_CTR_Z)
-            * Rot(0, 90, 0)
-            * Cylinder(P.BTN_FLANGE_RECESS_D / 2, P.BTN_FLANGE_RECESS_DEPTH)
-        )
+        # (No flange recess: the plunger has no inner flange — see params.py.)
     # speaker grille slits: +Y wall
     n = P.SPK_GRILL_SLOTS
     total = (n - 1) * P.SPK_SLOT_PITCH

@@ -49,8 +49,19 @@ def main():
                angular_tolerance=0.15)
     export_stl(plunger, os.path.join(STL, "plunger.stl"), tolerance=0.01,
                angular_tolerance=0.1)
+    # 3MF (print-oriented, carries units so slicers cannot guess wrong).
+    # Generated here rather than by hand: a hand-exported lid.3mf went stale
+    # and still held the old 3 mm-corner geometry after the case was reshaped.
+    from build123d import Mesher
+    for part, name in ((base, "base"), (orient_lid(lid), "lid"),
+                       (plunger, "plunger")):
+        mesher = Mesher()
+        mesher.add_shape(part)
+        mesher.write(os.path.join(STL, f"{name}.3mf"))
+
     print(f"wrote base/lid/plunger .step -> {STEP}")
     print(f"wrote base/lid/plunger .stl  -> {STL}")
+    print(f"wrote base/lid/plunger .3mf  -> {STL}")
 
 
 if __name__ == "__main__":

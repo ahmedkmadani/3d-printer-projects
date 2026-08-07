@@ -25,7 +25,9 @@ interference, clearances, wall thickness and printability.
 | `lid.stl` | Display window + snap skirt | **top face on bed** (skirt up) | ~2.7 g |
 | `plunger.stl` | Side-button pin — **print 2** | cap face on bed | ~0.1 g each |
 
-`.step` versions of each are included for FreeCAD.
+`.step` versions are included for FreeCAD, and `.3mf` (print-oriented,
+unit-tagged) for slicers. All three formats are written by `export.py` — do not
+hand-export, or they drift apart.
 
 ## Dimensions
 
@@ -61,8 +63,10 @@ interference, clearances, wall thickness and printability.
    length); route its lead toward the board's MX1.25 connector.
 3. Seat the **board** onto the four corner seat-ledges, display facing up. The
    side rails and end stops locate it; the lid bezel provides the final clamp.
-4. Insert a **plunger** into each of the two right-edge button bores from
-   inside before the lid goes on — they're captive once installed.
+4. Push a **plunger** into each of the two right-edge button bores **from the
+   outside**, stem first, until the cap seats in its recess (it sits 0.2 mm
+   proud). The cap is wider than the bore, so it cannot fall inward; the side
+   switch behind it holds it out against that seat.
 5. Set the **lid** on and press until the four snaps click. The three-sided
    skirt keys the alignment; the button (right) wall has no skirt so the
    plunger caps stay free.
@@ -104,7 +108,8 @@ short — hence the deliberately long 7 mm beam.)
 | `SNAP_PANEL_L` | 18.0 | width of each flexing skirt panel |
 | `USB_OPEN_W/H` | 9.0 / 7.0 | USB-C opening |
 | `SD_SLOT_L/H` | 12.2 / 2.8 | microSD slot opening |
-| `BTN_BORE_D` / `BTN_CAP_D` | 4.0 / 6.0 | button bore + plunger cap |
+| `BTN_BORE_D` / `BTN_STEM_D` | 4.2 / 3.8 | bore + stem (0.2 mm radial sliding fit) |
+| `BTN_CAP_D` / `BTN_CAP_L` | 6.0 / 1.2 | plunger cap — wider than the bore, so it cannot fall inward |
 | `SPK_L/W`, `SPK_GRILL_SLOTS` | 16 / 5, 4 | speaker bay + grille slits |
 | `MIC_HOLE_D` / `PINHOLE` | 2.0 / 2.0 | mic + LED pinholes |
 
@@ -197,11 +202,11 @@ note/
 Building solids (OCCT kernel)...
 
 1. Manifold / watertight / positive volume
-  [PASS] base: positive volume (9.68 cm3)
+  [PASS] base: positive volume (9.69 cm3)
   [PASS] base: watertight mesh
   [PASS] base: consistent winding (oriented)
   [PASS] base: single connected body (1)
-        base: 1763 V, 3566 F, euler -20
+        base: 1441 V, 2922 F, euler -20
   [PASS] lid: positive volume (3.38 cm3)
   [PASS] lid: watertight mesh
   [PASS] lid: consistent winding (oriented)
@@ -211,7 +216,7 @@ Building solids (OCCT kernel)...
   [PASS] plunger: watertight mesh
   [PASS] plunger: consistent winding (oriented)
   [PASS] plunger: single connected body (1)
-        plunger: 378 V, 752 F, euler 2
+        plunger: 252 V, 500 F, euler 2
 
 2. Self-intersection
   [PASS] base: no self-intersection (watertight+oriented+non-degenerate)
@@ -226,8 +231,8 @@ Building solids (OCCT kernel)...
   [PASS] component 'usb' vs enclosure = 0.00 mm3 (< 2.0)
   [PASS] component 'sd' vs enclosure = 0.94 mm3 (< 2.0)
   [PASS] component 'speaker' vs enclosure = 0.00 mm3 (< 2.0)
-  [PASS] component 'switch1' vs enclosure = 1.24 mm3 (< 2.0)
-  [PASS] component 'switch2' vs enclosure = 1.24 mm3 (< 2.0)
+  [PASS] component 'switch1' vs enclosure = 0.84 mm3 (< 2.0)
+  [PASS] component 'switch2' vs enclosure = 0.84 mm3 (< 2.0)
   [PASS] internal: battery ∩ display = 0.000 mm3 (== 0)
   [PASS] internal: battery ∩ pcb = 0.000 mm3 (== 0)
   [PASS] internal: pcb ∩ display = 0.000 mm3 (== 0)
@@ -250,11 +255,11 @@ Building solids (OCCT kernel)...
      bezel ring (Z-)              (no hit)
 
 6. Print-mass estimate (PLA, 20% infill)
-  base     solid  9.68 cm3 -> ~  7.7 g (shell 55% + 20% infill)
+  base     solid  9.69 cm3 -> ~  7.7 g (shell 55% + 20% infill)
   lid      solid  3.38 cm3 -> ~  2.7 g (shell 55% + 20% infill)
-  plunger  solid  0.06 cm3 -> ~  0.0 g (shell 55% + 20% infill)
-  plunger  solid  0.06 cm3 -> ~  0.0 g (shell 55% + 20% infill)
-  TOTAL    ~10.4 g + 2nd plunger ~0.0 g
+  plunger  solid  0.06 cm3 -> ~  0.1 g (shell 55% + 20% infill)
+  plunger  solid  0.06 cm3 -> ~  0.1 g (shell 55% + 20% infill)
+  TOTAL    ~10.4 g + 2nd plunger ~0.1 g
 
 ============================================================
 VALIDATION PASSED — all hard checks green.

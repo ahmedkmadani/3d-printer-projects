@@ -191,14 +191,24 @@ WINDOW_CHAMFER = 1.0
 # Button plungers through the lid skirt/base wall on the +X edge: separate
 # printed pins (filament-agnostic, replaceable; a printed-in-place flexure
 # would hinge across layer lines here). Same 3-tier bore as the reference.
-BTN_BORE_D = 4.0
-BTN_STEM_D = 3.4
+# The plunger is a capped pin, inserted from OUTSIDE.
+#
+# It previously had a Ø5.2 retaining flange at the inner end AND a Ø6.0 cap at
+# the outer end, with a Ø4.0 bore between them — so both ends were wider than
+# the hole and the part could not be fitted from either direction. That is why
+# the plungers could not be installed.
+#
+# There is no room for an inboard retaining flange: the switch tip sits at
+# SWITCH_TIP_X = 17.05, inside the bore. So retention is by the cap bottoming
+# in its outer recess (it cannot fall inward), with the switch pressing it back
+# out against that seat.
+BTN_BORE_D = 4.2
+BTN_STEM_D = 3.8          # 0.2 radial clearance in the bore — sliding fit
+BTN_STEM_L = 2.7          # cap underside (19.75) to switch tip (17.05)
 BTN_CAP_D = 6.0
+BTN_CAP_L = 1.2           # 0.2 proud of the 1.0 recess, so it can be felt
 BTN_CAP_RECESS_D = 6.6
 BTN_CAP_RECESS_DEPTH = 1.0
-BTN_FLANGE_D = 5.2
-BTN_FLANGE_RECESS_D = 5.8
-BTN_FLANGE_RECESS_DEPTH = 0.8
 BTN_BOSS_T = 3.2          # local wall thickening for the bore tiers
 BTN_CTR_Z = PCB_BACK_Z - 1.0   # GUESS: switch bodies on the PCB back edge
 SWITCH_TIP_X = 17.05      # GUESS: side-switch plunger tip ~0.55 beyond PCB edge.

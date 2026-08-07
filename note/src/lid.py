@@ -122,15 +122,17 @@ def build_lid() -> Part:
 def build_plunger() -> Part:
     """Button plunger, own frame: axis Z, cap at the bottom (print face).
 
-    Installed along +X: nose/flange at the switch, cap proud of the wall.
-    Lengths from the wall tiers: cap 1.0 (recess depth), stem 2.6, flange 0.5.
+    A capped pin: cap seats in the outer recess, stem reaches the side switch.
+    Installed from OUTSIDE — it cannot fall inward past the cap, and the switch
+    holds it out against that seat. See params.py for why there is no inner
+    retaining flange (there is no room for one; the switch occupies it).
     """
     from build123d import Align
     up = (Align.CENTER, Align.CENTER, Align.MIN)
-    cap = Cylinder(P.BTN_CAP_D / 2, 1.0, align=up)
-    stem = Pos(0, 0, 1.0) * Cylinder(P.BTN_STEM_D / 2, 2.6, align=up)
-    flange = Pos(0, 0, 3.6) * Cylinder(P.BTN_FLANGE_D / 2, 0.5, align=up)
-    return cap + stem + flange
+    cap = Cylinder(P.BTN_CAP_D / 2, P.BTN_CAP_L, align=up)
+    stem = Pos(0, 0, P.BTN_CAP_L) * Cylinder(P.BTN_STEM_D / 2, P.BTN_STEM_L,
+                                             align=up)
+    return cap + stem
 
 
 if __name__ == "__main__":
