@@ -85,9 +85,10 @@ SPK_CTR_Y = 23.75         # speaker seated against the grille wall, behind the r
 SPK_L = 16.0              # [case-meas] oval speaker pocket
 SPK_W = 5.0
 SPK_GRILL_SLOTS = 4       # [case-meas] 0.8 x 4.0 slits in the wall
-SPK_SLOT_W = 0.8
+SPK_SLOT_W = 1.0
 SPK_SLOT_H = 4.0
-SPK_SLOT_PITCH = 1.64
+SPK_SLOT_CTR_Z = 7.0      # shared by the base wall and the lid skirt
+SPK_SLOT_PITCH = 2.0      # 1.64 left 0.84 mm pillars — under 2 perimeters
 
 # ---------------------------------------------------------------------------
 # Battery: 503035 LiPo w/ PCM (Pala build uses 500 mAh — Hackster).
@@ -121,7 +122,10 @@ USB_CTR_Z = PCB_BACK_Z - 1.65      # GUESS: shell ~3.3 tall on the back face
 # ---------------------------------------------------------------------------
 WALL_T = 2.4
 FLOOR_T = 2.0
-LID_T = 2.0
+# 2.8, not 2.0: RIM_CHAMFER 1.6 on a 2.0 mm plate leaves only 0.40 mm at the
+# outer face — below one extrusion width, and exactly where the snap
+# cantilevers root into the plate.
+LID_T = 2.8
 # Outer vertical edges. This is the parameter that decides whether the case
 # reads as a box or as a pebble — it is ~19% of the 41.5 mm width at 8.0.
 # Vertical edges print cleanly at any radius in either part's orientation.
@@ -160,25 +164,54 @@ OUT_H = FLOOR_T + RIM_Z + LID_T
 # is a true cantilever, not a hoop).
 # ---------------------------------------------------------------------------
 SKIRT_T = 1.2
-SKIRT_DEPTH = 8.0
+SKIRT_DEPTH = 10.0        # >= SNAP_ENGAGE_DEPTH + 1.0
 REBATE = SKIRT_T + CLEARANCE
 REBATED_WALL = WALL_T - REBATE            # 0.95 >= MIN_FEATURE
 
-SNAP_BARB_H = 0.75        # barb proudness off the rebated wall face
-SNAP_DEFLECT = SNAP_BARB_H - CLEARANCE    # 0.5 — skirt clearance eats the rest;
-                                          # barb still penetrates the window 0.5
+# Deflection is a FIRST-CLASS parameter, not a by-product of CLEARANCE.
+# It used to be (SNAP_BARB_H - CLEARANCE), which meant loosening a sliding fit
+# silently reduced both snap deflection and retention.
+SNAP_DEFLECT = 0.50                       # skirt deflection during insertion
+SNAP_BARB_H = SNAP_DEFLECT + CLEARANCE    # clearance is taken up first
 SNAP_BARB_L = 8.0
-SNAP_WINDOW_H = 1.8
+
+# The window's lower edge is the retaining surface AND a printed bridge (the
+# lid prints top-face-down). Bridge sag closes the gap onto the barb, so the
+# window is oversized downward to give the sag somewhere to go.
+SNAP_WINDOW_H = 2.3
+SNAP_WINDOW_DROOP = 0.30                  # window bottom sits this far below
+                                          # the barb catch face
 SNAP_WINDOW_L = SNAP_BARB_L + 2 * CLEARANCE
-SNAP_ENGAGE_DEPTH = 7.0                   # cantilever length L
-SNAP_PANEL_L = 18.0
+
+# Cantilever length L. The lid prints top-face-down, so these beams bend
+# NORMAL TO THE LAYER PLANES — the weak direction. Printed PLA elongates only
+# ~0.8-1.5 % in Z and PETG ~2-4 %, so the 2 % handbook figure (moulded,
+# isotropic, single assembly) is far too generous here. L 7 -> 9 takes strain
+# from 1.84 % to 1.11 %, inside PETG's range with margin for the stress
+# concentration at the root that the 1-D formula ignores.
+SNAP_ENGAGE_DEPTH = 9.0
+
+# Panel width. Force scales with w, and at w=18/L=7 closing the lid needed an
+# estimated ~150 N in PLA — you would bow the plate before the snaps deflected.
+SNAP_PANEL_L = 11.0
 SNAP_SLOT_W = 1.2
+
+# Catch back-angle. A 0 degree (flat) catch cannot be cammed out at all, and
+# with barbs on two perpendicular walls the case could only be opened by
+# breaking it — which also meant the LiPo could never be removed. 30 degrees
+# retains firmly but releases under deliberate pull.
+SNAP_RELEASE_ANGLE = 30.0
+
 SNAP_STRAIN = 1.5 * SKIRT_T * SNAP_DEFLECT / SNAP_ENGAGE_DEPTH**2
 
 # Snap locations: (wall, center along that wall). The -Y wall gets none —
 # its center belongs to the USB opening (that edge is the natural thumb-
 # opening point). Positions chosen clear of the speaker grille slits.
-SNAPS = [("-X", -7.0), ("-X", 12.0), ("+Y", -11.0), ("+Y", 11.0)]
+# +Y positions must satisfy |c| + SNAP_BARB_L/2 <= SKIRT_X_LIMIT (= OUT_W/2 -
+# EDGE_FILLET_R = 12.75). At EDGE_FILLET_R 8.0 the old +-11.0 put the outer
+# 2.25 mm of each +Y barb into solid wall where no skirt exists, so it
+# retained nothing.
+SNAPS = [("-X", -7.0), ("-X", 12.0), ("+Y", -6.5), ("+Y", 6.5)]
 
 # ---------------------------------------------------------------------------
 # Lid window: opening = active area + reveal; bezel overlaps the panel border
@@ -191,24 +224,32 @@ WINDOW_CHAMFER = 1.0
 # Button plungers through the lid skirt/base wall on the +X edge: separate
 # printed pins (filament-agnostic, replaceable; a printed-in-place flexure
 # would hinge across layer lines here). Same 3-tier bore as the reference.
-# The plunger is a capped pin, inserted from OUTSIDE.
+# The plunger is a flanged pin, installed from INSIDE, before the board.
 #
-# It previously had a Ø5.2 retaining flange at the inner end AND a Ø6.0 cap at
-# the outer end, with a Ø4.0 bore between them — so both ends were wider than
-# the hole and the part could not be fitted from either direction. That is why
-# the plungers could not be installed.
+# History worth keeping: it was first a dumbbell (cap and flange both wider
+# than the bore) which could not be fitted from either direction. "Fixing" it
+# by deleting the flange and inserting from outside produced two new faults —
+# the cap bottomed in its recess at the exact moment the stem met the switch,
+# so there was ZERO press travel, and nothing resisted the switch's own return
+# spring, so the pins ejected.
 #
-# There is no room for an inboard retaining flange: the switch tip sits at
-# SWITCH_TIP_X = 17.05, inside the bore. So retention is by the cap bottoming
-# in its outer recess (it cannot fall inward), with the switch pressing it back
-# out against that seat.
-BTN_BORE_D = 4.2
-BTN_STEM_D = 3.8          # 0.2 radial clearance in the bore — sliding fit
-BTN_STEM_L = 2.7          # cap underside (19.75) to switch tip (17.05)
-BTN_CAP_D = 6.0
-BTN_CAP_L = 1.2           # 0.2 proud of the 1.0 recess, so it can be felt
-BTN_CAP_RECESS_D = 6.6
-BTN_CAP_RECESS_DEPTH = 1.0
+# The flange has to be inboard (it is what stops the switch pushing the pin
+# out) and therefore the pin must go in from inside, before the board traps
+# it. Everything outboard of the flange must pass through the bore.
+BTN_BORE_D = 4.4
+BTN_STEM_D = 3.6          # 0.40 radial nominal; a horizontally-printed bore
+                          # comes out undersize and out-of-round at the crown,
+                          # so the effective fit is ~0.25
+BTN_HEAD_D = 4.0          # < BORE: must pass through during installation
+BTN_HEAD_PROUD = 0.8      # stands proud of the wall, and stays proud through
+                          # the full press stroke
+BTN_FLANGE_D = 5.6        # > BORE: the outward stop
+BTN_FLANGE_L = 1.0
+BTN_POCKET_D = 6.0        # flange pocket bored into the boss from inside
+BTN_POCKET_L = 1.3
+BTN_FREE_TRAVEL = 0.30    # pin motion before it meets the switch
+BTN_SWITCH_TRAVEL = 0.25  # tactile switch actuation
+
 BTN_BOSS_T = 3.2          # local wall thickening for the bore tiers
 BTN_CTR_Z = PCB_BACK_Z - 1.0   # GUESS: switch bodies on the PCB back edge
 SWITCH_TIP_X = 17.05      # GUESS: side-switch plunger tip ~0.55 beyond PCB edge.

@@ -46,6 +46,14 @@ def _plate() -> Part:
     return plate + ring
 
 
+# Window Z is DERIVED from the barb, not hardcoded: the old literal 7.4 meant
+# changing SNAP_ENGAGE_DEPTH moved the barbs while the windows stayed put.
+# The bottom sits SNAP_WINDOW_DROOP below the catch face, because that edge
+# prints as a bridge and sags upward in assembled-Z.
+WINDOW_BOT_Z = P.BARB_CATCH_Z - P.SNAP_WINDOW_DROOP
+WINDOW_CTR_Z = WINDOW_BOT_Z + P.SNAP_WINDOW_H / 2
+
+
 def _skirt() -> Part:
     fp_out = Pos(0, EXT_CTR_Y) * RectangleRounded(P.OUT_W, P.OUT_L, P.EDGE_FILLET_R)
     fp_in = Pos(0, EXT_CTR_Y) * RectangleRounded(
@@ -65,7 +73,7 @@ def _skirt() -> Part:
     # snap windows + panel slots
     for wall, c in P.SNAPS:
         if wall == "-X":
-            win = Pos(-P.OUT_W / 2 + P.SKIRT_T / 2, c, 7.4) * Box(
+            win = Pos(-P.OUT_W / 2 + P.SKIRT_T / 2, c, WINDOW_CTR_Z) * Box(
                 P.SKIRT_T + 2, P.SNAP_WINDOW_L, P.SNAP_WINDOW_H
             )
             slots = [
@@ -76,7 +84,7 @@ def _skirt() -> Part:
             ]
         else:  # +Y
             face_y = EXT_CTR_Y + P.OUT_L / 2 - P.SKIRT_T / 2
-            win = Pos(c, face_y, 7.4) * Box(
+            win = Pos(c, face_y, WINDOW_CTR_Z) * Box(
                 P.SNAP_WINDOW_L, P.SKIRT_T + 2, P.SNAP_WINDOW_H
             )
             slots = [
@@ -102,6 +110,19 @@ def _skirt() -> Part:
         ring -= Pos(x, face_y, P.MIC_CTR_Z) * Rot(90, 0, 0) * Cylinder(
             P.PINHOLE / 2, 6.0
         )
+
+    # +Y skirt: the speaker grille. Without these the skirt covered the slits
+    # from z 5.55 up, leaving only ~0.55 mm of the 4.0 mm slit height open —
+    # about 86 % occluded, and what did escape whistled through the parting
+    # line and the snap-panel slots.
+    face_y_p = EXT_CTR_Y + P.OUT_L / 2 - P.SKIRT_T / 2
+    n = P.SPK_GRILL_SLOTS
+    total = (n - 1) * P.SPK_SLOT_PITCH
+    for i in range(n):
+        sx = P.SPK_CTR_X - total / 2 + i * P.SPK_SLOT_PITCH
+        ring -= Pos(sx, face_y_p, P.SPK_SLOT_CTR_Z) * Box(
+            P.SPK_SLOT_W, P.SKIRT_T + 2, P.SPK_SLOT_H
+        )
     return ring
 
 
@@ -120,19 +141,30 @@ def build_lid() -> Part:
 
 
 def build_plunger() -> Part:
-    """Button plunger, own frame: axis Z, cap at the bottom (print face).
+    """Button plunger, own frame: axis Z, FLANGE on the bed (print face).
 
-    A capped pin: cap seats in the outer recess, stem reaches the side switch.
-    Installed from OUTSIDE — it cannot fall inward past the cap, and the switch
-    holds it out against that seat. See params.py for why there is no inner
-    retaining flange (there is no room for one; the switch occupies it).
+    Installed from inside, before the board:
+      flange  > bore  -> the outward stop, so the switch cannot eject it
+      stem/head < bore -> so it can be threaded out through the wall
+      head     stands proud and stays proud through the whole stroke
+
+    Printed flange-down: every step is inward or a 0.2 mm ledge, so it is
+    self-supporting, and the stem is loaded in compression along the layer
+    normal — the strong direction.
     """
     from build123d import Align
     up = (Align.CENTER, Align.CENTER, Align.MIN)
-    cap = Cylinder(P.BTN_CAP_D / 2, P.BTN_CAP_L, align=up)
-    stem = Pos(0, 0, P.BTN_CAP_L) * Cylinder(P.BTN_STEM_D / 2, P.BTN_STEM_L,
-                                             align=up)
-    return cap + stem
+
+    # Stem spans the flange face to the outer wall face, plus the proud head.
+    shoulder_x = P.SWITCH_TIP_X + P.BTN_POCKET_L      # bore/pocket step
+    stem_l = (P.OUT_W / 2 - shoulder_x) + P.BTN_HEAD_PROUD
+
+    flange = Cylinder(P.BTN_FLANGE_D / 2, P.BTN_FLANGE_L, align=up)
+    stem = Pos(0, 0, P.BTN_FLANGE_L) * Cylinder(P.BTN_STEM_D / 2, stem_l,
+                                                align=up)
+    head = Pos(0, 0, P.BTN_FLANGE_L + stem_l - P.BTN_HEAD_PROUD) * Cylinder(
+        P.BTN_HEAD_D / 2, P.BTN_HEAD_PROUD, align=up)
+    return flange + stem + head
 
 
 if __name__ == "__main__":

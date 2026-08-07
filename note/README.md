@@ -21,9 +21,9 @@ interference, clearances, wall thickness and printability.
 
 | File | What | Print orientation | Est. mass @20% infill |
 |---|---|---|---|
-| `base.stl` | Battery + board tray, all wall openings, snap barbs | exterior floor on bed | ~7.7 g |
-| `lid.stl` | Display window + snap skirt | **top face on bed** (skirt up) | ~2.7 g |
-| `plunger.stl` | Side-button pin — **print 2** | cap face on bed | ~0.1 g each |
+| `base.stl` | Battery + board tray, all wall openings, snap barbs | exterior floor on bed | ~7.5 g |
+| `lid.stl` | Display window + snap skirt | **top face on bed** (skirt up) | ~3.7 g |
+| `plunger.stl` | Side-button pin — **print 2** | **flange face on bed** | ~0.1 g each |
 
 `.step` versions are included for FreeCAD, and `.3mf` (print-oriented,
 unit-tagged) for slicers. All three formats are written by `export.py` — do not
@@ -31,7 +31,7 @@ hand-export, or they drift apart.
 
 ## Dimensions
 
-- **Exterior:** 41.5 × 52.9 × 17.6 mm (W × L × H)
+- **Exterior:** 41.5 × 52.9 × 18.4 mm (W × L × H)
 - **Interior cavity:** 36.7 × 48.1 mm, 13.6 mm deep
 - **Display window:** 28.0 mm square (active area 27 mm + 0.5 mm reveal per
   side; the lid bezel overlaps the panel border to hide the panel edge and
@@ -63,10 +63,11 @@ hand-export, or they drift apart.
    length); route its lead toward the board's MX1.25 connector.
 3. Seat the **board** onto the four corner seat-ledges, display facing up. The
    side rails and end stops locate it; the lid bezel provides the final clamp.
-4. Push a **plunger** into each of the two right-edge button bores **from the
-   outside**, stem first, until the cap seats in its recess (it sits 0.2 mm
-   proud). The cap is wider than the bore, so it cannot fall inward; the side
-   switch behind it holds it out against that seat.
+4. Drop a **plunger** into each of the two right-edge bores **from inside,
+   flange first**, before the board goes in — the flange is wider than the
+   bore, so it cannot be pushed out by the switch, and the board then traps
+   it. The head stands 0.8 mm proud and stays proud through the 0.55 mm press
+   stroke.
 5. Set the **lid** on and press until the four snaps click. The three-sided
    skirt keys the alignment; the button (right) wall has no skirt so the
    plunger caps stay free.
@@ -80,8 +81,8 @@ real cantilever, not a stiff continuous hoop. Peak strain:
 
 ```
 eps = 1.5 · t · y / L²
-    = 1.5 · 1.2 · 0.5 / 7.0²          t=skirt 1.2, y=deflection 0.5, L=beam 7.0
-    = 1.84 %      < 2 %  ✓
+    = 1.5 · 1.2 · 0.5 / 9.0²          t=skirt 1.2, y=deflection 0.5, L=beam 9.0
+    = 1.11 %
 ```
 
 The barb stands 0.75 mm proud; the 0.25 mm skirt clearance is taken up first,
@@ -94,7 +95,7 @@ short — hence the deliberately long 7 mm beam.)
 | Parameter | Default | Controls |
 |---|---|---|
 | `CLEARANCE` | 0.25 | per-side gap at every part/component interface |
-| `WALL_T` / `FLOOR_T` / `LID_T` | 2.4 / 2.0 / 2.0 | shell thicknesses |
+| `WALL_T` / `FLOOR_T` / `LID_T` | 2.4 / 2.0 / **2.8** | shell thicknesses (LID_T carries the snap roots past the rim chamfer) |
 | `EDGE_FILLET_R` | 8.0 | outer vertical edge fillet — sets the pebble silhouette |
 | `RIM_CHAMFER` | 1.6 | top/bottom rim chamfer (**not** a fillet — both edges print on the bed) |
 | `PCB_W` / `PCB_L` / `PCB_T` | 33 / 39 / 1.6 | board envelope |
@@ -102,10 +103,10 @@ short — hence the deliberately long 7 mm beam.)
 | `ACTIVE_CTR_X/Y` | 0.55 / 3.0 | active-area (window) offset from PCB center |
 | `WINDOW_REVEAL` | 0.5 | window oversize past active area (bezel overlap) |
 | `BATT_L/W/T` | 37 / 30.5 / 5.3 | 503035 max envelope |
-| `SKIRT_T` / `SKIRT_DEPTH` | 1.2 / 8.0 | lid skirt wall + engagement depth |
+| `SKIRT_T` / `SKIRT_DEPTH` | 1.2 / 10.0 | lid skirt wall + engagement depth |
 | `SNAP_BARB_H` | 0.75 | barb proudness (drives strain + retention) |
-| `SNAP_ENGAGE_DEPTH` | 7.0 | snap cantilever length L |
-| `SNAP_PANEL_L` | 18.0 | width of each flexing skirt panel |
+| `SNAP_ENGAGE_DEPTH` | 9.0 | snap cantilever length L |
+| `SNAP_PANEL_L` | 11.0 | width of each flexing skirt panel (sets closing force) |
 | `USB_OPEN_W/H` | 9.0 / 7.0 | USB-C opening |
 | `SD_SLOT_L/H` | 12.2 / 2.8 | microSD slot opening |
 | `BTN_BORE_D` / `BTN_STEM_D` | 4.2 / 3.8 | bore + stem (0.2 mm radial sliding fit) |
@@ -202,21 +203,21 @@ note/
 Building solids (OCCT kernel)...
 
 1. Manifold / watertight / positive volume
-  [PASS] base: positive volume (9.69 cm3)
+  [PASS] base: positive volume (9.40 cm3)
   [PASS] base: watertight mesh
   [PASS] base: consistent winding (oriented)
   [PASS] base: single connected body (1)
-        base: 1441 V, 2922 F, euler -20
-  [PASS] lid: positive volume (3.38 cm3)
+        base: 1500 V, 3040 F, euler -20
+  [PASS] lid: positive volume (4.62 cm3)
   [PASS] lid: watertight mesh
   [PASS] lid: consistent winding (oriented)
   [PASS] lid: single connected body (1)
-        lid: 689 V, 1398 F, euler -10
+        lid: 724 V, 1468 F, euler -10
   [PASS] plunger: positive volume (0.06 cm3)
   [PASS] plunger: watertight mesh
   [PASS] plunger: consistent winding (oriented)
   [PASS] plunger: single connected body (1)
-        plunger: 252 V, 500 F, euler 2
+        plunger: 378 V, 752 F, euler 2
 
 2. Self-intersection
   [PASS] base: no self-intersection (watertight+oriented+non-degenerate)
@@ -229,10 +230,10 @@ Building solids (OCCT kernel)...
   [PASS] component 'display' vs enclosure = 0.00 mm3 (< 2.0)
   [PASS] component 'back_mid' vs enclosure = 0.00 mm3 (< 2.0)
   [PASS] component 'usb' vs enclosure = 0.00 mm3 (< 2.0)
-  [PASS] component 'sd' vs enclosure = 0.94 mm3 (< 2.0)
+  [PASS] component 'sd' vs enclosure = 0.54 mm3 (< 2.0)
   [PASS] component 'speaker' vs enclosure = 0.00 mm3 (< 2.0)
-  [PASS] component 'switch1' vs enclosure = 0.84 mm3 (< 2.0)
-  [PASS] component 'switch2' vs enclosure = 0.84 mm3 (< 2.0)
+  [PASS] component 'switch1' vs enclosure = 0.33 mm3 (< 2.0)
+  [PASS] component 'switch2' vs enclosure = 0.33 mm3 (< 2.0)
   [PASS] internal: battery ∩ display = 0.000 mm3 (== 0)
   [PASS] internal: battery ∩ pcb = 0.000 mm3 (== 0)
   [PASS] internal: pcb ∩ display = 0.000 mm3 (== 0)
@@ -250,16 +251,16 @@ Building solids (OCCT kernel)...
      +X wall (X+ @ mid)           3.70 mm
      -X rebated wall (X+)         2.55 mm
   lid:
-     top plate (Z- @ corner)      2.00 mm
-     skirt -X (X+)                1.20 mm
+     top plate (Z- @ corner)      2.80 mm
+     skirt -X (X+)                (no hit)
      bezel ring (Z-)              (no hit)
 
 6. Print-mass estimate (PLA, 20% infill)
-  base     solid  9.69 cm3 -> ~  7.7 g (shell 55% + 20% infill)
-  lid      solid  3.38 cm3 -> ~  2.7 g (shell 55% + 20% infill)
-  plunger  solid  0.06 cm3 -> ~  0.1 g (shell 55% + 20% infill)
-  plunger  solid  0.06 cm3 -> ~  0.1 g (shell 55% + 20% infill)
-  TOTAL    ~10.4 g + 2nd plunger ~0.1 g
+  base     solid  9.40 cm3 -> ~  7.5 g (shell 55% + 20% infill)
+  lid      solid  4.62 cm3 -> ~  3.7 g (shell 55% + 20% infill)
+  plunger  solid  0.06 cm3 -> ~  0.0 g (shell 55% + 20% infill)
+  plunger  solid  0.06 cm3 -> ~  0.0 g (shell 55% + 20% infill)
+  TOTAL    ~11.2 g + 2nd plunger ~0.0 g
 
 ============================================================
 VALIDATION PASSED — all hard checks green.

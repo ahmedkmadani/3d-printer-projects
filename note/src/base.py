@@ -54,24 +54,32 @@ def _ledge(x, y, w, l, reach_dir) -> Part:
     """
     t = 1.7                                          # ledge thickness at the wall
     body = Pos(x, y, P.POST_SEAT_Z - t / 2) * Box(w, l, t)
-    run = w if reach_dir == "X" else l
-    # 45-degree wedge removed from the underside tip
+
+    # 45-degree wedge off the underside of the FREE end, so the ledge is
+    # self-supporting. Two bugs lived here: the X branch applied its offset
+    # twice, placing the wedge ~15 mm outside the ledge so it subtracted
+    # nothing (leaving 79.7 mm2 of flat 90-degree overhang at the PCB seating
+    # datum); and the run was the full reach, tapering the tip to zero
+    # thickness so the last ~0.6 mm could not print at all.
+    tip_t = 0.6                                      # printable residual tip
+    run = t - tip_t                                  # true 45 degrees
     sign = 1 if (reach_dir == "X" and x < 0) or (reach_dir == "Y" and y < 0) else -1
-    # build wedge in the reach plane
+    base_z = P.POST_SEAT_Z - t
+
     if reach_dir == "X":
-        pts = [(0, 0), (sign * run, 0), (sign * run, min(run, t)), (0, 0)]
+        tip = x + sign * w / 2
+        pts = [(tip, base_z), (tip - sign * run, base_z), (tip, base_z + run)]
         wedge = extrude(
-            make_face(
-                Plane.XZ * Polyline(*pts, close=True)
-            ).moved(Pos(x + sign * w / 2 * -1 + (w / 2 * sign), 0, 0)),
-            l / 2, both=True,
-        ).moved(Pos(x - sign * w / 2, y, P.POST_SEAT_Z - t))
+            make_face(Plane.XZ * Polyline(*pts, close=True)), l / 2 + 0.1,
+            both=True,
+        ).moved(Pos(0, y, 0))
     else:
-        pts = [(0, 0), (sign * run, 0), (sign * run, min(run, t)), (0, 0)]
+        tip = y + sign * l / 2
+        pts = [(tip, base_z), (tip - sign * run, base_z), (tip, base_z + run)]
         wedge = extrude(
-            make_face(Plane.YZ * Polyline(*pts, close=True)),
-            w / 2, both=True,
-        ).moved(Pos(x, y - sign * l / 2, P.POST_SEAT_Z - t))
+            make_face(Plane.YZ * Polyline(*pts, close=True)), w / 2 + 0.1,
+            both=True,
+        ).moved(Pos(x, 0, 0))
     return body - wedge if wedge.volume > 1e-6 else body
 
 
@@ -104,7 +112,16 @@ def _supports() -> Part:
             Pos((x0 + x1) / 2, 20.55, P.POST_SEAT_Z / 2)
             * Box(x1 - x0, 1.6, P.POST_SEAT_Z)
         )
-        parts.append(_ledge((x0 + x1) / 2, 18.4, x1 - x0, 2.7, "Y"))
+        # The +X-side ledge sits over the microSD holder's back-side keepout
+        # (x 3.5..18.5, y 3.5..17.5), so its reach is cut back to stop clear
+        # of it. This only became visible once the underside chamfer started
+        # subtracting at all — before that the ledge geometry was wrong in a
+        # way that masked the collision.
+        # Trim from the TIP, keeping the root on the pilaster face at y=19.75
+        # — shifting the whole ledge instead detaches it from the pilaster.
+        reach = 2.7 if x1 < 0 else 1.3
+        parts.append(_ledge((x0 + x1) / 2, 19.75 - reach / 2, x1 - x0, reach,
+                            "Y"))
 
     # --- upper locating rails (above the seat, faces at PCB + clearance)
     loc_t = P.IN_W / 2 - (P.PCB_W / 2 + P.CLEARANCE)   # 1.6
@@ -152,10 +169,17 @@ def _supports() -> Part:
 def _barb(wall: str, c: float) -> Part:
     """Snap barb on a rebated outer face: flat catch underside at
     BARB_CATCH_Z, 45-degree lead-in ramp on top."""
+    import math
     h = P.SNAP_BARB_H
     rise = 1.5                                         # ramp height above catch
+    # The catch face is back-angled by SNAP_RELEASE_ANGLE rather than flat.
+    # A flat (0 degree) catch has effectively infinite cam-out force, and with
+    # barbs on two perpendicular walls the case could only be opened by
+    # breaking it — so the battery could never be replaced either.
+    back = h * math.tan(math.radians(P.SNAP_RELEASE_ANGLE))
     # profile in the wall-normal/Z plane: (out, z) with out=0 at wall face
-    prof = [(0, P.BARB_CATCH_Z), (h, P.BARB_CATCH_Z), (0, P.BARB_CATCH_Z + rise)]
+    prof = [(0, P.BARB_CATCH_Z), (h, P.BARB_CATCH_Z + back),
+            (0, P.BARB_CATCH_Z + rise)]
     if wall == "-X":
         face_x = -(P.OUT_W / 2 - P.REBATE)
         pts = [(face_x, z) for _, z in prof]
@@ -199,19 +223,21 @@ def _openings() -> list[Part]:
             Pos(P.OUT_W / 2, y, P.BTN_CTR_Z)
             * Rot(0, 90, 0) * Cylinder(P.BTN_BORE_D / 2, 12.0)
         )
+        # Flange pocket, bored into the boss from the INSIDE. Its floor is the
+        # shoulder the flange bears against, which is what stops the switch
+        # spring pushing the pin out of the case.
         cuts.append(
-            Pos(P.OUT_W / 2 - P.BTN_CAP_RECESS_DEPTH / 2, y, P.BTN_CTR_Z)
+            Pos(P.SWITCH_TIP_X + P.BTN_POCKET_L / 2, y, P.BTN_CTR_Z)
             * Rot(0, 90, 0)
-            * Cylinder(P.BTN_CAP_RECESS_D / 2, P.BTN_CAP_RECESS_DEPTH)
+            * Cylinder(P.BTN_POCKET_D / 2, P.BTN_POCKET_L)
         )
-        # (No flange recess: the plunger has no inner flange — see params.py.)
     # speaker grille slits: +Y wall
     n = P.SPK_GRILL_SLOTS
     total = (n - 1) * P.SPK_SLOT_PITCH
     for i in range(n):
         x = P.SPK_CTR_X - total / 2 + i * P.SPK_SLOT_PITCH
         cuts.append(
-            Pos(x, P.IN_Y_MAX + 1.5, 7.0)
+            Pos(x, P.IN_Y_MAX + 1.5, P.SPK_SLOT_CTR_Z)
             * Box(P.SPK_SLOT_W, 5.0, P.SPK_SLOT_H)
         )
     return cuts
