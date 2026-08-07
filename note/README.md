@@ -72,11 +72,13 @@ hand-export, or they drift apart.
    skirt keys the alignment; the button (right) wall has no skirt so the
    plunger caps stay free.
 
-To open: flex the two −X-wall snap panels outward and lift.
+To open: lift the +Y edge and flex the two −X-wall snap panels outward.
+The catch faces are back-angled 30°, so they release under a deliberate pull
+instead of having to be broken.
 
 ## Snap-fit — cantilever strain check
 
-The lid skirt is **slotted into discrete panels** so each snap behaves as a
+The lid skirt is **slotted into discrete panels** on the -X wall so each snap behaves as a
 real cantilever, not a stiff continuous hoop. Peak strain:
 
 ```
@@ -203,16 +205,16 @@ note/
 Building solids (OCCT kernel)...
 
 1. Manifold / watertight / positive volume
-  [PASS] base: positive volume (9.40 cm3)
+  [PASS] base: positive volume (9.39 cm3)
   [PASS] base: watertight mesh
   [PASS] base: consistent winding (oriented)
   [PASS] base: single connected body (1)
-        base: 1500 V, 3040 F, euler -20
-  [PASS] lid: positive volume (4.62 cm3)
+        base: 1484 V, 3008 F, euler -20
+  [PASS] lid: positive volume (4.72 cm3)
   [PASS] lid: watertight mesh
   [PASS] lid: consistent winding (oriented)
   [PASS] lid: single connected body (1)
-        lid: 724 V, 1468 F, euler -10
+        lid: 684 V, 1400 F, euler -16
   [PASS] plunger: positive volume (0.06 cm3)
   [PASS] plunger: watertight mesh
   [PASS] plunger: consistent winding (oriented)
@@ -256,8 +258,8 @@ Building solids (OCCT kernel)...
      bezel ring (Z-)              (no hit)
 
 6. Print-mass estimate (PLA, 20% infill)
-  base     solid  9.40 cm3 -> ~  7.5 g (shell 55% + 20% infill)
-  lid      solid  4.62 cm3 -> ~  3.7 g (shell 55% + 20% infill)
+  base     solid  9.39 cm3 -> ~  7.5 g (shell 55% + 20% infill)
+  lid      solid  4.72 cm3 -> ~  3.7 g (shell 55% + 20% infill)
   plunger  solid  0.06 cm3 -> ~  0.0 g (shell 55% + 20% infill)
   plunger  solid  0.06 cm3 -> ~  0.0 g (shell 55% + 20% infill)
   TOTAL    ~11.2 g + 2nd plunger ~0.0 g

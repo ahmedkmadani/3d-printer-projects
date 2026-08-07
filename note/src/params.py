@@ -207,11 +207,22 @@ SNAP_STRAIN = 1.5 * SKIRT_T * SNAP_DEFLECT / SNAP_ENGAGE_DEPTH**2
 # Snap locations: (wall, center along that wall). The -Y wall gets none —
 # its center belongs to the USB opening (that edge is the natural thumb-
 # opening point). Positions chosen clear of the speaker grille slits.
-# +Y positions must satisfy |c| + SNAP_BARB_L/2 <= SKIRT_X_LIMIT (= OUT_W/2 -
-# EDGE_FILLET_R = 12.75). At EDGE_FILLET_R 8.0 the old +-11.0 put the outer
-# 2.25 mm of each +Y barb into solid wall where no skirt exists, so it
-# retained nothing.
-SNAPS = [("-X", -7.0), ("-X", 12.0), ("+Y", -6.5), ("+Y", 6.5)]
+# -X only. The +Y wall cannot carry a snap: its skirt is limited to |x| <=
+# 12.75 by EDGE_FILLET_R, and the speaker grille occupies x -2.70..4.30, so a
+# panel would need c >= 11.40 to clear the grille but c <= 6.65 to stay on the
+# skirt. Forcing both sets of cuts onto that wall left 0.1 mm slivers of skirt
+# between them — thinner than one extrusion, which is what a slicer reports as
+# floating regions.
+#
+# Dropping them is right regardless: four catches on two perpendicular walls
+# could not be released (you cannot flex +Y while lifting -X), so the case
+# could only be opened by breaking it, and the LiPo could never be replaced.
+# Two snaps on the long -X wall plus full skirt engagement on three sides
+# retains a 30 g device and gives a defined opening motion.
+#
+# Follow-up: a rigid hook lip on +Y, engaged by tilting the lid in, would
+# restore positive retention on that edge without a flexing cantilever.
+SNAPS = [("-X", -7.0), ("-X", 12.0)]
 
 # ---------------------------------------------------------------------------
 # Lid window: opening = active area + reveal; bezel overlaps the panel border
