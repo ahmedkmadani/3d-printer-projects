@@ -1,5 +1,13 @@
 build123d==0.11.1
 trimesh==4.12.2
 manifold3d==3.5.2
-numpy==2.4.6
-scipy==1.17.1
+
+# numpy 2.4.x requires Python >= 3.12; this range also installs on 3.10, and
+# the geometry comes from OCCT so the numpy version does not affect the model.
+numpy>=2.2,<3
+
+# trimesh's ray backend — validate.py's wall-thickness report needs it.
+rtree>=1.4
+
+# render.py
+matplotlib>=3.5

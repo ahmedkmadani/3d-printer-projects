@@ -122,8 +122,17 @@ USB_CTR_Z = PCB_BACK_Z - 1.65      # GUESS: shell ~3.3 tall on the back face
 WALL_T = 2.4
 FLOOR_T = 2.0
 LID_T = 2.0
-EDGE_FILLET_R = 3.0
-RIM_CHAMFER = 0.8
+# Outer vertical edges. This is the parameter that decides whether the case
+# reads as a box or as a pebble — it is ~19% of the 41.5 mm width at 8.0.
+# Vertical edges print cleanly at any radius in either part's orientation.
+EDGE_FILLET_R = 8.0
+
+# Top and bottom rims. These MUST stay chamfers, not fillets: the base prints
+# floor-down and the lid prints top-face-down, so both of these edges sit ON
+# THE BED. A true fillet there flares outward from a horizontal tangent — at
+# R=2 the first 0.2 mm layer would overhang the one below it by ~0.87 mm and
+# droop. A 45 degree chamfer steps out 0.2 mm per layer and is self-supporting.
+RIM_CHAMFER = 1.6
 
 # Board support: PCB has NO usable mounting holes (Pala case screws pass
 # OUTSIDE the PCB outline — the board is clamped, not screwed). Ours:

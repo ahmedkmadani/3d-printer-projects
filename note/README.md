@@ -21,8 +21,8 @@ interference, clearances, wall thickness and printability.
 
 | File | What | Print orientation | Est. mass @20% infill |
 |---|---|---|---|
-| `base.stl` | Battery + board tray, all wall openings, snap barbs | exterior floor on bed | ~8 g |
-| `lid.stl` | Display window + snap skirt | **top face on bed** (skirt up) | ~3 g |
+| `base.stl` | Battery + board tray, all wall openings, snap barbs | exterior floor on bed | ~7.7 g |
+| `lid.stl` | Display window + snap skirt | **top face on bed** (skirt up) | ~2.7 g |
 | `plunger.stl` | Side-button pin — **print 2** | cap face on bed | ~0.1 g each |
 
 `.step` versions of each are included for FreeCAD.
@@ -35,7 +35,7 @@ interference, clearances, wall thickness and printability.
   side; the lid bezel overlaps the panel border to hide the panel edge and
   driver)
 - **Wall:** 2.4 mm (0.95 mm at the rebated skirt shoulder — still ≥ 0.8 mm)
-- **Outer vertical edges** filleted R3.0; **top/bottom rims** chamfered 0.8 mm
+- **Outer vertical edges** filleted R8.0; **top/bottom rims** chamfered 1.6 mm
 
 ## Print settings
 
@@ -91,8 +91,8 @@ short — hence the deliberately long 7 mm beam.)
 |---|---|---|
 | `CLEARANCE` | 0.25 | per-side gap at every part/component interface |
 | `WALL_T` / `FLOOR_T` / `LID_T` | 2.4 / 2.0 / 2.0 | shell thicknesses |
-| `EDGE_FILLET_R` | 3.0 | outer vertical edge fillet |
-| `RIM_CHAMFER` | 0.8 | top/bottom rim chamfer |
+| `EDGE_FILLET_R` | 8.0 | outer vertical edge fillet — sets the pebble silhouette |
+| `RIM_CHAMFER` | 1.6 | top/bottom rim chamfer (**not** a fillet — both edges print on the bed) |
 | `PCB_W` / `PCB_L` / `PCB_T` | 33 / 39 / 1.6 | board envelope |
 | `PANEL_W/L/T`, `ACTIVE` | 31.8 / 37.32 / 1.18, 27 | e-paper panel + active area |
 | `ACTIVE_CTR_X/Y` | 0.55 / 3.0 | active-area (window) offset from PCB center |
@@ -197,16 +197,16 @@ note/
 Building solids (OCCT kernel)...
 
 1. Manifold / watertight / positive volume
-  [PASS] base: positive volume (10.09 cm3)
+  [PASS] base: positive volume (9.68 cm3)
   [PASS] base: watertight mesh
   [PASS] base: consistent winding (oriented)
   [PASS] base: single connected body (1)
-        base: 1790 V, 3620 F, euler -20
-  [PASS] lid: positive volume (3.75 cm3)
+        base: 1763 V, 3566 F, euler -20
+  [PASS] lid: positive volume (3.38 cm3)
   [PASS] lid: watertight mesh
   [PASS] lid: consistent winding (oriented)
   [PASS] lid: single connected body (1)
-        lid: 683 V, 1390 F, euler -12
+        lid: 689 V, 1398 F, euler -10
   [PASS] plunger: positive volume (0.06 cm3)
   [PASS] plunger: watertight mesh
   [PASS] plunger: consistent winding (oriented)
@@ -250,11 +250,11 @@ Building solids (OCCT kernel)...
      bezel ring (Z-)              (no hit)
 
 6. Print-mass estimate (PLA, 20% infill)
-  base     solid 10.09 cm3 -> ~  8.0 g (shell 55% + 20% infill)
-  lid      solid  3.75 cm3 -> ~  3.0 g (shell 55% + 20% infill)
+  base     solid  9.68 cm3 -> ~  7.7 g (shell 55% + 20% infill)
+  lid      solid  3.38 cm3 -> ~  2.7 g (shell 55% + 20% infill)
   plunger  solid  0.06 cm3 -> ~  0.0 g (shell 55% + 20% infill)
   plunger  solid  0.06 cm3 -> ~  0.0 g (shell 55% + 20% infill)
-  TOTAL    ~11.0 g + 2nd plunger ~0.0 g
+  TOTAL    ~10.4 g + 2nd plunger ~0.0 g
 
 ============================================================
 VALIDATION PASSED — all hard checks green.
