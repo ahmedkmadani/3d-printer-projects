@@ -26,7 +26,6 @@ enum class Screen : uint8_t {
   ChooseTag,
   Syncing,
   NoteView,
-  Wifi,
   Pair,
 };
 

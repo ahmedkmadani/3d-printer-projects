@@ -19,7 +19,7 @@ namespace jota {
 // ---- Label tables ------------------------------------------------------
 
 // Five rows is the list's exact capacity: 5*22 + 4*5 = 130 <= CONTENT_H 156.
-const char *const MENU_ITEMS[] = {"NOTES", "TAGS", "SYNC", "SETUP", "GUIDE"};
+const char *const MENU_ITEMS[] = {"NOTES", "TAGS", "SYNC", "PAIR", "GUIDE"};
 const uint8_t     MENU_COUNT   = 5;
 
 const char *const TAG_ITEMS[] = {"WORK", "HOME", "IDEA", "BUY", "LATER"};
@@ -134,8 +134,9 @@ void screenSyncing(Adafruit_GFX &g, const AppModel &m) {
            (unsigned)m.syncTotal);
   statusBar(g, "SYNC", ratio);
 
-  // The bar alone. The ratio already lives in the status slot; repeating it
-  // below, plus three static dots, was four indicators of one quantity.
+  // SYNC means handing notes to the paired phone over BLE — there is no
+  // upload from the device. The bar alone: the ratio already lives in the
+  // status slot.
   const float frac =
       m.syncTotal ? (float)m.syncDone / (float)m.syncTotal : 0.0f;
   progressBar(g, MARGIN, CONTENT_MID - PROGRESS_H / 2, CONTENT_W, PROGRESS_H,
@@ -181,20 +182,6 @@ void screenPair(Adafruit_GFX &g, const AppModel &m) {
   // display face and the same rhythm.
   bigFigure(g, font::display(), CAP_DISPLAY,
             m.pairCode ? m.pairCode : "------", "ENTER ON PHONE");
-}
-
-void screenWifi(Adafruit_GFX &g, const AppModel &m) {
-  clear(g);
-  statusBar(g, "WIFI", m.wifiUp ? "OK" : "--");
-
-  g.setTextColor(INK);
-  if (m.wifiUp && m.ssid) {
-    bigFigure(g, font::figure(), CAP_FIGURE, m.ssid, "CONNECTED");
-  } else {
-    g.setFont(font::reading());
-    textCenteredAt(g, "NO NETWORK", CENTER_X, CONTENT_MID - 14);
-    textCenteredAt(g, "PRESS TO PAIR", CENTER_X, CONTENT_MID + 14);
-  }
 }
 
 void screenOff(Adafruit_GFX &g) {

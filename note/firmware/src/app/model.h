@@ -35,10 +35,11 @@ struct AppModel {
   uint8_t syncDone;
   uint8_t syncTotal;
 
-  // Provisioning / network
+  // Phone link. Jota has no WiFi: the phone pulls notes over BLE and does the
+  // transcription, so there are no credentials and no API key on the device.
   const char *pairCode;  // shown while pairing, nullptr otherwise
-  const char *ssid;      // connected network, nullptr if none
-  bool        wifiUp;
+  bool        paired;    // a phone is bonded
+  uint8_t     pending;   // notes recorded but not yet handed to the phone
 
   // Selection indices
   uint8_t menuSel;

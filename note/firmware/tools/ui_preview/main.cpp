@@ -84,8 +84,8 @@ int main(int argc, char **argv) {
   m.menuSel   = 1;
   m.tagSel    = 3;
   m.pairCode  = "428 913";
-  m.ssid      = "home-5g";
-  m.wifiUp    = true;
+  m.paired    = true;
+  m.pending   = 3;
   // Long enough to exercise wrapping and the max-lines clamp.
   m.note = {12, "14:32",
             "call the dentist about moving the appointment to next week and "
@@ -116,7 +116,6 @@ int main(int argc, char **argv) {
       {"05_saved", screenSaved},          {"06_menu", screenMenu},
       {"07_choose_tag", screenChooseTag}, {"08_syncing", screenSyncing},
       {"09_note_view", screenNoteView},   {"11_pair", screenPair},
-      {"12_wifi", screenWifi},
   };
 
   for (const Item &it : items) {
