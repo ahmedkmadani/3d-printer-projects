@@ -26,6 +26,8 @@ enum class Screen : uint8_t {
   ChooseTag,
   Syncing,
   NoteView,
+  Wifi,
+  Pair,
 };
 
 // Dispatch to the matching screen function.

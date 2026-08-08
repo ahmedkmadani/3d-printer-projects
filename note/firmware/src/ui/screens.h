@@ -24,6 +24,11 @@ void screenChooseTag(Adafruit_GFX &g, const AppModel &m);
 void screenSyncing(Adafruit_GFX &g, const AppModel &m);
 void screenNoteView(Adafruit_GFX &g, const AppModel &m);
 
+// Provisioning. The pairing code lives on the PANEL, not in the phone app —
+// holding the device is what authorises pairing.
+void screenPair(Adafruit_GFX &g, const AppModel &m);
+void screenWifi(Adafruit_GFX &g, const AppModel &m);
+
 // The resting frame. E-paper holds its last image indefinitely, so this is
 // what the object looks like sitting on a shelf — it is part of the product,
 // not a shutdown detail.

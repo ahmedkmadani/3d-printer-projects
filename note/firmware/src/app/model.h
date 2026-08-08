@@ -35,6 +35,11 @@ struct AppModel {
   uint8_t syncDone;
   uint8_t syncTotal;
 
+  // Provisioning / network
+  const char *pairCode;  // shown while pairing, nullptr otherwise
+  const char *ssid;      // connected network, nullptr if none
+  bool        wifiUp;
+
   // Selection indices
   uint8_t menuSel;
   uint8_t tagSel;

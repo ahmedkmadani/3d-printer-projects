@@ -18,8 +18,9 @@ namespace jota {
 
 // ---- Label tables ------------------------------------------------------
 
-const char *const MENU_ITEMS[] = {"NOTES", "TAGS", "SYNC", "GUIDE"};
-const uint8_t     MENU_COUNT   = 4;
+// Five rows is the list's exact capacity: 5*22 + 4*5 = 130 <= CONTENT_H 156.
+const char *const MENU_ITEMS[] = {"NOTES", "TAGS", "SYNC", "SETUP", "GUIDE"};
+const uint8_t     MENU_COUNT   = 5;
 
 const char *const TAG_ITEMS[] = {"WORK", "HOME", "IDEA", "BUY", "LATER"};
 const uint8_t     TAG_COUNT   = 5;
@@ -170,6 +171,29 @@ void screenNoteView(Adafruit_GFX &g, const AppModel &m) {
   } else {
     g.setFont(font::reading());
     textCenteredAt(g, "NO TRANSCRIPT", CENTER_X, CONTENT_MID + 12);
+  }
+}
+
+void screenPair(Adafruit_GFX &g, const AppModel &m) {
+  clear(g);
+  statusBar(g, "PAIR", "BLE");
+  // Same big-figure pattern as SAVED — a code is a figure, so it gets the
+  // display face and the same rhythm.
+  bigFigure(g, font::display(), CAP_DISPLAY,
+            m.pairCode ? m.pairCode : "------", "ENTER ON PHONE");
+}
+
+void screenWifi(Adafruit_GFX &g, const AppModel &m) {
+  clear(g);
+  statusBar(g, "WIFI", m.wifiUp ? "OK" : "--");
+
+  g.setTextColor(INK);
+  if (m.wifiUp && m.ssid) {
+    bigFigure(g, font::figure(), CAP_FIGURE, m.ssid, "CONNECTED");
+  } else {
+    g.setFont(font::reading());
+    textCenteredAt(g, "NO NETWORK", CENTER_X, CONTENT_MID - 14);
+    textCenteredAt(g, "PRESS TO PAIR", CENTER_X, CONTENT_MID + 14);
   }
 }
 

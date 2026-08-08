@@ -22,6 +22,13 @@ static const uint32_t GUIDE_MS     = 4000;
 static const uint32_t SAVED_MS     = 1800;
 static const uint32_t SYNC_STEP_MS = 900;
 
+// PHASE 2 STUB: stands in for the BLE provisioning handshake so the flow can
+// be walked on hardware before the radio exists. The real code comes from the
+// provisioning manager, and this timeout becomes its success callback.
+static const uint32_t PAIR_SIM_MS   = 6000;
+static const char    *SIM_PAIR_CODE = "428 913";
+static const char    *SIM_SSID      = "home-5g";
+
 // Element regions, so a tick pushes only the pixels that actually change.
 static const Rect kTimerRect = {TIMER_X, TIMER_Y, TIMER_W, TIMER_H};
 static const Rect kListRect  = {MARGIN, CONTENT_TOP, CONTENT_W, CONTENT_H};
@@ -41,6 +48,8 @@ void renderScreen(Adafruit_GFX &g, Screen s, const AppModel &m) {
     case Screen::ChooseTag: screenChooseTag(g, m); break;
     case Screen::Syncing:   screenSyncing(g, m); break;
     case Screen::NoteView:  screenNoteView(g, m); break;
+    case Screen::Wifi:      screenWifi(g, m); break;
+    case Screen::Pair:      screenPair(g, m); break;
   }
 }
 
@@ -131,6 +140,7 @@ void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
           case 0: go(Screen::NoteView, nowMs); break;
           case 1: go(Screen::ChooseTag, nowMs); break;
           case 2: m.syncDone = 0; go(Screen::Syncing, nowMs); break;
+          case 3: go(Screen::Wifi, nowMs); break;
           default: go(Screen::Guide, nowMs); break;
         }
       } else if (e == BtnEvent::BootLong) {
@@ -156,6 +166,22 @@ void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
     case Screen::NoteView:
       if (e == BtnEvent::BootShort || e == BtnEvent::BootLong) {
         go(Screen::Menu, nowMs);
+      }
+      break;
+
+    case Screen::Wifi:
+      if (e == BtnEvent::BootShort) {
+        m.pairCode = SIM_PAIR_CODE;   // real: from the provisioning manager
+        go(Screen::Pair, nowMs);
+      } else if (e == BtnEvent::BootLong) {
+        go(Screen::Menu, nowMs);
+      }
+      break;
+
+    case Screen::Pair:
+      if (e == BtnEvent::BootLong) {   // cancel pairing
+        m.pairCode = nullptr;
+        go(Screen::Wifi, nowMs);
       }
       break;
   }
@@ -195,6 +221,15 @@ void Nav::tick(uint32_t nowMs, AppModel &m) {
         } else {
           go(Screen::Menu, nowMs);
         }
+      }
+      break;
+
+    case Screen::Pair:
+      if (nowMs - enteredMs_ >= PAIR_SIM_MS) {
+        m.pairCode = nullptr;
+        m.ssid     = SIM_SSID;
+        m.wifiUp   = true;
+        go(Screen::Wifi, nowMs);
       }
       break;
 
