@@ -2,27 +2,29 @@
 //  Jota — device controller
 //
 //  Everything about the link: what is in range, what is paired, what a sync is
-//  doing right now. Screens read this; nothing else in the app talks to
-//  flutter_blue_plus directly.
+//  doing right now. Screens read this; nothing else in the app talks to a
+//  scanner or a sync engine directly.
+//
+//  Depends only on the interfaces in lib/ble/, so the same controller drives the
+//  real radio and the simulated device used by the web preview.
 // ============================================================================
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../ble/background_sync.dart';
+import '../ble/device_scanner.dart';
 import '../ble/jota_protocol.dart';
-import '../ble/jota_scanner.dart';
-import '../ble/sync_engine.dart';
+import '../ble/sync_service.dart';
 import '../data/settings_store.dart';
 import 'notes_controller.dart';
 
 class DeviceController extends ChangeNotifier {
   DeviceController({
-    required JotaScanner scanner,
-    required SyncEngine sync,
+    required DeviceScanner scanner,
+    required SyncService sync,
     required SettingsStore settings,
-    required BackgroundSync background,
+    required BackgroundSyncController background,
     required NotesController notes,
   })  : _scanner = scanner,
         _sync = sync,
@@ -38,7 +40,8 @@ class DeviceController extends ChangeNotifier {
       }
     });
 
-    _adapterSub = JotaScanner.adapterState.listen((BluetoothAdapterState s) {
+    _adapter = _scanner.adapterNow;
+    _adapterSub = _scanner.adapterState.listen((AdapterStatus s) {
       _adapter = s;
       notifyListeners();
     });
@@ -50,21 +53,21 @@ class DeviceController extends ChangeNotifier {
     });
   }
 
-  final JotaScanner _scanner;
-  final SyncEngine _sync;
+  final DeviceScanner _scanner;
+  final SyncService _sync;
   final SettingsStore _settings;
-  final BackgroundSync _background;
+  final BackgroundSyncController _background;
   final NotesController _notes;
 
   StreamSubscription<SyncProgress>? _progressSub;
-  StreamSubscription<BluetoothAdapterState>? _adapterSub;
+  StreamSubscription<AdapterStatus>? _adapterSub;
   StreamSubscription<List<JotaAdvertisement>>? _scanSub;
 
   // ---- state ---------------------------------------------------------------
 
-  BluetoothAdapterState _adapter = BluetoothAdapterState.unknown;
-  BluetoothAdapterState get adapter => _adapter;
-  bool get bluetoothReady => _adapter == BluetoothAdapterState.on;
+  AdapterStatus _adapter = AdapterStatus.unavailable;
+  AdapterStatus get adapter => _adapter;
+  bool get bluetoothReady => _adapter.isReady;
 
   List<JotaAdvertisement> _inRange = <JotaAdvertisement>[];
   List<JotaAdvertisement> get inRange => _inRange;
@@ -80,8 +83,8 @@ class DeviceController extends ChangeNotifier {
 
   BackgroundMode get backgroundMode => _background.mode;
 
-  /// The paired device's advertisement, if it is in range right now. This is
-  /// the object that answers "how many notes are waiting" WITHOUT connecting.
+  /// The paired device's advertisement, if it is in range right now. This is the
+  /// object that answers "how many notes are waiting" WITHOUT connecting.
   JotaAdvertisement? get pairedAdvertisement {
     final String? id = pairedId;
     if (id == null) return null;
@@ -91,16 +94,15 @@ class DeviceController extends ChangeNotifier {
     return null;
   }
 
-  /// Notes waiting on the device, straight from the advertisement. Null when
-  /// the device is not in range — which is different from zero, and the UI
-  /// says so.
+  /// Notes waiting on the device, straight from the advertisement. Null when the
+  /// device is not in range — which is different from zero, and the UI says so.
   int? get pendingOnDevice => pairedAdvertisement?.pending;
 
   String? _lastError;
   String? get lastError => _lastError;
 
-  /// Set while a sync is blocked waiting for the user to type the code from
-  /// the e-paper.
+  /// Set while a sync is blocked waiting for the user to type the code from the
+  /// e-paper.
   Completer<String?>? _pairCodeRequest;
   bool get needsPairCode => _pairCodeRequest != null;
 
@@ -167,7 +169,7 @@ class DeviceController extends ChangeNotifier {
     notifyListeners();
 
     final SyncResult result = await _sync.run(
-      JotaScanner.deviceFor(id),
+      id,
       onPairCodeNeeded: _requestPairCode,
     );
 
@@ -199,13 +201,13 @@ class DeviceController extends ChangeNotifier {
 
   // ---- tags ----------------------------------------------------------------
 
-  /// Read the device's tag list. Returns null if no device is reachable, so the
-  /// editor can fall back to what is stored locally.
+  /// Read the device's tag list. Null if no device is reachable, so the editor can
+  /// fall back to what is stored locally.
   Future<List<String>?> readDeviceTags() async {
     final String? id = pairedId;
     if (id == null) return null;
     try {
-      return await _sync.readTags(JotaScanner.deviceFor(id));
+      return await _sync.readTags(id);
     } on Exception catch (e) {
       _lastError = e.toString();
       notifyListeners();
@@ -217,7 +219,7 @@ class DeviceController extends ChangeNotifier {
     final String? id = pairedId;
     if (id == null) return false;
     try {
-      await _sync.writeTags(JotaScanner.deviceFor(id), tags);
+      await _sync.writeTags(id, tags);
       return true;
     } on Exception catch (e) {
       _lastError = e.toString();

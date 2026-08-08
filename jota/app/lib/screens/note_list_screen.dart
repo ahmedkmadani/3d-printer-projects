@@ -73,6 +73,7 @@ class _NoteListScreenState extends State<NoteListScreen>
       showSignalDot: (device.pendingOnDevice ?? 0) > 0,
       padded: false,
       trailing: _HeaderActions(
+        archived: visible.length,
         pending: device.pendingOnDevice,
         syncing: device.isSyncing,
       ),
@@ -125,12 +126,23 @@ class _NoteListScreenState extends State<NoteListScreen>
   }
 }
 
-/// The device's status slot holds one figure. When notes are waiting on the
-/// device, that figure is the more urgent one — so it takes the slot and the
-/// archive count moves to the label.
+/// STATUS RIGHT SLOT RULE: exactly one figure, and it is the most urgent one
+/// this screen has.
+///
+///   syncing            SYNC   — something is happening right now
+///   notes waiting      003    — at full ink, because it is a call to action
+///   otherwise          008    — how many notes are in the archive
+///
+/// Never two figures, never a figure plus an icon. The device's status line has
+/// room for one thing and so does this one.
 class _HeaderActions extends StatelessWidget {
-  const _HeaderActions({required this.pending, required this.syncing});
+  const _HeaderActions({
+    required this.archived,
+    required this.pending,
+    required this.syncing,
+  });
 
+  final int archived;
   final int? pending;
   final bool syncing;
 
@@ -145,7 +157,10 @@ class _HeaderActions extends StatelessWidget {
     if (pending != null && pending! > 0) {
       return Text(fmtCount(pending!), style: t.reading.copyWith(color: c.ink));
     }
-    return const SizedBox.shrink();
+    return Text(
+      fmtCount(archived),
+      style: t.reading.copyWith(color: c.inkMuted),
+    );
   }
 }
 

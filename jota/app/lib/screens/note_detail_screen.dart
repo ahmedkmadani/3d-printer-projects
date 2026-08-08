@@ -70,7 +70,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
 
           PlaybackBar(
             key: ValueKey<String>('${_note.deviceId}/${_note.noteId}'),
-            audio: services.audio,
+            createPlayer: services.newPlayer,
             deviceId: _note.deviceId,
             noteId: _note.noteId,
             durationSeconds: _note.secs,

@@ -1,65 +1,24 @@
 // ============================================================================
-//  Jota — settings
-//
-//  Two stores, split by sensitivity:
-//
-//    flutter_secure_storage  the OpenAI API key. Keychain on iOS, EncryptedShared
-//                            Preferences on Android. Never anywhere else, never
-//                            logged, never in a crash report.
-//    shared_preferences      everything else — which device we paired with,
-//                            whether background sync is on, the model name.
+//  Jota — settings interface
 //
 //  There is no account and no server, so this is the entire configuration
-//  surface of the product.
+//  surface of the product: one secret, one paired device, three behaviours.
+//
+//  The real implementation (PrefsSettingsStore) splits by sensitivity —
+//  flutter_secure_storage for the API key, shared_preferences for everything
+//  else. Nothing outside that file needs to know which is which.
 // ============================================================================
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-class SettingsStore {
-  SettingsStore(this._prefs, this._secure);
-
-  final SharedPreferences _prefs;
-  final FlutterSecureStorage _secure;
-
-  static const String _kApiKey = 'openai_api_key';
-  static const String _kDeviceId = 'device_id';
-  static const String _kDeviceName = 'device_name';
-  static const String _kBackgroundSync = 'background_sync';
-  static const String _kAutoTranscribe = 'auto_transcribe';
-  static const String _kModel = 'whisper_model';
-  static const String _kLanguage = 'whisper_language';
-  static const String _kBackend = 'transcribe_backend';
-
-  static Future<SettingsStore> open() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    const FlutterSecureStorage secure = FlutterSecureStorage(
-      aOptions: AndroidOptions(encryptedSharedPreferences: true),
-      iOptions: IOSOptions(
-        accessibility: KeychainAccessibility.first_unlock,
-      ),
-    );
-    return SettingsStore(prefs, secure);
-  }
-
+abstract class SettingsStore {
   // ---- API key ------------------------------------------------------------
+  // Async because on the real implementation it is a Keychain read.
 
-  Future<String?> apiKey() => _secure.read(key: _kApiKey);
+  Future<String?> apiKey();
 
-  Future<void> setApiKey(String? key) async {
-    final String? k = key?.trim();
-    if (k == null || k.isEmpty) {
-      await _secure.delete(key: _kApiKey);
-    } else {
-      await _secure.write(key: _kApiKey, value: k);
-    }
-  }
+  Future<void> setApiKey(String? key);
 
-  Future<bool> hasApiKey() async {
-    final String? k = await apiKey();
-    return k != null && k.isNotEmpty;
-  }
+  Future<bool> hasApiKey();
 
-  /// `sk-...abcd`. Enough to tell two keys apart, not enough to use one.
+  /// `sk-…abcd`. Enough to tell two keys apart, not enough to use one.
   static String maskKey(String key) {
     if (key.length <= 8) return '••••';
     return '${key.substring(0, 3)}…${key.substring(key.length - 4)}';
@@ -69,50 +28,33 @@ class SettingsStore {
 
   /// The remote id of the Jota we are paired with. Remembered so the app can
   /// reconnect without a scan, and so background sync knows what to look for.
-  String? get deviceId => _prefs.getString(_kDeviceId);
-  String? get deviceName => _prefs.getString(_kDeviceName);
+  String? get deviceId;
 
-  Future<void> setDevice(String? id, {String? name}) async {
-    if (id == null) {
-      await _prefs.remove(_kDeviceId);
-      await _prefs.remove(_kDeviceName);
-      return;
-    }
-    await _prefs.setString(_kDeviceId, id);
-    if (name != null) await _prefs.setString(_kDeviceName, name);
-  }
+  String? get deviceName;
 
-  bool get hasDevice => (deviceId ?? '').isNotEmpty;
+  Future<void> setDevice(String? id, {String? name});
+
+  bool get hasDevice;
 
   // ---- behaviour ----------------------------------------------------------
 
-  bool get backgroundSync => _prefs.getBool(_kBackgroundSync) ?? false;
-  Future<void> setBackgroundSync(bool v) => _prefs.setBool(_kBackgroundSync, v);
+  bool get backgroundSync;
+  Future<void> setBackgroundSync(bool v);
 
-  /// Transcribe automatically after a note arrives. On by default — the whole
-  /// premise is that you speak and later you read.
-  bool get autoTranscribe => _prefs.getBool(_kAutoTranscribe) ?? true;
-  Future<void> setAutoTranscribe(bool v) => _prefs.setBool(_kAutoTranscribe, v);
+  /// Transcribe automatically once a note arrives. On by default — the whole
+  /// premise is that you speak now and read later.
+  bool get autoTranscribe;
+  Future<void> setAutoTranscribe(bool v);
 
-  String get model => _prefs.getString(_kModel) ?? 'whisper-1';
-  Future<void> setModel(String v) => _prefs.setString(_kModel, v);
+  String get model;
+  Future<void> setModel(String v);
 
-  /// ISO-639-1, or null to let Whisper detect. A hint measurably improves
+  /// ISO-639-1, or null to let the backend detect. A hint measurably improves
   /// accuracy on short clips, which is most of what this device records.
-  String? get language {
-    final String? v = _prefs.getString(_kLanguage);
-    return (v == null || v.isEmpty) ? null : v;
-  }
-
-  Future<void> setLanguage(String? v) async {
-    if (v == null || v.isEmpty) {
-      await _prefs.remove(_kLanguage);
-    } else {
-      await _prefs.setString(_kLanguage, v);
-    }
-  }
+  String? get language;
+  Future<void> setLanguage(String? v);
 
   /// Which Transcriber implementation to use. See lib/transcribe/.
-  String get backend => _prefs.getString(_kBackend) ?? 'whisper';
-  Future<void> setBackend(String v) => _prefs.setString(_kBackend, v);
+  String get backend;
+  Future<void> setBackend(String v);
 }

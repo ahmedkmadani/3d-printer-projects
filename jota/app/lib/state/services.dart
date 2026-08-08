@@ -1,31 +1,43 @@
 // ============================================================================
 //  Jota — service container
 //
-//  Everything long-lived, built once in main() and handed down with provider.
-//  There is no dependency-injection framework here on purpose: the object graph
-//  is a dozen nodes deep and completely static, so a constructor and a
-//  `Provider.value` say it more clearly than annotations would.
+//  Everything long-lived, built once at startup and handed down with provider.
+//  There is no dependency-injection framework here on purpose: the object graph is
+//  a dozen nodes and completely static, so a constructor says it more clearly
+//  than annotations would.
+//
+//  Every field is an INTERFACE. That is what lets `main.dart` assemble the real
+//  thing over BLE and sqflite while `main_preview.dart` assembles fakes and runs
+//  the identical screens in a browser.
 // ============================================================================
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../audio/decoded_note_player.dart';
+import '../audio/note_player.dart';
 import '../ble/background_sync.dart';
+import '../ble/device_scanner.dart';
+import '../ble/foreground_background_sync.dart';
 import '../ble/jota_scanner.dart';
 import '../ble/sync_engine.dart';
+import '../ble/sync_service.dart';
 import '../data/audio_store.dart';
 import '../data/database.dart';
+import '../data/file_audio_store.dart';
+import '../data/file_partial_store.dart';
 import '../data/note_repository.dart';
 import '../data/partial_store.dart';
+import '../data/prefs_settings_store.dart';
 import '../data/settings_store.dart';
+import '../data/sqflite_note_repository.dart';
 import '../transcribe/transcriber.dart';
 import '../transcribe/transcription_queue.dart';
 import '../transcribe/whisper_transcriber.dart';
 
 class Services {
   Services({
-    required this.db,
     required this.settings,
     required this.notes,
     required this.audio,
@@ -34,18 +46,27 @@ class Services {
     required this.sync,
     required this.background,
     required this.transcription,
+    required this.newPlayer,
+    this.isPreview = false,
   });
 
-  final Database db;
   final SettingsStore settings;
   final NoteRepository notes;
   final AudioStore audio;
   final PartialStore partials;
-  final JotaScanner scanner;
-  final SyncEngine sync;
-  final BackgroundSync background;
+  final DeviceScanner scanner;
+  final SyncService sync;
+  final BackgroundSyncController background;
   final TranscriptionQueue transcription;
 
+  /// A factory, because the playback bar owns its player's lifetime.
+  final NotePlayer Function() newPlayer;
+
+  /// True when the graph is made of fakes. Screens use it only to add the one
+  /// banner that says so — no other behaviour branches on it.
+  final bool isPreview;
+
+  /// The real graph: BLE, sqflite, the filesystem, the Keychain.
   static Future<Services> boot() async {
     // iOS state restoration must be requested before any other BLE call.
     await JotaScanner.configureForBackground();
@@ -54,13 +75,16 @@ class Services {
     final Directory cache = await getTemporaryDirectory();
 
     final Database db = await JotaDatabase.open();
-    final SettingsStore settings = await SettingsStore.open();
-    final AudioStore audio =
-        await AudioStore.open(appSupport: support, cacheDir: cache);
-    final PartialStore partials = await PartialStore.open(support);
-    final NoteRepository notes = NoteRepository(db, audio);
+    final SettingsStore settings = await PrefsSettingsStore.open();
+    final AudioStore audio = await FileAudioStore.open(
+      appSupport: support,
+      cacheDir: cache,
+    );
+    final PartialStore partials = await FilePartialStore.open(support);
+    final NoteRepository notes = SqfliteNoteRepository(db, audio);
 
-    final BackgroundSync background = BackgroundSync()..configure();
+    final BackgroundSyncController background =
+        ForegroundServiceBackgroundSync()..configure();
 
     // The transcriber is rebuilt per use so a key or model changed in settings
     // takes effect on the very next note, with no restart and no stale client.
@@ -73,7 +97,6 @@ class Services {
     }
 
     return Services(
-      db: db,
       settings: settings,
       notes: notes,
       audio: audio,
@@ -87,6 +110,7 @@ class Services {
         settings: settings,
         transcriber: buildTranscriber,
       ),
+      newPlayer: () => DecodedNotePlayer(audio),
     );
   }
 
@@ -95,6 +119,6 @@ class Services {
     await sync.dispose();
     await transcription.dispose();
     await background.dispose();
-    await db.close();
+    await notes.close();
   }
 }

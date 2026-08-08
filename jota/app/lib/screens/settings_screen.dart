@@ -208,7 +208,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // The honest description, from the same source the README
                 // quotes. No "syncs every 10 minutes" anywhere.
                 Text(
-                  BackgroundSync.explain(device.backgroundMode),
+                  BackgroundSyncController.explain(device.backgroundMode),
                   style: t.prose.copyWith(color: c.inkMuted, fontSize: 13),
                 ),
 

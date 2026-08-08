@@ -12,9 +12,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../ble/background_sync.dart';
 import '../ble/jota_protocol.dart';
-import '../ble/sync_engine.dart';
+import '../ble/sync_service.dart';
 import '../design/format.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
@@ -189,30 +188,10 @@ class _DeviceFacts extends StatelessWidget {
           value: ad == null ? '---' : fmtCount(ad.pending),
           emphasis: (ad?.pending ?? 0) > 0,
         ),
-        JotaKeyValue(
-          name: 'Bluetooth',
-          value:
-              device.bluetoothReady ? 'ON' : device.adapter.name.toUpperCase(),
-        ),
-        JotaKeyValue(
-          name: 'Background',
-          value: _modeLabel(device.backgroundMode),
-        ),
+        JotaKeyValue(name: 'Bluetooth', value: device.adapter.label),
+        JotaKeyValue(name: 'Background', value: device.backgroundMode.label),
       ],
     );
-  }
-
-  static String _modeLabel(BackgroundMode m) {
-    switch (m) {
-      case BackgroundMode.off:
-        return 'OFF';
-      case BackgroundMode.foregroundService:
-        return 'SERVICE';
-      case BackgroundMode.systemWake:
-        return 'SYSTEM';
-      case BackgroundMode.denied:
-        return 'DENIED';
-    }
   }
 }
 
