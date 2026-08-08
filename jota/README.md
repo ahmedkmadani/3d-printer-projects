@@ -178,20 +178,20 @@ there, one level up from this project):
 ```bash
 python3 -m venv .venv && source .venv/bin/activate   # once, at workspace root
 pip install -r requirements.txt
-python note/src/params.py     # parameter sanity + arithmetic
-python note/src/validate.py   # full validation suite (must pass)
-python note/src/export.py     # -> note/models/stl/*.stl + note/models/step/*.step
-python note/src/render.py     # -> note/renders/*.png
+python jota/src/params.py     # parameter sanity + arithmetic
+python jota/src/validate.py   # full validation suite (must pass)
+python jota/src/export.py     # -> jota/models/stl/*.stl + jota/models/step/*.step
+python jota/src/render.py     # -> jota/renders/*.png
 ```
 
 ## Layout
 
-This project (`note/`) lives inside a workspace that can hold several 3D-print
+This project (`jota/`) lives inside a workspace that can hold several 3D-print
 projects. General-purpose files (`.venv/`, `requirements.txt`, `.gitignore`)
 stay at the workspace root and are shared; everything below is this project's:
 
 ```
-note/
+jota/
 ├── src/          all Python (params, components, base, lid, validate, export, render)
 ├── models/stl/   print-oriented base.stl, lid.stl, plunger.stl
 ├── models/step/  base.step, lid.step, plunger.step  (FreeCAD)

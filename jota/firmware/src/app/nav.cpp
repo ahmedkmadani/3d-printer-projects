@@ -78,7 +78,6 @@ static void commitNote(AppModel &m) {
   m.note.secs = m.recSecs;
   m.note.text = nullptr;  // untranscribed until phase 2
   m.noteIndex = m.noteCount;
-  m.pending++;   // this is what the BLE advertisement broadcasts
 }
 
 void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
@@ -206,7 +205,6 @@ void Nav::tick(uint32_t nowMs, AppModel &m) {
         lastTickMs_ = nowMs;
         if (m.syncDone < m.syncTotal) {
           m.syncDone++;
-          if (m.pending) m.pending--;
           // Spans the status ratio as well as the bar — both change together.
           markDirtyRegion(kSyncRect);
         } else {

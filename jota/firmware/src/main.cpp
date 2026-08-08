@@ -16,7 +16,9 @@
 
 #include "app/model.h"
 #include "app/nav.h"
+#include "app/notes.h"
 #include "hal/buttons.h"
+#include "link/ble.h"
 #include "ui/screens.h"
 #include "ui/theme.h"
 
@@ -38,9 +40,11 @@ GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(
 
 using namespace jota;
 
-static Nav      nav;
-static Buttons  buttons;
-static AppModel model;
+static Nav       nav;
+static Buttons   buttons;
+static AppModel  model;
+static NoteStore notes;
+static Link      bleLink;   // not `link`: collides with POSIX link()
 
 // Full refresh clears e-paper ghosting; partial is fast but accumulates it.
 static uint16_t       partialsSinceFull = 0;
@@ -135,6 +139,14 @@ void setup() {
   updateClock(millis());
   model.clock = clockBuf;
 
+  // Dummy notes live in flash — no SD card and no microphone needed yet, so
+  // the phone app can be built against a real protocol today.
+  notes.begin();
+  model.pending = notes.pending();
+
+  bleLink.begin(notes, model);
+  Serial.printf("[jota] BLE up, %u notes pending\n", (unsigned)notes.pending());
+
   nav.begin(millis());
   paint();
 
@@ -148,6 +160,26 @@ void loop() {
   if (e != BtnEvent::None) nav.handle(e, model, now);
   nav.tick(now, model);
   updateClock(now);
+
+  // The pairing code the phone must present is whatever the panel is showing.
+  bleLink.setPairCode(model.pairCode);
+
+  // `pending` is what the advertisement broadcasts, so it must reflect the
+  // real note store rather than the recording simulation.
+  static uint8_t lastPending = 0xFF;
+  static Screen  lastScreen  = Screen::Splash;
+  model.pending = notes.pending();
+
+  // Advertise fast for a minute whenever there is a fresh reason for the
+  // phone to notice: a note appeared, or the user asked for a sync.
+  if (model.pending != lastPending && model.pending > 0) bleLink.nudge(now);
+  if (nav.screen() == Screen::Syncing && lastScreen != Screen::Syncing) {
+    bleLink.nudge(now);
+  }
+  lastPending = model.pending;
+  lastScreen  = nav.screen();
+
+  bleLink.loop(now);
 
   if (nav.powerOff()) {
     Serial.println("[jota] powering off");

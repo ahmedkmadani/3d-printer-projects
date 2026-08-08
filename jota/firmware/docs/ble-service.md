@@ -25,9 +25,10 @@ recording or after `SYNC` is pressed, then back to slow).
 |---|---|
 | Local name | `JOTA` |
 | Service UUID | `4a6f7461-1e5f-4b2a-9c33-000000000000` |
-| Manufacturer data | 2 bytes: `[pending_count, flags]` |
+| Manufacturer data | 4 bytes: `FF FF <pending> <flags>` |
 
-`flags` bit 0 = paired. The phone can therefore see **how many notes are
+`FF FF` is the "no company" prefix BLE requires; the two bytes after it are
+ours. `flags` bit 0 = paired. The phone can therefore see **how many notes are
 waiting without connecting** — if it is zero, the app never wakes and neither
 side spends battery.
 
