@@ -1,0 +1,106 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ====================================================================
+         Bluetooth — Android 12 (API 31) and later
+         ====================================================================
+         BLUETOOTH_SCAN carries `neverForLocation`, which is the whole point:
+         Jota is a device you own and put on your desk, and the app has no
+         business asking for the user's location to talk to it. Declaring it
+         this way means Android does NOT require ACCESS_FINE_LOCATION on 12+.
+         -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- ====================================================================
+         Bluetooth — Android 11 (API 30) and earlier
+         ====================================================================
+         The legacy permissions, capped so they are not requested on newer
+         releases. On these versions the platform genuinely does tie BLE
+         scanning to location, so FINE_LOCATION is unavoidable — but only up
+         to API 30.
+         -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="30" />
+
+    <!-- The app is useless without BLE, but `required="false"` lets it install
+         on a device without it and fail with an explanation rather than being
+         invisible in the store. -->
+    <uses-feature android:name="android.hardware.bluetooth_le"
+        android:required="false" />
+
+    <!-- ====================================================================
+         Background sync
+         ====================================================================
+         Jota cannot contact the phone; it can only advertise. To notice that
+         advertisement while the app is not on screen, the process has to stay
+         alive, and on Android the only sanctioned way to do that is a
+         foreground service with a visible notification.
+
+         connectedDevice is the correct type: this service exists to talk to a
+         Bluetooth peripheral the user owns. See lib/ble/background_sync.dart.
+         -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Android 13+: a foreground service needs a postable notification. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Keeps the CPU awake for the duration of a transfer. A minute of audio
+         is ~16 s on the wire and a suspended CPU mid-transfer just means
+         resuming later. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Transcription uploads to Whisper. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:label="Jota"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!-- flutter_foreground_task's service, declared with the same type as
+             the permission above. Android 14+ rejects a service whose declared
+             type does not match its permission. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="connectedDevice"
+            android:exported="false"
+            tools:replace="android:foregroundServiceType" />
+
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+</manifest>

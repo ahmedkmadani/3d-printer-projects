@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Jota</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>jota</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+
+	<!-- ================================================================
+	     Bluetooth
+	     ================================================================
+	     Shown in the system permission prompt, so it says what the app
+	     does with the radio rather than "this app would like to use
+	     Bluetooth". NSBluetoothPeripheralUsageDescription is the iOS 12
+	     spelling and is kept for older deployment targets. -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Jota uses Bluetooth to collect the voice notes stored on your device.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Jota uses Bluetooth to collect the voice notes stored on your device.</string>
+
+	<!-- ================================================================
+	     Background BLE
+	     ================================================================
+	     `bluetooth-central` is what lets a scan keep being delivered after
+	     the app leaves the foreground, and what allows iOS to relaunch the
+	     app when Jota's service UUID is seen.
+
+	     Two conditions, both handled in code:
+	       * the scan MUST name an explicit service UUID — an unfiltered
+	         scan returns nothing in the background (see JotaScanner.start);
+	       * state restoration MUST be opted into before any other
+	         CoreBluetooth call (see JotaScanner.configureForBackground,
+	         called first thing in Services.boot).
+
+	     There is no background *timer* here on purpose. iOS suspends
+	     timers when the app is backgrounded; wake-ups happen when the
+	     system sees the advertisement, on its schedule. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+	</array>
+
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+</dict>
+</plist>

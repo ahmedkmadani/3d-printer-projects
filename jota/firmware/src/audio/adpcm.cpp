@@ -65,12 +65,35 @@ static uint8_t encodeSample(AdpcmState &s, int16_t sample) {
   return code;
 }
 
+// Pick a starting step index that already suits this block's signal level.
+//
+// Starting every block at index 0 (step 7, the smallest) makes the predictor
+// climb from nothing 32 times a second, and the climb is audible as a chirp
+// at each block boundary. Since the header carries the index, choosing a
+// better one costs nothing on the wire and needs no decoder change.
+static int8_t pickStartIndex(const int16_t *pcm) {
+  const size_t look = 32;
+  int32_t      acc  = 0;
+  for (size_t i = 1; i < look && i < ADPCM_BLOCK_SAMPLES; ++i) {
+    int32_t d = (int32_t)pcm[i] - pcm[i - 1];
+    acc += (d < 0) ? -d : d;
+  }
+  const int32_t mean = acc / (int32_t)(look - 1);
+
+  int8_t best = 0;
+  for (int8_t i = 0; i < 89; ++i) {
+    if (kStepTable[i] > mean) break;
+    best = i;
+  }
+  return best;
+}
+
 void adpcmEncodeBlock(const int16_t *pcm, uint8_t *out) {
   AdpcmState s;
   // The block header is the state a decoder needs to start here cold — which
   // is what makes resume-from-offset possible.
   s.predictor = pcm[0];
-  s.index     = 0;
+  s.index     = pickStartIndex(pcm);
 
   out[0] = (uint8_t)(s.predictor & 0xFF);
   out[1] = (uint8_t)((s.predictor >> 8) & 0xFF);

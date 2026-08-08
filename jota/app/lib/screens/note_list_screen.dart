@@ -1,0 +1,354 @@
+// ============================================================================
+//  Jota — note list
+//
+//  Home. Mirrors the device's MENU/NOTES screens: a status line with the count
+//  in the right slot, a hairline, and rows. The device's own list is stadiums
+//  because it has five items and no scrolling; a phone list of a hundred notes
+//  is hairline-separated rows instead — a hundred stadiums would be noise.
+//
+//  Each row is the same three facts the device shows: the id, the duration, and
+//  what was said. Id and duration in mono because they are figures; the
+//  transcript in sans because it is prose. That split is the product.
+// ============================================================================
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../data/note.dart';
+import '../design/format.dart';
+import '../design/theme.dart';
+import '../design/widgets.dart';
+import '../state/device_controller.dart';
+import '../state/notes_controller.dart';
+import 'note_detail_screen.dart';
+import 'settings_screen.dart';
+import 'sync_screen.dart';
+import 'tag_editor_screen.dart';
+
+class NoteListScreen extends StatefulWidget {
+  const NoteListScreen({super.key});
+
+  @override
+  State<NoteListScreen> createState() => _NoteListScreenState();
+}
+
+class _NoteListScreenState extends State<NoteListScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // A scan on open is what makes "put it on the desk and it syncs" true
+      // while the app is in the foreground.
+      context.read<DeviceController>().startScan();
+      context.read<NotesController>().drainTranscriptions();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<DeviceController>().startScan();
+      context.read<NotesController>().drainTranscriptions();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final NotesController notes = context.watch<NotesController>();
+    final DeviceController device = context.watch<DeviceController>();
+    final List<Note> visible = notes.visible;
+
+    // STATUS RIGHT SLOT RULE: the one defining figure. Here it is how many
+    // notes are in the archive.
+    return JotaScreen(
+      label: 'NOTES',
+      value: fmtCount(visible.length),
+      showSignalDot: (device.pendingOnDevice ?? 0) > 0,
+      padded: false,
+      trailing: _HeaderActions(
+        pending: device.pendingOnDevice,
+        syncing: device.isSyncing,
+      ),
+      footer: const _FooterControls(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          if (notes.tagsInUse.isNotEmpty)
+            _TagFilterStrip(
+              tags: notes.tagsInUse,
+              selected: notes.tagFilter,
+              onSelect: notes.setTagFilter,
+            ),
+          Expanded(
+            child: notes.loading
+                ? const SizedBox.shrink()
+                : visible.isEmpty
+                    ? _EmptyArchive(hasDevice: device.hasPairedDevice)
+                    : RefreshIndicator(
+                        color: context.ink.ink,
+                        backgroundColor: context.ink.bg,
+                        onRefresh: () => device.syncNow().then((_) {}),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.only(bottom: JotaGrid.gapL),
+                          itemCount: visible.length,
+                          separatorBuilder: (_, __) => const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: JotaGrid.margin,
+                            ),
+                            child: JotaRule(),
+                          ),
+                          itemBuilder: (BuildContext context, int i) {
+                            return _NoteRow(
+                              note: visible[i],
+                              transcribing: notes.isTranscribing(visible[i]),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      NoteDetailScreen(note: visible[i]),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The device's status slot holds one figure. When notes are waiting on the
+/// device, that figure is the more urgent one — so it takes the slot and the
+/// archive count moves to the label.
+class _HeaderActions extends StatelessWidget {
+  const _HeaderActions({required this.pending, required this.syncing});
+
+  final int? pending;
+  final bool syncing;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+
+    if (syncing) {
+      return Text('SYNC', style: t.reading.copyWith(color: c.inkMuted));
+    }
+    if (pending != null && pending! > 0) {
+      return Text(fmtCount(pending!), style: t.reading.copyWith(color: c.ink));
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+class _TagFilterStrip extends StatelessWidget {
+  const _TagFilterStrip({
+    required this.tags,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<String> tags;
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: JotaRows.heightCompact + JotaGrid.gapM * 2,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(
+          horizontal: JotaGrid.margin,
+          vertical: JotaGrid.gapM,
+        ),
+        children: <Widget>[
+          _FilterPill(
+            label: 'ALL',
+            selected: selected == null,
+            onTap: () => onSelect(null),
+          ),
+          for (final String tag in tags) ...<Widget>[
+            const SizedBox(width: JotaRows.gap),
+            _FilterPill(
+              label: tag,
+              selected: selected == tag,
+              onTap: () => onSelect(selected == tag ? null : tag),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Selection by inversion, exactly like the device's rows — filled ink, label
+/// knocked out. No tint, no colour, no checkmark.
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicWidth(
+      child: JotaRow(
+        label: label,
+        selected: selected,
+        height: JotaRows.heightCompact,
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _NoteRow extends StatelessWidget {
+  const _NoteRow({
+    required this.note,
+    required this.onTap,
+    required this.transcribing,
+  });
+
+  final Note note;
+  final VoidCallback onTap;
+  final bool transcribing;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+
+    return InkWell(
+      onTap: onTap,
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: JotaGrid.margin,
+          vertical: JotaGrid.gapM + 2,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // Figure line: everything here is a measurement, so all of it is
+            // mono and all of it is zero-padded.
+            Row(
+              children: <Widget>[
+                Text(note.displayId, style: t.label),
+                const SizedBox(width: JotaGrid.gapM),
+                Text(
+                  fmtClock(note.recordedAt),
+                  style: t.reading.copyWith(color: c.inkMuted),
+                ),
+                const Spacer(),
+                if (note.tag != null) ...<Widget>[
+                  Text(
+                    note.tag!,
+                    style: t.reading.copyWith(color: c.inkMuted),
+                  ),
+                  const SizedBox(width: JotaGrid.gapM),
+                ],
+                Text(note.displayDuration, style: t.reading),
+              ],
+            ),
+            const SizedBox(height: JotaGrid.gapS),
+            // Prose line: sans, because at this width mono would fit about
+            // fifteen characters and shred the sentence.
+            Text(
+              transcribing ? 'Transcribing…' : note.preview,
+              style: t.prose.copyWith(
+                fontSize: 15,
+                color: note.hasTranscript ? c.ink : c.inkMuted,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyArchive extends StatelessWidget {
+  const _EmptyArchive({required this.hasDevice});
+
+  final bool hasDevice;
+
+  @override
+  Widget build(BuildContext context) {
+    return JotaEmpty(
+      message: hasDevice ? 'No notes yet' : 'No device paired',
+      action: hasDevice
+          ? null
+          : SizedBox(
+              width: 200,
+              child: JotaButton(
+                label: 'Pair a device',
+                primary: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const SyncScreen()),
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+/// The device's MENU screen, flattened into a footer. Three destinations, the
+/// same stadium rows, in the same order of importance.
+class _FooterControls extends StatelessWidget {
+  const _FooterControls();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: JotaButton(
+            label: 'Sync',
+            primary: true,
+            height: JotaRows.heightCompact,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SyncScreen()),
+            ),
+          ),
+        ),
+        const SizedBox(width: JotaRows.gap),
+        Expanded(
+          child: JotaButton(
+            label: 'Tags',
+            height: JotaRows.heightCompact,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const TagEditorScreen()),
+            ),
+          ),
+        ),
+        const SizedBox(width: JotaRows.gap),
+        Expanded(
+          child: JotaButton(
+            label: 'Settings',
+            height: JotaRows.heightCompact,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}

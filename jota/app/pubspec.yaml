@@ -1,0 +1,72 @@
+name: jota
+description: Companion app for Jota, a pocket voice-note device. Pulls notes over BLE and transcribes them on the phone.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+# Versions are pinned exactly rather than caret-ranged. This app talks to a
+# physical device over a hand-written binary protocol; a silent minor-version
+# change in flutter_blue_plus is the kind of thing that turns into "sync stopped
+# working" three months later. Bump deliberately, re-test against hardware.
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- BLE ---------------------------------------------------------------
+  # The only BLE package with maintained background support on both platforms
+  # and a stream API that does not swallow notification ordering.
+  flutter_blue_plus: 1.35.5
+
+  # --- Storage -----------------------------------------------------------
+  # sqflite over drift: see README. Two tables, no codegen step.
+  sqflite: 2.4.1
+  path: 1.9.0
+  path_provider: 2.1.5
+  # API key only. Never in SharedPreferences.
+  flutter_secure_storage: 9.2.4
+  # Non-secret preferences (device id, autosync flag, model name).
+  shared_preferences: 2.3.3
+
+  # --- Network -----------------------------------------------------------
+  # Multipart upload to Whisper. dio would also work; http is one dependency
+  # lighter and this app makes exactly one kind of request.
+  http: 1.2.2
+
+  # --- Audio -------------------------------------------------------------
+  # Plays the decoded WAV from a file path on both platforms.
+  just_audio: 0.9.42
+
+  # --- Background --------------------------------------------------------
+  # Android foreground service that keeps a Dart isolate alive so the BLE
+  # scan can survive the app leaving the foreground. iOS needs none of this —
+  # see README, "Background sync, honestly".
+  flutter_foreground_task: 8.10.4
+
+  # --- Misc --------------------------------------------------------------
+  intl: 0.19.0
+  provider: 6.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 4.0.0
+
+flutter:
+  uses-material-design: true
+
+  # The design leans hard on a monospace face. Flutter falls back to the
+  # platform monospace (Roboto Mono on Android, Menlo/SF Mono on iOS), which is
+  # good enough to ship. To lock the two platforms to one face, drop the .ttf
+  # files in assets/fonts/ and uncomment. lib/design/theme.dart already reads
+  # the family name from a single constant.
+  #
+  # fonts:
+  #   - family: JotaMono
+  #     fonts:
+  #       - asset: assets/fonts/JetBrainsMono-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/JetBrainsMono-Bold.ttf
+  #         weight: 700
