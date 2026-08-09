@@ -11,6 +11,11 @@ Built with a real CAD kernel (**build123d** → OpenCASCADE), so the fillets,
 chamfers and booleans are exact. Validated for manifoldness, component
 interference, clearances, wall thickness and printability.
 
+> **This README covers the enclosure only.** The device firmware is in
+> [`firmware/`](firmware/README.md) and the phone app in
+> [`app/`](app/README.md). Jota has no WiFi — the phone pulls notes over BLE
+> and transcribes them, so nothing on the device holds a credential.
+
 ![exploded](renders/exploded.png)
 
 | | |
