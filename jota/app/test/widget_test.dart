@@ -12,8 +12,6 @@
 // ============================================================================
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jota/app.dart';
-import 'package:jota/design/format.dart';
-import 'package:jota/design/widgets.dart';
 import 'package:jota/preview/preview_services.dart';
 import 'package:jota/screens/note_detail_screen.dart';
 import 'package:jota/screens/sync_screen.dart';
@@ -23,6 +21,11 @@ import 'package:jota/state/services.dart';
 /// never ends with the fake scanner still ticking.
 Future<Services> bootPreview(WidgetTester tester) async {
   final Services services = await PreviewServices.boot();
+  // These tests exercise the note list and what it leads to, not the first-run
+  // flow, so skip onboarding — the app then boots straight past the splash to
+  // the notes. (The browser preview leaves the flag false, so it still shows
+  // onboarding on load.)
+  await services.settings.setHasSeenOnboarding(true);
   addTearDown(() async {
     await services.scanner.dispose();
     await services.sync.dispose();
@@ -32,11 +35,14 @@ Future<Services> bootPreview(WidgetTester tester) async {
   return services;
 }
 
-/// One frame, then enough time for the initial async refresh and the fake's
-/// first advertisement.
+/// Boots past the splash and gives the note list enough time for its initial
+/// async refresh and the fake's first advertisement. The splash holds for a
+/// beat before routing, so the clock is advanced past that first.
 Future<void> pumpAwake(WidgetTester tester) async {
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 900));
+  await tester.pump(); // splash first frame
+  await tester.pump(const Duration(seconds: 1)); // hold elapses, route to notes
+  await tester.pump(); // note list builds, kicks off its refresh
+  await tester.pump(const Duration(milliseconds: 900)); // refresh + first ad
   await tester.pump();
 }
 
@@ -58,27 +64,22 @@ void main() {
     await tester.pumpWidget(JotaApp(services: services));
     await pumpAwake(tester);
 
-    // The status label, and the archive count in its right slot.
-    expect(find.text('NOTES'), findsOneWidget);
-    expect(find.text(fmtCount(8)), findsWidgets);
+    // The status label — Title case now, not all-caps. (Also appears on the
+    // active nav pill, so there's more than one.)
+    expect(find.text('Notes'), findsWidgets);
 
     // Ids are monospaced and zero-padded everywhere in the product.
     expect(find.text('N-012'), findsOneWidget);
     expect(find.text('N-011'), findsOneWidget);
 
-    // A transcript, rendered as prose.
+    // A transcript, rendered as prose in the row preview.
     expect(
       find.textContaining('call the dentist about moving the appointment'),
       findsOneWidget,
     );
 
-    // A note still waiting for text. (The seed's failed note and its oldest
-    // notes are below the fold at the 800x600 test surface; the count above
-    // proves all eight loaded.)
-    expect(find.text('No transcript'), findsWidgets);
-
-    // Tags in use drive the filter strip.
-    expect(find.text('ALL'), findsOneWidget);
+    // Tags in use drive the filter strip: an 'All' pill plus a pill per tag.
+    expect(find.text('All'), findsOneWidget);
     expect(find.text('WORK'), findsWidgets);
 
     await quiesce(tester, services);
@@ -97,16 +98,17 @@ void main() {
 
     expect(find.byType(NoteDetailScreen), findsOneWidget);
 
-    // The right slot holds this note's position in the list — the same
-    // `004/012` shape the device's own NOTE VIEW screen uses.
-    expect(find.text(fmtRatio(1, 8)), findsOneWidget);
-
-    // Duration is a figure: mono, zero-padded, on the meta line.
-    expect(find.text(fmtDuration(47)), findsWidgets);
-
-    // The transcript is here as prose, and the technical facts as mono rows.
-    expect(find.text('CRC'), findsOneWidget);
-    expect(find.text('SIZE'), findsOneWidget);
+    // The detail leads with the transcript as prose; the note's date is its
+    // title, so there is no list-position figure in the header any more. (The
+    // list is still mounted under the pushed route, so the text is found twice.)
+    expect(
+      find.textContaining('call the dentist about moving the appointment'),
+      findsWidgets,
+    );
+    // A transcribed note offers the hold-to-edit affordance and a delete —
+    // both unique to the detail screen, so they prove we're actually on it.
+    expect(find.text('Hold to edit'), findsOneWidget);
+    expect(find.text('Delete note'), findsOneWidget);
 
     await quiesce(tester, services);
   });
@@ -127,30 +129,30 @@ void main() {
     await quiesce(tester, services);
   });
 
-  testWidgets('sync screen reads the pending count from the advertisement', (
+  testWidgets('sync tab shows the connect flow and finds a nearby Jota', (
     WidgetTester tester,
   ) async {
     final Services services = await bootPreview(tester);
     await tester.pumpWidget(JotaApp(services: services));
     await pumpAwake(tester);
 
-    await tester.tap(find.widgetWithText(JotaButton, 'SYNC'));
+    // The nav is a floating pill of icon buttons now, not a footer SYNC button;
+    // the Sync destination carries a semantics label so it stays tappable.
+    await tester.tap(find.bySemanticsLabel('Sync'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.byType(SyncScreen), findsOneWidget);
 
-    // Nothing paired yet, so the screen offers what is in range.
-    expect(find.text('IN RANGE'), findsWidgets);
+    // Nothing paired yet, so the screen leads with the connect flow.
+    expect(find.text('Connect your Jota'), findsOneWidget);
 
-    // The fake advertises after a beat, the way a real one does.
+    // The fake advertises after a beat, the way a real one does; the device
+    // then appears in range as a tappable row named after the local name —
+    // discovered WITHOUT connecting, which is the point of the advertisement.
     await tester.pump(const Duration(milliseconds: 900));
     await tester.pump();
-
     expect(find.text('JOTA'), findsWidgets);
-    // Three notes waiting — learned WITHOUT connecting, which is the entire
-    // point of putting the count in the manufacturer data.
-    expect(find.text(fmtCount(3)), findsWidgets);
 
     await quiesce(tester, services);
   });

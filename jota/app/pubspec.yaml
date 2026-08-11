@@ -23,7 +23,9 @@ dependencies:
   # --- Storage -----------------------------------------------------------
   # sqflite over drift: see README. Two tables, no codegen step.
   sqflite: 2.4.1
-  path: 1.9.0
+  # 1.9.1, not 1.9.0: the Flutter SDK's flutter_test pins path to 1.9.1, so the
+  # exact 1.9.0 pin no longer resolves. A patch bump, SDK-required.
+  path: 1.9.1
   path_provider: 2.1.5
   # API key only. Never in SharedPreferences.
   flutter_secure_storage: 9.2.4
@@ -45,9 +47,19 @@ dependencies:
   # see README, "Background sync, honestly".
   flutter_foreground_task: 8.10.4
 
+  # --- Security ----------------------------------------------------------
+  # The app lock (Settings ▸ Privacy). Face ID / Touch ID / fingerprint with
+  # the device passcode as fallback — the OS owns the credential, we never
+  # store a secret. Needs FlutterFragmentActivity on Android (see MainActivity)
+  # and NSFaceIDUsageDescription on iOS.
+  local_auth: 2.3.0
+
   # --- Misc --------------------------------------------------------------
   intl: 0.19.0
   provider: 6.1.2
+  # Minimal hairline line-icons (Feather's successor), drop-in IconData. Used in
+  # the bottom nav and for back/add/edit throughout. Pinned exact.
+  lucide_icons_flutter: 3.1.15
 
 dev_dependencies:
   flutter_test:
@@ -56,6 +68,23 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # The type system is three bundled faces: Fraunces (an elegant display serif,
+  # the warm voice) for headlines + wordmark; Inter (clean humanist sans) for
+  # labels, buttons and prose; and the PLATFORM monospace for every figure, so
+  # codes and columns stay aligned. All are STATIC instances baked from the
+  # variable originals with fonttools — iOS/CoreText did not load the variable
+  # files — and each family name matches the font's internal name.
+  fonts:
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces-Display.ttf
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
 
   # The design leans hard on a monospace face. Flutter falls back to the
   # platform monospace (Roboto Mono on Android, Menlo/SF Mono on iOS), which is

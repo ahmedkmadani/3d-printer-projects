@@ -32,6 +32,8 @@ import '../data/partial_store.dart';
 import '../data/prefs_settings_store.dart';
 import '../data/settings_store.dart';
 import '../data/sqflite_note_repository.dart';
+import '../security/authenticator.dart';
+import '../security/local_authenticator.dart';
 import '../transcribe/transcriber.dart';
 import '../transcribe/transcription_queue.dart';
 import '../transcribe/whisper_transcriber.dart';
@@ -46,6 +48,7 @@ class Services {
     required this.sync,
     required this.background,
     required this.transcription,
+    required this.auth,
     required this.newPlayer,
     this.isPreview = false,
   });
@@ -58,6 +61,9 @@ class Services {
   final SyncService sync;
   final BackgroundSyncController background;
   final TranscriptionQueue transcription;
+
+  /// The biometric / passcode gate behind the app lock (Settings ▸ Privacy).
+  final Authenticator auth;
 
   /// A factory, because the playback bar owns its player's lifetime.
   final NotePlayer Function() newPlayer;
@@ -110,6 +116,7 @@ class Services {
         settings: settings,
         transcriber: buildTranscriber,
       ),
+      auth: LocalAuthenticator(),
       newPlayer: () => DecodedNotePlayer(audio),
     );
   }

@@ -28,7 +28,7 @@ android {
         //   * below 23 the runtime-permission model does not exist, so the
         //     Bluetooth permission flow would need a second code path for a
         //     vanishingly small install base.
-        minSdk = 23
+        minSdkVersion = flutter.minSdkVersion
 
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

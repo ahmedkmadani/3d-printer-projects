@@ -328,17 +328,26 @@ class InMemorySettingsStore implements SettingsStore {
     String? deviceName,
     bool backgroundSync = false,
     bool autoTranscribe = true,
+    bool hasSeenOnboarding = false,
+    List<String> tags = const <String>[],
+    bool appLockEnabled = false,
   })  : _apiKey = apiKey,
         _deviceId = deviceId,
         _deviceName = deviceName,
         _backgroundSync = backgroundSync,
-        _autoTranscribe = autoTranscribe;
+        _autoTranscribe = autoTranscribe,
+        _hasSeenOnboarding = hasSeenOnboarding,
+        _tags = tags,
+        _appLockEnabled = appLockEnabled;
 
   String? _apiKey;
   String? _deviceId;
   String? _deviceName;
   bool _backgroundSync;
   bool _autoTranscribe;
+  bool _hasSeenOnboarding;
+  List<String> _tags;
+  bool _appLockEnabled;
   String _model = 'whisper-1';
   String? _language;
   String _backend = 'whisper';
@@ -371,6 +380,18 @@ class InMemorySettingsStore implements SettingsStore {
   bool get hasDevice => (_deviceId ?? '').isNotEmpty;
 
   @override
+  List<String> get tags => _tags;
+
+  @override
+  Future<void> setTags(List<String> v) async => _tags = v;
+
+  @override
+  bool get appLockEnabled => _appLockEnabled;
+
+  @override
+  Future<void> setAppLockEnabled(bool v) async => _appLockEnabled = v;
+
+  @override
   bool get backgroundSync => _backgroundSync;
 
   @override
@@ -381,6 +402,12 @@ class InMemorySettingsStore implements SettingsStore {
 
   @override
   Future<void> setAutoTranscribe(bool v) async => _autoTranscribe = v;
+
+  @override
+  bool get hasSeenOnboarding => _hasSeenOnboarding;
+
+  @override
+  Future<void> setHasSeenOnboarding(bool v) async => _hasSeenOnboarding = v;
 
   @override
   String get model => _model;

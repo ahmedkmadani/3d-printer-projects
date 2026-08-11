@@ -26,6 +26,9 @@ class PrefsSettingsStore implements SettingsStore {
   static const String _kDeviceName = 'device_name';
   static const String _kBackgroundSync = 'background_sync';
   static const String _kAutoTranscribe = 'auto_transcribe';
+  static const String _kSeenOnboarding = 'seen_onboarding';
+  static const String _kTags = 'tags';
+  static const String _kAppLock = 'app_lock';
   static const String _kModel = 'whisper_model';
   static const String _kLanguage = 'whisper_language';
   static const String _kBackend = 'transcribe_backend';
@@ -95,6 +98,25 @@ class PrefsSettingsStore implements SettingsStore {
 
   @override
   Future<void> setAutoTranscribe(bool v) => _prefs.setBool(_kAutoTranscribe, v);
+
+  @override
+  bool get hasSeenOnboarding => _prefs.getBool(_kSeenOnboarding) ?? false;
+
+  @override
+  Future<void> setHasSeenOnboarding(bool v) =>
+      _prefs.setBool(_kSeenOnboarding, v);
+
+  @override
+  List<String> get tags => _prefs.getStringList(_kTags) ?? const <String>[];
+
+  @override
+  Future<void> setTags(List<String> v) => _prefs.setStringList(_kTags, v);
+
+  @override
+  bool get appLockEnabled => _prefs.getBool(_kAppLock) ?? false;
+
+  @override
+  Future<void> setAppLockEnabled(bool v) => _prefs.setBool(_kAppLock, v);
 
   @override
   String get model => _prefs.getString(_kModel) ?? 'whisper-1';

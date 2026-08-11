@@ -1,29 +1,34 @@
 // ============================================================================
 //  Jota — settings
 //
-//  Three things: the API key, the device, and what the app is allowed to do in
-//  the background. There is no account, no sync service and no telemetry, so
-//  this is the whole configuration surface of the product.
+//  Your device, background sync, storage, and a couple of "about" actions. No
+//  account, no server key, no telemetry — transcription is handled elsewhere —
+//  so this is the whole configuration surface of the product.
 // ============================================================================
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../ble/background_sync.dart';
 import '../design/format.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
+import '../state/lock_controller.dart';
 import '../state/services.dart';
+import 'splash_screen.dart';
+import 'tag_editor_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.embedded = false});
+
+  /// True when shown as a tab inside the home shell — the back chevron is
+  /// dropped (there is no route to pop back to).
+  final bool embedded;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  String? _maskedKey;
   bool _loading = true;
   int _archiveBytes = 0;
   int _cacheBytes = 0;
@@ -36,203 +41,152 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _load() async {
     final Services s = context.read<Services>();
-    final String? key = await s.settings.apiKey();
     final int archive = await s.audio.archiveBytes();
     final int cache = await s.audio.cacheBytes();
     if (!mounted) return;
     setState(() {
-      _maskedKey = (key == null || key.isEmpty) ? null : _mask(key);
       _archiveBytes = archive;
       _cacheBytes = cache;
       _loading = false;
     });
   }
 
-  static String _mask(String key) {
-    if (key.length <= 8) return '••••';
-    return '${key.substring(0, 3)}…${key.substring(key.length - 4)}';
-  }
-
-  Future<void> _editKey() async {
-    final Services s = context.read<Services>();
-    final TextEditingController controller = TextEditingController();
-
-    final String? value = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.ink.bg,
-      builder: (BuildContext sheetContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: JotaGrid.margin,
-            right: JotaGrid.margin,
-            top: JotaGrid.gapL,
-            bottom:
-                MediaQuery.of(sheetContext).viewInsets.bottom + JotaGrid.gapL,
+  /// Toggle the app lock. Turning it on prompts Face ID / passcode first (so the
+  /// user can't lock themselves out); if the phone has neither, we say so and
+  /// leave it off. A cancelled prompt just leaves it as it was — no message.
+  Future<void> _setLock(LockController lock, bool value) async {
+    final LockSetupResult result = await lock.setEnabled(value);
+    if (!mounted) return;
+    if (result == LockSetupResult.unavailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Set up Face ID or a passcode in your phone settings first.',
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Text('OPENAI API KEY', style: context.type.label),
-              const SizedBox(height: JotaGrid.gapM),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                obscureText: true,
-                autocorrect: false,
-                enableSuggestions: false,
-                style: context.type.reading,
-                decoration: const InputDecoration(hintText: 'sk-…'),
-              ),
-              const SizedBox(height: JotaGrid.gapM),
-              Text(
-                'Stored in the iOS Keychain / Android EncryptedSharedPreferences. '
-                'It is sent only to OpenAI, only when transcribing, and never '
-                'reaches the device — Jota has no network at all.',
-                style: context.type.prose.copyWith(
-                  color: context.ink.inkMuted,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: JotaGrid.gapM),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: JotaButton(
-                      label: 'Remove',
-                      danger: true,
-                      height: JotaRows.heightCompact,
-                      onTap: () => Navigator.of(sheetContext).pop(''),
-                    ),
-                  ),
-                  const SizedBox(width: JotaRows.gap),
-                  Expanded(
-                    child: JotaButton(
-                      label: 'Save',
-                      primary: true,
-                      height: JotaRows.heightCompact,
-                      onTap: () => Navigator.of(sheetContext)
-                          .pop(controller.text.trim()),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    controller.dispose();
-    if (value == null) return;
-    await s.settings.setApiKey(value.isEmpty ? null : value);
-    await _load();
+        ),
+      );
+    }
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final Services s = context.read<Services>();
     final DeviceController device = context.watch<DeviceController>();
+    final LockController lock = context.watch<LockController>();
     final JotaType t = context.type;
     final JotaColors c = context.ink;
 
     return JotaScreen(
-      label: 'SETTINGS',
-      onBack: () => Navigator.of(context).pop(),
+      label: 'Settings',
+      upcase: false,
+      onBack: widget.embedded ? null : () => Navigator.of(context).pop(),
       child: _loading
           ? const SizedBox.shrink()
           : ListView(
               padding: const EdgeInsets.only(top: JotaGrid.gapL),
               children: <Widget>[
-                const _SectionLabel('TRANSCRIPTION'),
-                JotaRow(
-                  label: _maskedKey ?? 'ADD API KEY',
-                  trailing: Icon(
-                    _maskedKey == null ? Icons.add : Icons.edit_outlined,
-                  ),
-                  onTap: _editKey,
-                ),
-                const SizedBox(height: JotaRows.gap),
-                _ToggleRow(
-                  label: 'AUTO-TRANSCRIBE',
-                  value: s.settings.autoTranscribe,
-                  onChanged: (bool v) async {
-                    await s.settings.setAutoTranscribe(v);
-                    setState(() {});
-                  },
-                ),
-                const SizedBox(height: JotaGrid.gapS),
-                Text(
-                  'Audio is decoded to WAV on the phone and sent to OpenAI '
-                  'Whisper. Nothing else leaves the device.',
-                  style: t.prose.copyWith(color: c.inkMuted, fontSize: 13),
-                ),
-
-                const SizedBox(height: JotaGrid.gapXL),
-                const _SectionLabel('DEVICE'),
+                const _SectionLabel('Device'),
                 JotaKeyValue(
-                  name: 'Paired',
+                  name: 'Your Jota',
                   value: device.hasPairedDevice
-                      ? (s.settings.deviceName ?? 'JOTA')
-                      : 'NONE',
+                      ? (s.settings.deviceName ?? 'Connected')
+                      : 'Not set up',
                 ),
-                if (device.hasPairedDevice)
-                  JotaKeyValue(
-                    name: 'ID',
-                    value: device.pairedId ?? '',
-                  ),
-                const SizedBox(height: JotaRows.gap),
-                if (device.hasPairedDevice)
+                if (device.hasPairedDevice) ...<Widget>[
+                  const SizedBox(height: JotaRows.gap),
                   JotaButton(
-                    label: 'Forget device',
+                    label: 'Forget this Jota',
                     danger: true,
+                    upcase: false,
                     height: JotaRows.heightCompact,
                     onTap: () async {
                       await device.forgetDevice();
                       setState(() {});
                     },
                   ),
+                ],
 
                 const SizedBox(height: JotaGrid.gapXL),
-                const _SectionLabel('BACKGROUND SYNC'),
+                const _SectionLabel('Tags'),
+                Text(
+                  'The words you sort notes by — here and on your Jota.',
+                  style: t.prose.copyWith(color: c.inkMuted),
+                ),
+                const SizedBox(height: JotaGrid.gapM),
+                JotaButton(
+                  label: 'Edit tags',
+                  upcase: false,
+                  height: JotaRows.heightCompact,
+                  onTap: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const TagEditorScreen(),
+                      ),
+                    );
+                    if (mounted) setState(() {});
+                  },
+                ),
+
+                const SizedBox(height: JotaGrid.gapXL),
+                const _SectionLabel('Background'),
                 _ToggleRow(
-                  label: 'BACKGROUND SYNC',
+                  label: 'Sync in the background',
                   value: s.settings.backgroundSync,
                   onChanged: (bool v) async {
                     await device.setBackgroundSync(v);
                     setState(() {});
                   },
                 ),
+
+                const SizedBox(height: JotaGrid.gapXL),
+                const _SectionLabel('Privacy'),
+                _ToggleRow(
+                  label: 'Lock the app',
+                  value: lock.enabled,
+                  onChanged: (bool v) => _setLock(lock, v),
+                ),
                 const SizedBox(height: JotaGrid.gapS),
-                // The honest description, from the same source the README
-                // quotes. No "syncs every 10 minutes" anywhere.
                 Text(
-                  BackgroundSyncController.explain(device.backgroundMode),
-                  style: t.prose.copyWith(color: c.inkMuted, fontSize: 13),
+                  'Ask for Face ID or your passcode each time you open Jota. '
+                  'Your notes stay on this phone — this keeps them yours.',
+                  style: t.prose.copyWith(color: c.inkMuted),
                 ),
 
                 const SizedBox(height: JotaGrid.gapXL),
-                const _SectionLabel('STORAGE'),
-                JotaKeyValue(name: 'Archive', value: fmtBytes(_archiveBytes)),
+                const _SectionLabel('Storage'),
+                JotaKeyValue(name: 'Notes', value: fmtBytes(_archiveBytes)),
                 JotaKeyValue(
-                  name: 'Decoded cache',
+                  name: 'Playback cache',
                   value: fmtBytes(_cacheBytes),
                 ),
                 const SizedBox(height: JotaRows.gap),
                 JotaButton(
-                  label: 'Clear decoded cache',
+                  label: 'Clear cache',
+                  upcase: false,
                   height: JotaRows.heightCompact,
                   onTap: () async {
                     await s.audio.clearCache();
                     await _load();
                   },
                 ),
-                const SizedBox(height: JotaGrid.gapS),
-                Text(
-                  'The archive is the audio exactly as Jota sent it and is the '
-                  'only copy. The cache is decoded WAV and rebuilds itself.',
-                  style: t.prose.copyWith(color: c.inkMuted, fontSize: 13),
+
+                const SizedBox(height: JotaGrid.gapXL),
+                const _SectionLabel('About'),
+                JotaButton(
+                  label: 'Replay onboarding',
+                  upcase: false,
+                  height: JotaRows.heightCompact,
+                  onTap: () async {
+                    await s.settings.setHasSeenOnboarding(false);
+                    if (!context.mounted) return;
+                    await Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SplashScreen(),
+                      ),
+                      (Route<dynamic> route) => false,
+                    );
+                  },
                 ),
 
                 const SizedBox(height: JotaGrid.gapXL),
@@ -242,7 +196,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: JotaGrid.gapS),
                 Center(
                   child: Text(
-                    'V0.1.0',
+                    kVersionLabel,
                     style: t.reading.copyWith(color: c.inkMuted),
                   ),
                 ),
@@ -296,7 +250,7 @@ class _ToggleRow extends StatelessWidget {
       label: label,
       selected: value,
       leading: const SizedBox.shrink(),
-      trailing: Text(value ? 'ON' : 'OFF'),
+      trailing: Text(value ? 'On' : 'Off'),
       onTap: () => onChanged(!value),
     );
   }

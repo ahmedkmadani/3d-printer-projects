@@ -65,5 +65,15 @@ abstract class DeviceScanner {
 
   Future<void> stop();
 
+  /// Ask the OS to turn Bluetooth on, so the user never has to leave the app to
+  /// dig through Settings.
+  ///
+  /// Android shows a system "allow this app to turn on Bluetooth" dialog and
+  /// this resolves `true` once it comes on. **iOS forbids turning the radio on
+  /// from an app**, so there it returns `false` — the caller should then fall
+  /// back to nudging the system's own prompt (start a scan) or guiding to
+  /// Settings.
+  Future<bool> turnOn();
+
   Future<void> dispose();
 }

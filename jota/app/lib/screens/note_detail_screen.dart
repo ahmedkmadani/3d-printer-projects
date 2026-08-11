@@ -10,10 +10,10 @@
 //  things it can afford: playback, and a tag.
 // ============================================================================
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../data/note.dart';
-import '../design/format.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/notes_controller.dart';
@@ -48,23 +48,28 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     final JotaType t = context.type;
     final JotaColors c = context.ink;
 
-    final int pos = notes.positionOf(_note);
-    final int total = notes.visible.length;
-
     return JotaScreen(
-      // The note's OWN id is the label — this screen is about one note.
-      label: _note.displayId,
-      // The right slot holds position in the list, matching the device exactly.
-      value: fmtRatio(pos, total),
+      // No device id or list position up here — the note's date is its title,
+      // in the body. The header is just a way back.
+      label: '',
+      upcase: false,
       onBack: () => Navigator.of(context).pop(),
       child: ListView(
         padding: const EdgeInsets.only(top: JotaGrid.gapM),
         children: <Widget>[
           // The note's time and duration live in the BODY, not in the status
           // slot — up there they would masquerade as the live clock.
-          JotaMetaLine(
-            left: fmtClock(_note.recordedAt),
-            right: _note.displayDuration,
+          // A Fraunces headline, like every other screen's — the note's own
+          // date is its title. The time and length sit under it in quiet mono.
+          Text(
+            DateFormat('MMMM d').format(_note.recordedAt),
+            style: t.headline,
+          ),
+          const SizedBox(height: JotaGrid.gapS),
+          Text(
+            '${DateFormat('HH:mm').format(_note.recordedAt)} · '
+            '${_note.displayDuration}',
+            style: t.reading.copyWith(color: c.inkMuted),
           ),
           const SizedBox(height: JotaGrid.gapL),
 
@@ -91,25 +96,16 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           const SizedBox(height: JotaGrid.gapM),
 
           _TagPicker(
-            tags: notes.tagsInUse,
+            tags: services.settings.tags,
             selected: _note.tag,
             onSelect: (String? tag) => notes.setTag(_note, tag),
           ),
 
           const SizedBox(height: JotaGrid.gapXL),
-
-          // Technical facts, in mono, aligned by the monospace grid alone.
-          JotaKeyValue(name: 'ID', value: _note.displayId),
-          JotaKeyValue(name: 'Recorded', value: fmtDate(_note.recordedAt)),
-          JotaKeyValue(name: 'Size', value: fmtBytes(_note.bytes)),
-          JotaKeyValue(name: 'CRC', value: _note.crc),
-          if (_note.transcriptModel != null)
-            JotaKeyValue(name: 'Model', value: _note.transcriptModel!),
-
-          const SizedBox(height: JotaGrid.gapXL),
           JotaButton(
             label: 'Delete note',
             danger: true,
+            upcase: false,
             height: JotaRows.heightCompact,
             onTap: () => _confirmDelete(context, notes),
           ),
@@ -149,7 +145,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Text('TRANSCRIPT', style: context.type.label),
+              Text('Transcript', style: context.type.label),
               const SizedBox(height: JotaGrid.gapM),
               TextField(
                 controller: controller,
@@ -166,6 +162,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               JotaButton(
                 label: 'Save',
                 primary: true,
+                upcase: false,
                 onTap: () =>
                     Navigator.of(sheetContext).pop(controller.text.trim()),
               ),
@@ -189,21 +186,20 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: Text('DELETE ${_note.displayId}', style: context.type.label),
+          title: Text('Delete this note?', style: context.type.headline),
           content: Text(
-            'The device has already dropped its copy and there is no server. '
-            'This cannot be undone.',
+            'Your Jota has already let go of its copy, so this can’t be undone.',
             style: context.type.prose,
           ),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text('CANCEL', style: context.type.label),
+              child: Text('Cancel', style: context.type.label),
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: Text(
-                'DELETE',
+                'Delete',
                 style: context.type.label.copyWith(color: context.ink.signal),
               ),
             ),
@@ -258,9 +254,9 @@ class _TranscriptBlock extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 note.transcriptState == TranscriptState.manual
-                    ? 'EDITED BY HAND'
-                    : 'HOLD TO EDIT',
-                style: t.reading.copyWith(color: c.inkMuted, fontSize: 11),
+                    ? 'Edited by hand'
+                    : 'Hold to edit',
+                style: t.prose.copyWith(color: c.inkMuted, fontSize: 12),
               ),
             ),
           ],
@@ -276,8 +272,8 @@ class _TranscriptBlock extends StatelessWidget {
         Text(
           note.transcriptState == TranscriptState.done
               ? 'No speech detected'
-              : 'NO TRANSCRIPT',
-          style: t.reading.copyWith(color: c.inkMuted),
+              : 'Not transcribed yet',
+          style: t.prose.copyWith(color: c.inkMuted),
         ),
         const SizedBox(height: JotaGrid.gapM),
         Row(
@@ -286,6 +282,7 @@ class _TranscriptBlock extends StatelessWidget {
               child: JotaButton(
                 label: 'Transcribe',
                 primary: true,
+                upcase: false,
                 height: JotaRows.heightCompact,
                 onTap: onTranscribe,
               ),
@@ -293,7 +290,8 @@ class _TranscriptBlock extends StatelessWidget {
             const SizedBox(width: JotaRows.gap),
             Expanded(
               child: JotaButton(
-                label: 'Type it',
+                label: 'Write it',
+                upcase: false,
                 height: JotaRows.heightCompact,
                 onTap: onEdit,
               ),
@@ -320,8 +318,8 @@ class _TagPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     if (tags.isEmpty) {
       return Text(
-        'NO TAGS — ADD THEM IN THE TAG EDITOR',
-        style: context.type.reading.copyWith(color: context.ink.inkMuted),
+        'No tags yet — add them in Settings.',
+        style: context.type.prose.copyWith(color: context.ink.inkMuted),
       );
     }
     return Wrap(

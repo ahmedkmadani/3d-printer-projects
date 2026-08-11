@@ -20,9 +20,7 @@ import '../design/widgets.dart';
 import '../state/device_controller.dart';
 import '../state/notes_controller.dart';
 import 'note_detail_screen.dart';
-import 'settings_screen.dart';
 import 'sync_screen.dart';
-import 'tag_editor_screen.dart';
 
 class NoteListScreen extends StatefulWidget {
   const NoteListScreen({super.key});
@@ -68,7 +66,8 @@ class _NoteListScreenState extends State<NoteListScreen>
     // STATUS RIGHT SLOT RULE: the one defining figure. Here it is how many
     // notes are in the archive.
     return JotaScreen(
-      label: 'NOTES',
+      label: 'Notes',
+      upcase: false,
       value: fmtCount(visible.length),
       showSignalDot: (device.pendingOnDevice ?? 0) > 0,
       padded: false,
@@ -77,7 +76,6 @@ class _NoteListScreenState extends State<NoteListScreen>
         pending: device.pendingOnDevice,
         syncing: device.isSyncing,
       ),
-      footer: const _FooterControls(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
@@ -187,7 +185,7 @@ class _TagFilterStrip extends StatelessWidget {
         ),
         children: <Widget>[
           _FilterPill(
-            label: 'ALL',
+            label: 'All',
             selected: selected == null,
             onTap: () => onSelect(null),
           ),
@@ -315,6 +313,8 @@ class _EmptyArchive extends StatelessWidget {
               child: JotaButton(
                 label: 'Pair a device',
                 primary: true,
+                upcase: false,
+                height: JotaRows.heightTall,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(builder: (_) => const SyncScreen()),
                 ),
@@ -324,46 +324,3 @@ class _EmptyArchive extends StatelessWidget {
   }
 }
 
-/// The device's MENU screen, flattened into a footer. Three destinations, the
-/// same stadium rows, in the same order of importance.
-class _FooterControls extends StatelessWidget {
-  const _FooterControls();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: JotaButton(
-            label: 'Sync',
-            primary: true,
-            height: JotaRows.heightCompact,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const SyncScreen()),
-            ),
-          ),
-        ),
-        const SizedBox(width: JotaRows.gap),
-        Expanded(
-          child: JotaButton(
-            label: 'Tags',
-            height: JotaRows.heightCompact,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const TagEditorScreen()),
-            ),
-          ),
-        ),
-        const SizedBox(width: JotaRows.gap),
-        Expanded(
-          child: JotaButton(
-            label: 'Settings',
-            height: JotaRows.heightCompact,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}

@@ -70,7 +70,22 @@ class JotaScanner implements DeviceScanner {
   /// Services.boot() does it first. No effect on Android.
   static Future<void> configureForBackground() async {
     if (Platform.isIOS) {
-      await FlutterBluePlus.setOptions(restoreState: true);
+      // showPowerAlert lets iOS raise its own "Turn On Bluetooth" system alert
+      // when we try to use the radio while it is off — the closest iOS allows to
+      // enabling it from the app.
+      await FlutterBluePlus.setOptions(restoreState: true, showPowerAlert: true);
+    }
+  }
+
+  @override
+  Future<bool> turnOn() async {
+    // Only Android permits an app to turn the radio on (via a system dialog).
+    if (!Platform.isAndroid) return false;
+    try {
+      await FlutterBluePlus.turnOn();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
