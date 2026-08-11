@@ -46,6 +46,24 @@ abstract class SettingsStore {
   bool get autoTranscribe;
   Future<void> setAutoTranscribe(bool v);
 
+  /// Whether the first-run splash → onboarding flow has been completed. False on
+  /// a fresh install; set true once the user finishes or skips onboarding, so
+  /// every launch after the first goes straight to the notes.
+  bool get hasSeenOnboarding;
+  Future<void> setHasSeenOnboarding(bool v);
+
+  /// The user's tags, managed in the APP (app-first). Editable any time without
+  /// the device; synced to the Jota whenever it connects. Uppercase, since the
+  /// e-paper shows them in its mono label face.
+  List<String> get tags;
+  Future<void> setTags(List<String> v);
+
+  /// Whether opening the app requires Face ID / Touch ID / the device passcode.
+  /// Off by default. The notes are personal and live only on this phone, so the
+  /// lock is the on-device complement to that: private AND protected.
+  bool get appLockEnabled;
+  Future<void> setAppLockEnabled(bool v);
+
   String get model;
   Future<void> setModel(String v);
 

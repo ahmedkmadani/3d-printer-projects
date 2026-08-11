@@ -65,25 +65,30 @@ class JotaColors extends ThemeExtension<JotaColors> {
   /// Text-selection wash. A literal rather than a computed alpha so the token
   /// survives Flutter's ongoing churn around Color.withOpacity/withValues.
   Color get selection =>
-      brightnessIsDark ? const Color(0x33F2F2F2) : const Color(0x330A0A0A);
+      brightnessIsDark ? const Color(0x33EFE7DB) : const Color(0x33241E1A);
 
   bool get brightnessIsDark => bg.computeLuminance() < 0.5;
 
+  // The phone is not a 1-bit panel, so it does not have to be pure black on
+  // pure white. Paper is a warm cream and ink is a warm espresso — the same
+  // near-monochrome the device reads as, but the temperature the e-paper
+  // actually has in the hand. The greys and the one terracotta accent warm to
+  // match. Nothing structural changed: everything still resolves to ink or bg.
   static const JotaColors light = JotaColors(
-    ink: Color(0xFF0A0A0A),
-    bg: Color(0xFFFFFFFF),
-    inkMuted: Color(0xFF6E6E6E),
-    rule: Color(0xFFD9D9D9),
-    field: Color(0xFFF4F4F4),
-    signal: Color(0xFFB33A22),
+    ink: Color(0xFF241E1A), // espresso
+    bg: Color(0xFFFAF6EF), // cream paper
+    inkMuted: Color(0xFF8A7F73), // warm taupe
+    rule: Color(0xFFE6DED2),
+    field: Color(0xFFF1EADE),
+    signal: Color(0xFFB33A22), // terracotta, unchanged
   );
 
   static const JotaColors dark = JotaColors(
-    ink: Color(0xFFF2F2F2),
-    bg: Color(0xFF0B0B0B),
-    inkMuted: Color(0xFF8C8C8C),
-    rule: Color(0xFF2B2B2B),
-    field: Color(0xFF181818),
+    ink: Color(0xFFEFE7DB), // warm paper-white
+    bg: Color(0xFF14110D), // warm charcoal
+    inkMuted: Color(0xFF948A7C),
+    rule: Color(0xFF2E2820),
+    field: Color(0xFF1C1813),
     signal: Color(0xFFE0674A),
   );
 
@@ -156,6 +161,10 @@ abstract final class JotaRows {
   /// Compact variant for inline controls (PLAY, SAVE, the tag pills).
   static const double heightCompact = 36;
 
+  /// A prominent primary CTA — the one "do this now" button on a focused
+  /// screen (pair, an empty-state action). Taller so it carries the screen.
+  static const double heightTall = 56;
+
   static double radiusOf(double height) => height / 2;
 
   static BorderRadius borderRadiusOf(double height) =>
@@ -179,6 +188,15 @@ abstract final class JotaIndicators {
   static const double signalDot = 7;
 }
 
+// ---- Cards -----------------------------------------------------------------
+// The ONE non-stadium radius in the whole app, and the only sanctioned rounded
+// rectangle: the onboarding/splash hero that holds a device render. Everything
+// else is a stadium (radius = h/2). The card is still flat — a hairline and a
+// fill, never a shadow — because the device is a flat panel and so is this.
+abstract final class JotaCards {
+  static const double radius = 20;
+}
+
 // ---- Motion ----------------------------------------------------------------
 // E-paper cannot animate, so the device has no motion language to inherit. The
 // phone gets the minimum that keeps state changes legible, and nothing that
@@ -197,6 +215,7 @@ abstract final class JotaMotion {
 //   reading  status value, metadata, secondary figures (mono, regular)
 //   figure   the ONE live number on a screen           (mono, bold, large)
 //   display  terminal confirmation, pair codes         (mono, bold, largest)
+//   headline onboarding / splash headlines ONLY        (serif)
 //   prose    transcripts ONLY                          (sans)
 //   wordmark JOTA — a brand asset, not a style
 //
@@ -206,13 +225,29 @@ abstract final class JotaMotion {
 // prose, mono for everything else. This is the strongest single signal that the
 // app and the device are one product.
 abstract final class JotaFonts {
-  /// Swap to 'JotaMono' after bundling the .ttf files listed in pubspec.yaml.
+  /// Three bundled faces, one per job. The family strings MATCH each font's
+  /// internal name — on iOS the bundled font is resolved by that, not by an
+  /// arbitrary pubspec alias.
+  static const String serif = 'Fraunces'; // headlines + wordmark — the warm voice
+  static const String sans = 'Inter'; //     labels, buttons, prose — clean chrome
+
+  /// Figures stay on the PLATFORM monospace so codes and columns align without a
+  /// layout pass. Null family → Flutter walks the fallback list below.
   static const String? mono = null;
 
-  /// Platform monospace, in preference order. Flutter walks this list until it
-  /// finds a family that has the glyph.
+  static const List<String> serifFallback = <String>[
+    'Georgia',
+    'Times New Roman',
+    'serif',
+  ];
+
+  static const List<String> sansFallback = <String>[
+    'Helvetica Neue',
+    'Arial',
+    'sans-serif',
+  ];
+
   static const List<String> monoFallback = <String>[
-    'JotaMono',
     'Roboto Mono',
     'SF Mono',
     'Menlo',
@@ -220,8 +255,6 @@ abstract final class JotaFonts {
     'Courier New',
     'monospace',
   ];
-
-  static const String? sans = null; // platform default: Roboto / SF Pro
 }
 
 @immutable
@@ -231,6 +264,7 @@ class JotaType extends ThemeExtension<JotaType> {
     required this.reading,
     required this.figure,
     required this.display,
+    required this.headline,
     required this.prose,
     required this.wordmark,
   });
@@ -239,6 +273,11 @@ class JotaType extends ThemeExtension<JotaType> {
   final TextStyle reading;
   final TextStyle figure;
   final TextStyle display;
+
+  /// Serif, large. The one warm, elegant voice in the app — reserved for
+  /// onboarding and splash headlines. Never a figure, never an identifier.
+  final TextStyle headline;
+
   final TextStyle prose;
   final TextStyle wordmark;
 
@@ -248,50 +287,74 @@ class JotaType extends ThemeExtension<JotaType> {
     fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
   );
 
+  static const TextStyle _sans = TextStyle(
+    fontFamily: JotaFonts.sans,
+    fontFamilyFallback: JotaFonts.sansFallback,
+  );
+
+  static const TextStyle _serif = TextStyle(
+    fontFamily: JotaFonts.serif,
+    fontFamilyFallback: JotaFonts.serifFallback,
+  );
+
   static JotaType of(Color ink) {
     return JotaType(
-      label: _mono.copyWith(
+      // Three voices, by role:
+      //   serif (Fraunces)  headline, wordmark        — the warm, elegant note
+      //   sans  (Inter)     label, prose              — clean chrome + paragraphs
+      //   mono  (platform)  reading, figure, display  — every figure, aligned
+      // Fraunces is a single baked weight, so its fontWeight is nominal; the
+      // platform mono has a real bold, so figures lean on w700.
+      label: _sans.copyWith(
         color: ink,
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.4,
-        height: 1.2,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.2,
+        height: 1.3,
       ),
       reading: _mono.copyWith(
         color: ink,
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: FontWeight.w400,
-        letterSpacing: 0.8,
-        height: 1.35,
+        letterSpacing: 0,
+        height: 1.4,
       ),
       figure: _mono.copyWith(
         color: ink,
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: FontWeight.w700,
-        letterSpacing: 0.5,
+        letterSpacing: 0,
         height: 1.15,
       ),
       display: _mono.copyWith(
         color: ink,
-        fontSize: 36,
+        fontSize: 34,
         fontWeight: FontWeight.w700,
-        letterSpacing: 1.5,
+        letterSpacing: 1,
         height: 1.1,
       ),
-      prose: TextStyle(
-        fontFamily: JotaFonts.sans,
+      // The warm voice. A high-contrast serif carries a two-line headline best
+      // with tight leading and a hair of negative tracking.
+      headline: _serif.copyWith(
+        color: ink,
+        fontSize: 32,
+        fontWeight: FontWeight.w400,
+        letterSpacing: -0.3,
+        height: 1.15,
+      ),
+      prose: _sans.copyWith(
         color: ink,
         fontSize: 16,
         fontWeight: FontWeight.w400,
-        height: 1.5,
         letterSpacing: 0,
+        height: 1.55,
       ),
-      wordmark: _mono.copyWith(
+      wordmark: _serif.copyWith(
         color: ink,
-        fontSize: 40,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 6,
-        height: 1.0,
+        fontSize: 46,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0.5,
+        height: 1.05,
       ),
     );
   }
@@ -302,6 +365,7 @@ class JotaType extends ThemeExtension<JotaType> {
     TextStyle? reading,
     TextStyle? figure,
     TextStyle? display,
+    TextStyle? headline,
     TextStyle? prose,
     TextStyle? wordmark,
   }) {
@@ -310,6 +374,7 @@ class JotaType extends ThemeExtension<JotaType> {
       reading: reading ?? this.reading,
       figure: figure ?? this.figure,
       display: display ?? this.display,
+      headline: headline ?? this.headline,
       prose: prose ?? this.prose,
       wordmark: wordmark ?? this.wordmark,
     );
@@ -323,6 +388,7 @@ class JotaType extends ThemeExtension<JotaType> {
       reading: TextStyle.lerp(reading, other.reading, t)!,
       figure: TextStyle.lerp(figure, other.figure, t)!,
       display: TextStyle.lerp(display, other.display, t)!,
+      headline: TextStyle.lerp(headline, other.headline, t)!,
       prose: TextStyle.lerp(prose, other.prose, t)!,
       wordmark: TextStyle.lerp(wordmark, other.wordmark, t)!,
     );
@@ -399,7 +465,7 @@ abstract final class JotaTheme {
         modalElevation: 0,
         shape: const RoundedRectangleBorder(),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: c.bg,
         elevation: 0,
         shape: RoundedRectangleBorder(

@@ -10,8 +10,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'design/theme.dart';
-import 'screens/note_list_screen.dart';
+import 'screens/lock_screen.dart';
+import 'screens/splash_screen.dart';
 import 'state/device_controller.dart';
+import 'state/lock_controller.dart';
 import 'state/notes_controller.dart';
 import 'state/services.dart';
 
@@ -41,6 +43,12 @@ class JotaApp extends StatelessWidget {
           ),
           update: (_, __, DeviceController? previous) => previous!,
         ),
+        ChangeNotifierProvider<LockController>(
+          create: (_) => LockController(
+            auth: services.auth,
+            settings: services.settings,
+          ),
+        ),
       ],
       child: MaterialApp(
         title: 'Jota',
@@ -50,12 +58,38 @@ class JotaApp extends StatelessWidget {
         // Follows the system. E-paper has one appearance; a phone has two, and
         // fighting the user's choice is not a design decision worth making.
         themeMode: ThemeMode.system,
-        builder: services.isPreview
-            ? (BuildContext context, Widget? child) =>
-                _PreviewChrome(child: child ?? const SizedBox.shrink())
-            : null,
-        home: const NoteListScreen(),
+        // The app lock overlays every screen from above the Navigator, so it
+        // covers the notes, a modal, anything. The preview chrome (if any) sits
+        // under it. Always present now, not just for the preview.
+        builder: (BuildContext context, Widget? child) {
+          Widget content = child ?? const SizedBox.shrink();
+          if (services.isPreview) content = _PreviewChrome(child: content);
+          return _LockGate(child: content);
+        },
+        // First run shows splash → onboarding → pair; every launch after that,
+        // the splash reads the flag and goes straight to the notes.
+        home: const SplashScreen(),
       ),
+    );
+  }
+}
+
+/// Holds the lock screen over the app whenever [LockController] says so. It
+/// lives inside MaterialApp.builder — above the Navigator — so nothing the user
+/// was looking at leaks through behind it.
+class _LockGate extends StatelessWidget {
+  const _LockGate({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool locked = context.watch<LockController>().locked;
+    return Stack(
+      children: <Widget>[
+        child,
+        if (locked) const Positioned.fill(child: LockScreen()),
+      ],
     );
   }
 }

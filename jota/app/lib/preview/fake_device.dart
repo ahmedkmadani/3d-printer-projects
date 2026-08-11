@@ -116,6 +116,9 @@ class FakeScanner implements DeviceScanner {
   }
 
   @override
+  Future<bool> turnOn() async => true; // preview Bluetooth is always "on"
+
+  @override
   Future<void> dispose() async {
     await stop();
     await _found.close();

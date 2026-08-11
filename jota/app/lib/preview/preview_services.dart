@@ -9,6 +9,7 @@ import '../data/note.dart';
 import '../state/services.dart';
 import '../transcribe/transcriber.dart';
 import '../transcribe/transcription_queue.dart';
+import 'fake_authenticator.dart';
 import 'fake_device.dart';
 import 'fake_playback.dart';
 import 'fake_transcriber.dart';
@@ -29,7 +30,9 @@ abstract final class PreviewServices {
     // Starts UNPAIRED and with no API key on purpose: those two empty states are
     // the first thing a new user sees, and the pair flow is one of the things
     // this preview exists to show.
-    final InMemorySettingsStore settings = InMemorySettingsStore();
+    final InMemorySettingsStore settings = InMemorySettingsStore(
+      tags: <String>['WORK', 'BUY', 'IDEA', 'LATER'],
+    );
 
     final FakeJota device = FakeJota();
 
@@ -61,6 +64,8 @@ abstract final class PreviewServices {
         settings: settings,
         transcriber: buildTranscriber,
       ),
+      auth: FakeAuthenticator(),
+
       newPlayer: () => FakeNotePlayer(durationFor: durationFor),
       isPreview: true,
     );

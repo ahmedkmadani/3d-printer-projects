@@ -69,6 +69,11 @@ class DeviceController extends ChangeNotifier {
   AdapterStatus get adapter => _adapter;
   bool get bluetoothReady => _adapter.isReady;
 
+  /// Ask the OS to turn Bluetooth on. Android shows a system dialog and this
+  /// resolves true once it comes on; iOS cannot enable the radio from an app, so
+  /// it returns false and the UI nudges the system prompt / guides the user.
+  Future<bool> turnOnBluetooth() => _scanner.turnOn();
+
   List<JotaAdvertisement> _inRange = <JotaAdvertisement>[];
   List<JotaAdvertisement> get inRange => _inRange;
 
@@ -172,6 +177,16 @@ class DeviceController extends ChangeNotifier {
       id,
       onPairCodeNeeded: _requestPairCode,
     );
+
+    // App-first tags: the phone owns the tag list, so push it to the device on
+    // every successful sync (covers tags added while it was out of range).
+    if (result.ok) {
+      try {
+        await _sync.writeTags(id, _settings.tags);
+      } on Exception catch (_) {
+        // Non-fatal: tags will try again next sync.
+      }
+    }
 
     if (!result.ok) _lastError = result.error;
     if (result.notesAdded > 0) await _notes.refresh();

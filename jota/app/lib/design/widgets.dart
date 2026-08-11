@@ -9,6 +9,7 @@
 //  sizes or radii of its own.
 // ============================================================================
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'theme.dart';
 
@@ -59,10 +60,15 @@ class JotaStatusBar extends StatelessWidget {
     this.onBack,
     this.trailing,
     this.showSignalDot = false,
+    this.upcase = true,
   });
 
-  /// Left slot: what this screen is. Uppercase, `label` role.
+  /// Left slot: what this screen is. `label` role, uppercased unless a screen
+  /// in the handwriting voice opts out.
   final String label;
+
+  /// See [JotaButton.upcase]. Defaults true so existing screens are untouched.
+  final bool upcase;
 
   /// Right slot: the one defining figure. `reading` role — lighter than the
   /// label, because it is data and the label is chrome.
@@ -93,13 +99,13 @@ class JotaStatusBar extends StatelessWidget {
             children: <Widget>[
               if (onBack != null)
                 _StatusIconButton(
-                  icon: Icons.arrow_back,
+                  icon: LucideIcons.arrowLeft,
                   onTap: onBack!,
                   semanticLabel: 'Back',
                 ),
               Expanded(
                 child: Text(
-                  label.toUpperCase(),
+                  upcase ? label.toUpperCase() : label,
                   style: t.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -173,6 +179,7 @@ class JotaScreen extends StatelessWidget {
     required this.child,
     this.footer,
     this.padded = true,
+    this.upcase = true,
   });
 
   final String label;
@@ -181,6 +188,9 @@ class JotaScreen extends StatelessWidget {
   final Widget? trailing;
   final bool showSignalDot;
   final Widget child;
+
+  /// See [JotaButton.upcase]. Forwarded to the status bar's label.
+  final bool upcase;
 
   /// Pinned to the bottom, above the safe area. Used for the primary action.
   final Widget? footer;
@@ -210,6 +220,7 @@ class JotaScreen extends StatelessWidget {
                 onBack: onBack,
                 trailing: trailing,
                 showSignalDot: showSignalDot,
+                upcase: upcase,
               ),
             ),
             Expanded(
@@ -379,6 +390,7 @@ class JotaButton extends StatelessWidget {
     this.height = JotaRows.height,
     this.busy = false,
     this.danger = false,
+    this.upcase = true,
   });
 
   final String label;
@@ -386,6 +398,12 @@ class JotaButton extends StatelessWidget {
   final bool primary;
   final double height;
   final bool busy;
+
+  /// The device shouts in caps because a 1-bit panel has no case contrast to
+  /// spare. The phone's handwriting face reads far better in Title case, so
+  /// screens set in that voice (onboarding, pair) pass `upcase: false`. Defaults
+  /// true so every existing screen is untouched.
+  final bool upcase;
 
   /// Destructive actions get the signal colour for their *label only* — never
   /// a red fill. The app does not shout.
@@ -397,9 +415,14 @@ class JotaButton extends StatelessWidget {
     final JotaType t = context.type;
     final bool enabled = onTap != null && !busy;
 
-    final Color border = enabled ? c.ink : c.rule;
-    final Color fill = primary && enabled ? c.ink : Colors.transparent;
-    Color fg = primary && enabled ? c.onInk : (enabled ? c.ink : c.inkMuted);
+    // A primary CTA always reads as a solid pill — filled ink when live, a soft
+    // filled `field` when not — never a thin hollow outline, which looks flimsy
+    // for the one action a screen is asking for. Secondary buttons stay outline.
+    final Color fill = enabled
+        ? (primary ? c.ink : Colors.transparent)
+        : (primary ? c.field : Colors.transparent);
+    final Color border = enabled ? c.ink : (primary ? c.field : c.rule);
+    Color fg = enabled ? (primary ? c.onInk : c.ink) : c.inkMuted;
     if (danger && enabled && !primary) fg = c.signal;
 
     return Semantics(
@@ -422,13 +445,13 @@ class JotaButton extends StatelessWidget {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 1.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      primary ? c.onInk : c.ink,
-                    ),
+                    // busy implies not-enabled, so a primary is on the soft
+                    // `field` fill now — a dark spinner reads on both.
+                    valueColor: AlwaysStoppedAnimation<Color>(c.ink),
                   ),
                 )
               : Text(
-                  label.toUpperCase(),
+                  upcase ? label.toUpperCase() : label,
                   style: t.label.copyWith(color: fg),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -736,6 +759,37 @@ class JotaDots extends StatelessWidget {
   }
 }
 
+// ---- hero card -------------------------------------------------------------
+// The single sanctioned rounded rectangle in the app (JotaCards.radius),
+// reserved for the onboarding / splash hero that holds a device render. It is
+// still flat — a field-tinted fill and a hairline, no shadow — because the
+// device is a flat panel and so is this. Everywhere else, the shape is a
+// stadium.
+class JotaHeroCard extends StatelessWidget {
+  const JotaHeroCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(JotaGrid.gapL),
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    return Container(
+      decoration: BoxDecoration(
+        color: c.field,
+        borderRadius: BorderRadius.circular(JotaCards.radius),
+        border: Border.all(color: c.rule, width: JotaGrid.hairline),
+      ),
+      padding: padding,
+      child: child,
+    );
+  }
+}
+
 // ---- meta line -------------------------------------------------------------
 // screens.cpp screenNoteView(): the note's own timestamp on the left and its
 // duration on the right, in `reading`, above the prose. Explicitly NOT in the
@@ -784,7 +838,7 @@ class JotaKeyValue extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
         children: <Widget>[
-          Text(name.toUpperCase(), style: t.label.copyWith(color: c.inkMuted)),
+          Text(name, style: t.label.copyWith(color: c.inkMuted)),
           const SizedBox(width: JotaGrid.gapM),
           Flexible(
             child: Text(
@@ -822,9 +876,9 @@ class JotaEmpty extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Text(
-            message.toUpperCase(),
+            message,
             textAlign: TextAlign.center,
-            style: t.reading.copyWith(color: c.inkMuted, letterSpacing: 1.4),
+            style: t.prose.copyWith(color: c.inkMuted),
           ),
           if (action != null) ...<Widget>[
             const SizedBox(height: JotaGrid.gapL),
