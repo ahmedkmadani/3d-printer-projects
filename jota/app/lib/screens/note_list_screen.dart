@@ -25,7 +25,7 @@ import '../design/widgets.dart';
 import '../state/device_controller.dart';
 import '../state/notes_controller.dart';
 import 'note_detail_screen.dart';
-import 'sync_screen.dart';
+import 'connect_screen.dart';
 
 class NoteListScreen extends StatefulWidget {
   const NoteListScreen({super.key});
@@ -271,7 +271,7 @@ class _EmptyArchive extends StatelessWidget {
                 upcase: false,
                 height: JotaRows.heightTall,
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const SyncScreen()),
+                  MaterialPageRoute<void>(builder: (_) => const ConnectScreen()),
                 ),
               ),
             ),

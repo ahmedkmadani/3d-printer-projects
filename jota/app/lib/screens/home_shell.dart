@@ -29,7 +29,8 @@ import 'bluetooth_off_screen.dart';
 import 'home_screen.dart';
 import 'note_list_screen.dart';
 import 'settings_screen.dart';
-import 'sync_screen.dart';
+import 'connect_screen.dart';
+import 'pair_screen.dart';
 import 'widgets/device_chip.dart';
 
 class HomeShell extends StatefulWidget {
@@ -120,18 +121,50 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     }
   }
 
-  /// The chip is the way to the sync screen now that it is not a tab. Pushed
-  /// over the shell rather than swapped in, because it is a thing you go and
-  /// look at and then come back from.
-  void _openSync() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const SyncScreen()),
-    );
+  /// The chip DOES the thing rather than going somewhere to do it.
+  ///
+  /// product.md: "Sync is never a place you go." It used to open a whole screen
+  /// whose only content was a button and a progress line — a destination for a
+  /// mechanism, which is the shape that says the mechanism does not work by
+  /// itself. With no device yet there is still something to go TO, so that case
+  /// pushes Connect.
+  Future<void> _chipTapped() async {
+    final DeviceController device = context.read<DeviceController>();
+    if (!device.hasPairedDevice) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const ConnectScreen()),
+      );
+      return;
+    }
+    if (device.isSyncing) return;
+    await device.syncNow();
   }
+
+  /// The engine blocks mid-sync waiting for the digits on the e-paper, and a
+  /// sync can now start from anywhere — the chip, pull-to-refresh, or the
+  /// device simply coming into range. So the prompt lives HERE, above every
+  /// tab, rather than on the one screen that used to own syncing. Without it a
+  /// pull-to-refresh that needed a code would wait forever with nothing on
+  /// screen to type into.
+  Future<void> _maybeAskForCode(DeviceController device) async {
+    if (!device.needsPairCode || _pairOpen) return;
+    _pairOpen = true;
+    final String? code = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(builder: (_) => const PairScreen()),
+    );
+    _pairOpen = false;
+    device.submitPairCode(code);
+  }
+
+  bool _pairOpen = false;
 
   @override
   Widget build(BuildContext context) {
     final JotaColors c = context.ink;
+    final DeviceController device = context.watch<DeviceController>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _maybeAskForCode(device);
+    });
     // The Scaffold insets the body above the bottom bar and owns the bottom
     // safe area, so no screen has to reserve room for the nav by hand.
     return Scaffold(
@@ -148,7 +181,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         children: <Widget>[
           // Above the nav, under every tab: the answer to "is it there" without
           // having to open Sync and ask.
-          DeviceChip(onTap: _openSync),
+          DeviceChip(onTap: _chipTapped),
           HomeNavBar(current: _index, onSelect: _select),
         ],
       ),

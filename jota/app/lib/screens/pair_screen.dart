@@ -85,7 +85,23 @@ class _PairScreenState extends State<PairScreen> {
           constraints: BoxConstraints(
             minHeight: MediaQuery.sizeOf(context).height * 0.60,
           ),
-          child: Column(
+          child: LayoutBuilder(
+        // Scrollable, because the keyboard is up on this screen by definition:
+        // a fixed Column under a Scaffold that resizes for the keyboard has
+        // only its Spacer to give, and a Spacer bottoms out at zero — past
+        // that it overflows.
+        //
+        // LayoutBuilder + IntrinsicHeight rather than a bare scroll view: a
+        // Spacer needs a bounded height to divide, and a scroll view hands its
+        // child infinite height. This floors the column at the viewport, so the
+        // Spacer still centres things when there is room and the whole thing
+        // scrolls once the keyboard takes that room away.
+        builder: (BuildContext context, BoxConstraints viewport) =>
+            SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: viewport.maxHeight),
+            child: IntrinsicHeight(
+              child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           const SizedBox(height: JotaGrid.gapM),
@@ -103,7 +119,11 @@ class _PairScreenState extends State<PairScreen> {
           const SizedBox(height: JotaGrid.gapL),
           const JotaRule(),
 
-          const Spacer(),
+          // A fixed gap, not a Spacer. This column lives inside a scroll
+          // view so it can survive the keyboard, and a scroll view hands its
+          // child unbounded height — a flex child cannot divide infinity, so a
+          // Spacer here is a layout error rather than a centred screen.
+          const SizedBox(height: JotaGrid.gapXL * 2),
 
           Text(
             'Enter the code showing on Jota',
@@ -150,6 +170,10 @@ class _PairScreenState extends State<PairScreen> {
           ),
           const SizedBox(height: JotaGrid.gapM),
         ],
+      ),
+            ),
+          ),
+        ),
       ),
         ),
       ),

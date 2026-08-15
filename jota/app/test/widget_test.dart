@@ -16,7 +16,7 @@ import 'package:jota/app.dart';
 import 'package:jota/design/widgets.dart';
 import 'package:jota/preview/preview_services.dart';
 import 'package:jota/screens/note_detail_screen.dart';
-import 'package:jota/screens/sync_screen.dart';
+import 'package:jota/screens/connect_screen.dart';
 import 'package:jota/screens/widgets/device_chip.dart';
 import 'package:jota/state/services.dart';
 
@@ -163,14 +163,15 @@ void main() {
     await tester.pumpWidget(JotaApp(services: services));
     await pumpAwake(tester);
 
-    // The nav is a floating pill of icon buttons now, not a footer SYNC button;
-    // Sync is no longer a tab: the device chip above the nav is the way in,
-    // and it pushes the screen rather than swapping a destination.
+    // Sync is not a place you go (product.md), so there is no sync screen to
+    // reach any more. With nothing paired the chip has something to go TO —
+    // pairing — so it opens Connect. Once a device IS paired the same tap
+    // simply syncs, in place.
     await tester.tap(find.byType(DeviceChip));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.byType(SyncScreen), findsOneWidget);
+    expect(find.byType(ConnectScreen), findsOneWidget);
 
     // Nothing paired yet, so the screen leads with the connect flow.
     expect(find.text('Connect your Jota'), findsOneWidget);

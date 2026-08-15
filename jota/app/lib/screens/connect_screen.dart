@@ -23,7 +23,7 @@ import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
 import '../state/services.dart';
-import 'tag_setup_screen.dart';
+import 'home_shell.dart';
 
 class ConnectScreen extends StatefulWidget {
   const ConnectScreen({super.key});
@@ -66,8 +66,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
     await context.read<Services>().settings.setHasSeenOnboarding(true);
     if (!mounted) return;
     unawaited(
+      // Straight into the app. There used to be a tag-picking step here, and
+      // product.md is explicit that tags live in Settings only — choosing them
+      // before you own a single note is a decision made with no information,
+      // and it stood between pairing and the thing you came for.
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const TagSetupScreen()),
+        MaterialPageRoute<void>(builder: (_) => const HomeShell()),
       ),
     );
   }
@@ -157,7 +161,11 @@ class _ConnectScreenState extends State<ConnectScreen> {
               ),
             ),
 
-          const Spacer(),
+          // A fixed gap, not a Spacer. This column lives inside a scroll
+          // view so it can survive the keyboard, and a scroll view hands its
+          // child unbounded height — a flex child cannot divide infinity, so a
+          // Spacer here is a layout error rather than a centred screen.
+          const SizedBox(height: JotaGrid.gapXL * 2),
 
           if (wantsCode) ...<Widget>[
             Text(
