@@ -10,7 +10,6 @@
 //  what was said. Id and duration in mono because they are figures; the
 //  transcript in sans because it is prose. That split is the product.
 // ============================================================================
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -22,9 +21,7 @@ import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
 import '../state/notes_controller.dart';
-import '../state/services.dart';
 import 'note_detail_screen.dart';
-import 'settings_screen.dart';
 import 'sync_screen.dart';
 
 class NoteListScreen extends StatefulWidget {
@@ -62,22 +59,10 @@ class _NoteListScreenState extends State<NoteListScreen>
     super.dispose();
   }
 
-  /// Whether transcription is unconfigured. Checked once per appearance rather
-  /// than watched: a keychain read is async and the answer changes only when
-  /// the user sets a key, which comes back through _refreshKeyState.
-  bool _needsKey = false;
-
-  Future<void> _refreshKeyState() async {
-    final bool has = await context.read<Services>().settings.hasApiKey();
-    if (!mounted || has == !_needsKey) return;
-    setState(() => _needsKey = !has);
-  }
-
   @override
   Widget build(BuildContext context) {
     final NotesController notes = context.watch<NotesController>();
     final DeviceController device = context.watch<DeviceController>();
-    unawaited(_refreshKeyState());
     final List<Note> visible = notes.visible;
 
     // STATUS RIGHT SLOT RULE: the one defining figure. Here it is how many
@@ -96,13 +81,12 @@ class _NoteListScreenState extends State<NoteListScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          if (_needsKey) const _NoKeyBanner(),
-          if (notes.tagsInUse.isNotEmpty)
-            _TagFilterStrip(
-              tags: notes.tagsInUse,
-              selected: notes.tagFilter,
-              onSelect: notes.setTagFilter,
-            ),
+          // No filter strip and no "add a key" banner. Both were chrome
+          // sitting between you and the list: the strip spent a row of the
+          // screen on a control for an archive that is usually short enough to
+          // scroll, and the banner turned every empty morning into a nag about
+          // configuration. Where the key matters is Settings, and it says so
+          // there — see the "what leaves your phone" card.
           Expanded(
             child: notes.loading
                 ? const SizedBox.shrink()
@@ -180,73 +164,8 @@ class _HeaderActions extends StatelessWidget {
   }
 }
 
-class _TagFilterStrip extends StatelessWidget {
-  const _TagFilterStrip({
-    required this.tags,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final List<String> tags;
-  final String? selected;
-  final ValueChanged<String?> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: JotaRows.heightCompact + JotaGrid.gapM * 2,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(
-          horizontal: JotaGrid.margin,
-          vertical: JotaGrid.gapM,
-        ),
-        children: <Widget>[
-          _FilterPill(
-            label: 'All',
-            selected: selected == null,
-            onTap: () => onSelect(null),
-          ),
-          for (final String tag in tags) ...<Widget>[
-            const SizedBox(width: JotaRows.gap),
-            _FilterPill(
-              label: tag,
-              selected: selected == tag,
-              onTap: () => onSelect(selected == tag ? null : tag),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 /// Selection by inversion, exactly like the device's rows — filled ink, label
 /// knocked out. No tint, no colour, no checkmark.
-class _FilterPill extends StatelessWidget {
-  const _FilterPill({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IntrinsicWidth(
-      child: JotaRow(
-        label: label,
-        selected: selected,
-        height: JotaRows.heightCompact,
-        onTap: onTap,
-      ),
-    );
-  }
-}
-
 class _NoteRow extends StatelessWidget {
   const _NoteRow({
     required this.note,
@@ -356,44 +275,3 @@ class _EmptyArchive extends StatelessWidget {
 /// notes arrive, play back perfectly, and simply never grow text. The only
 /// hint was a message on the detail screen pointing at a Settings section that
 /// did not exist.
-class _NoKeyBanner extends StatelessWidget {
-  const _NoKeyBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    final JotaType t = context.type;
-    final JotaColors c = context.ink;
-    return InkWell(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-      ),
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(
-          JotaGrid.margin,
-          JotaGrid.gapS,
-          JotaGrid.margin,
-          0,
-        ),
-        padding: const EdgeInsets.all(JotaGrid.gapM),
-        decoration: BoxDecoration(
-          border: Border.all(color: c.inkMuted),
-          borderRadius: BorderRadius.circular(JotaGrid.gapM),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text('Not transcribing yet', style: t.label),
-            const SizedBox(height: JotaGrid.gapS),
-            Text(
-              // Lead with the reassurance. The notes ARE safe; only the text is
-              // missing, and that distinction is the whole anxiety here.
-              'Your notes are saved and playable. Add a Google Cloud key in '
-              'Settings to turn them into text.',
-              style: t.prose.copyWith(color: c.inkMuted),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

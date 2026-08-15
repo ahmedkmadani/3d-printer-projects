@@ -10,6 +10,7 @@
 //  exactly as a real one does, so there is no quiet moment to settle to. Frames
 //  are pumped by hand instead.
 // ============================================================================
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jota/app.dart';
 import 'package:jota/design/widgets.dart';
@@ -87,8 +88,9 @@ void main() {
       findsOneWidget,
     );
 
-    // Tags in use drive the filter strip: an 'All' pill plus a pill per tag.
-    expect(find.text('All'), findsOneWidget);
+    // No filter strip and no configuration banner: the list is the screen.
+    expect(find.text('All'), findsNothing);
+    // Tags still ride on the rows themselves, as pills.
     expect(find.text('WORK'), findsWidgets);
 
     await quiesce(tester, services);
@@ -114,9 +116,18 @@ void main() {
       find.textContaining('call the dentist about moving the appointment'),
       findsWidgets,
     );
+    // The summary card is the detail screen's first block and is unique to
+    // it, so finding it proves we are actually on it. Delete lives further
+    // down the scroll now that the card is above the transcript.
+    expect(find.text('WHAT IT WAS ABOUT'), findsOneWidget);
     // A transcribed note offers the hold-to-edit affordance and a delete —
     // both unique to the detail screen, so they prove we're actually on it.
     expect(find.text('Hold to edit'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.text('Delete note'),
+      find.byType(ListView).first,
+      const Offset(0, -120),
+    );
     expect(find.text('Delete note'), findsOneWidget);
 
     await quiesce(tester, services);

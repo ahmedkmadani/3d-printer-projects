@@ -88,6 +88,14 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           ),
           const SizedBox(height: JotaGrid.gapL),
 
+          // What the note was ABOUT, above the words themselves — the design's
+          // first block, and the half problem.md says every voice recorder
+          // ignores. Gemma fills this in; until it exists the card says so
+          // rather than showing invented bullets, because a summary you cannot
+          // trust is worse than none.
+          _SummaryCard(note: _note),
+          const SizedBox(height: JotaGrid.gapL),
+
           PlaybackBar(
             key: ValueKey<String>('${_note.deviceId}/${_note.noteId}'),
             createPlayer: services.newPlayer,
@@ -227,6 +235,48 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       await notes.delete(_note);
       if (context.mounted) Navigator.of(context).pop();
     }
+  }
+}
+
+/// "What it was about" — the few real points inside a ramble.
+///
+/// A PLACEHOLDER for now. Sorting is Gemma's job and Gemma is not wired up, so
+/// this states that plainly instead of filling the card with plausible
+/// sentences. On a screen whose whole promise is "you can trust what you read
+/// here", inventing the summary would be the one unrecoverable lie.
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.note});
+
+  final Note note;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    final JotaType t = context.type;
+    return Container(
+      padding: const EdgeInsets.all(JotaGrid.gapM),
+      decoration: BoxDecoration(
+        color: c.field,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'WHAT IT WAS ABOUT',
+            style: t.label.copyWith(color: c.inkMuted, fontSize: 11),
+          ),
+          const SizedBox(height: JotaGrid.gapS),
+          Text(
+            note.hasTranscript
+                ? 'Not sorted yet. The points inside this note will appear '
+                    'here once Jota can read it back to itself.'
+                : 'Nothing to sort yet — this note has no words on it.',
+            style: t.prose.copyWith(color: c.inkMuted, height: 1.5),
+          ),
+        ],
+      ),
+    );
   }
 }
 

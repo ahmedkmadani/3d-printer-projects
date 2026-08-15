@@ -331,6 +331,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
 
                 const SizedBox(height: JotaGrid.gapXL),
+                const _SectionLabel('Erase'),
+                Text(
+                  'Wipes every recording on the Jota itself and makes it '
+                  'forget this phone. Your notes here are not touched.',
+                  style: t.prose.copyWith(color: c.inkMuted),
+                ),
+                const SizedBox(height: JotaGrid.gapM),
+                JotaButton(
+                  label: 'Erase device',
+                  danger: true,
+                  upcase: false,
+                  height: JotaRows.heightCompact,
+                  // PLACEHOLDER. The firmware can erase itself — both buttons,
+                  // held twice — but there is no BLE command for it, so the app
+                  // cannot ask. Wiring it means a new characteristic on both
+                  // sides of docs/ble-service.md. Until then this says what it
+                  // cannot do rather than pretending to do it, because a
+                  // destructive button that silently does nothing is the worst
+                  // possible thing to be wrong about.
+                  onTap: () => _say(
+                    context,
+                    'Not yet — hold both buttons on the Jota for five seconds',
+                  ),
+                ),
+
+                const SizedBox(height: JotaGrid.gapXL),
                 const _SectionLabel('About'),
                 JotaButton(
                   label: 'Replay onboarding',
@@ -406,6 +432,13 @@ class _LeavesCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// One-line feedback. Settings has no error region and does not need one.
+void _say(BuildContext context, String message) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(message)));
 }
 
 class _SectionLabel extends StatelessWidget {
