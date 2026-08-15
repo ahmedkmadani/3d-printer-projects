@@ -69,6 +69,19 @@ String jotaShortName(String deviceId) {
 const int kMaxTags = 8;
 const int kMaxTagLength = 12;
 
+/// How many of those tags Jota is actually given.
+///
+/// Fewer than the contract allows, on purpose. Tagging happens in the ten
+/// seconds after a recording stops, often at the wheel, by pressing one button
+/// to step through the list — and every step costs an e-paper refresh. Five is
+/// about as far as anyone will thumb before the window closes; eight turns a
+/// convenience into a chore.
+///
+/// The list in the app can be longer. Its ORDER is what decides which five go
+/// down, which is why the Tags screen is drag-to-reorder and has no second
+/// "send this one" setting to keep in sync.
+const int kDeviceTagSlots = 5;
+
 /// The device shows a 6-digit code on its e-paper.
 const int kPairCodeLength = 6;
 

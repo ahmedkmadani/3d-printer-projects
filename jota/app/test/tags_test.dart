@@ -15,6 +15,7 @@
 // ============================================================================
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jota/ble/jota_protocol.dart';
 import 'package:jota/ble/sync_service.dart';
 import 'package:jota/data/note.dart';
 
@@ -201,6 +202,57 @@ void main() {
       expect(got.length, 8, reason: 'max 8 tags');
       expect(got.first, 'THIRTEENCHAR', reason: 'max 12 characters');
       expect(got, isNot(contains('NINTH')));
+    });
+
+    test('only the top five reach the device, in list order', () async {
+      final Services services = await bootPreview(null);
+      await services.settings.setDevice('JOTA-PREVIEW-01', name: 'JOTA');
+      final NotesController notes = NotesController(
+        repository: services.notes,
+        transcription: services.transcription,
+      );
+      addTearDown(notes.dispose);
+      final DeviceController device = DeviceController(
+        settings: services.settings,
+        scanner: services.scanner,
+        sync: services.sync,
+        background: services.background,
+        notes: notes,
+      );
+      addTearDown(device.dispose);
+      // Become the owner first — writeDeviceTags never prompts for a code, so
+      // an unknown phone would simply be skipped and the test would pass for
+      // the wrong reason.
+      await services.sync.readTags('JOTA-PREVIEW-01', onPairCodeNeeded: code);
+
+      // The contract allows eight. The product sends five, because each extra
+      // one is another button press and another e-paper refresh inside the ten
+      // seconds you have to tag a note at the wheel.
+      const List<String> all = <String>[
+        'PERSONAL', 'IDEAS', 'WORK', 'THERAPY', 'MONEY', 'BOOKS', 'HEALTH',
+      ];
+      await device.writeDeviceTags(all);
+
+      final List<String> onDevice = await services.sync.readTags(
+        'JOTA-PREVIEW-01',
+        onPairCodeNeeded: code,
+      );
+      expect(onDevice, all.take(kDeviceTagSlots).toList());
+      expect(onDevice, isNot(contains('BOOKS')));
+
+      // And the order is the setting: drag MONEY to the top and it travels,
+      // while THERAPY drops off the end. No second switch to keep in step.
+      final List<String> reordered = <String>[
+        'MONEY', 'PERSONAL', 'IDEAS', 'WORK', 'BOOKS', 'THERAPY', 'HEALTH',
+      ];
+      await device.writeDeviceTags(reordered);
+      expect(
+        await services.sync.readTags(
+          'JOTA-PREVIEW-01',
+          onPairCodeNeeded: code,
+        ),
+        reordered.take(kDeviceTagSlots).toList(),
+      );
     });
   });
 

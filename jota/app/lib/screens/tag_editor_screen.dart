@@ -104,6 +104,17 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
     await saveTags(context, _tags);
   }
 
+  /// Reordering is not decoration: the top [kDeviceTagSlots] are the ones Jota
+  /// offers after a recording, so a drag changes what the device will show and
+  /// has to be pushed like any other edit.
+  Future<void> _reorder(int oldIndex, int newIndex) async {
+    // onReorderItem (not the deprecated onReorder) already reports newIndex
+    // relative to the list AFTER the item is lifted out, so there is no
+    // off-by-one to correct here.
+    setState(() => _tags.insert(newIndex, _tags.removeAt(oldIndex)));
+    await saveTags(context, _tags);
+  }
+
   @override
   Widget build(BuildContext context) {
     return JotaScreen(
@@ -118,6 +129,7 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
               tags: _tags,
               onEdit: _edit,
               onAdd: _tags.length < kMaxTags ? _add : null,
+              onReorder: _reorder,
             ),
     );
   }
@@ -263,40 +275,129 @@ class _TagSheetState extends State<_TagSheet> {
 
 /// The editable tag list — a row per tag plus an "Add a tag" row (when [onAdd]
 /// is non-null). Shared by the Tags tab and the first-run tag-setup step.
+///
+/// Drag to reorder when [onReorder] is given, and the order is not cosmetic:
+/// the top [kDeviceTagSlots] are the ones Jota will offer you after a
+/// recording. A line across the list says where that cut falls, so the rule is
+/// visible instead of documented — reordering IS the setting, and there is no
+/// second switch to fall out of step with it.
 class TagList extends StatelessWidget {
   const TagList({
     super.key,
     required this.tags,
     required this.onEdit,
     required this.onAdd,
+    this.onReorder,
     this.padding = const EdgeInsets.only(top: JotaGrid.gapL),
   });
 
   final List<String> tags;
   final ValueChanged<int> onEdit;
   final VoidCallback? onAdd;
-  final EdgeInsetsGeometry padding;
+
+  /// (oldIndex, newIndex) in the caller's own list. Null means a plain,
+  /// non-draggable list — which is what the first-run step wants, since there
+  /// is no device to send anything to yet.
+  final void Function(int oldIndex, int newIndex)? onReorder;
+  final EdgeInsets padding;
+
+  Widget _row(BuildContext context, int i) {
+    return JotaRow(
+      label: tags[i],
+      trailing: Icon(
+        onReorder != null ? LucideIcons.gripVertical : LucideIcons.pencil,
+      ),
+      onTap: () => onEdit(i),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: padding,
-      children: <Widget>[
-        for (int i = 0; i < tags.length; i++) ...<Widget>[
-          JotaRow(
-            label: tags[i],
-            trailing: const Icon(LucideIcons.pencil),
-            onTap: () => onEdit(i),
-          ),
-          const SizedBox(height: JotaRows.gap),
+    if (onReorder == null) {
+      return ListView(
+        padding: padding,
+        children: <Widget>[
+          for (int i = 0; i < tags.length; i++) ...<Widget>[
+            _row(context, i),
+            const SizedBox(height: JotaRows.gap),
+          ],
+          if (onAdd != null)
+            JotaRow(
+              label: 'Add a tag',
+              onTap: onAdd,
+              trailing: const Icon(LucideIcons.plus),
+            ),
         ],
-        if (onAdd != null)
-          JotaRow(
-            label: 'Add a tag',
-            onTap: onAdd,
-            trailing: const Icon(LucideIcons.plus),
+      );
+    }
+
+    final bool showCut = tags.length > kDeviceTagSlots;
+
+    return ReorderableListView.builder(
+      padding: padding,
+      buildDefaultDragHandles: true,
+      itemCount: tags.length,
+      onReorderItem: onReorder!,
+      // The cut line is a footer of the row above it rather than its own list
+      // item: ReorderableListView requires every child to be reorderable and
+      // keyed, and a divider that could be dragged is nonsense.
+      itemBuilder: (BuildContext context, int i) {
+        final bool isCut = showCut && i == kDeviceTagSlots - 1;
+        return Padding(
+          key: ValueKey<String>('tag-${tags[i]}-$i'),
+          padding: const EdgeInsets.only(bottom: JotaRows.gap),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _row(context, i),
+              if (isCut) const _DeviceCutLine(),
+            ],
           ),
-      ],
+        );
+      },
+      footer: onAdd == null
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(bottom: JotaGrid.gapL),
+              child: JotaRow(
+                label: 'Add a tag',
+                onTap: onAdd,
+                trailing: const Icon(LucideIcons.plus),
+              ),
+            ),
+    );
+  }
+}
+
+/// "Everything above this goes to Jota." A hairline with a label in it, in the
+/// muted ink — this is information, not a warning, so it never takes the
+/// accent.
+class _DeviceCutLine extends StatelessWidget {
+  const _DeviceCutLine();
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    final JotaType t = context.type;
+    return Padding(
+      padding: const EdgeInsets.only(top: JotaRows.gap, bottom: JotaGrid.gapS),
+      child: Row(
+        children: <Widget>[
+          Expanded(child: Container(height: JotaGrid.hairline, color: c.rule)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: JotaGrid.gapM),
+            child: Text(
+              'ON JOTA ↑',
+              style: t.label.copyWith(
+                color: c.inkMuted,
+                fontSize: 11,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          Expanded(child: Container(height: JotaGrid.hairline, color: c.rule)),
+        ],
+      ),
     );
   }
 }

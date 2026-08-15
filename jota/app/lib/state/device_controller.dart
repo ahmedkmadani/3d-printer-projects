@@ -330,7 +330,15 @@ class DeviceController extends ChangeNotifier {
     // to the same device tears down the one the transfer is using.
     if (_sync.isRunning) return false;
     try {
-      await _sync.writeTags(id, tags, onPairCodeNeeded: _neverPrompt);
+      // Only the top few travel. The device offers them one button-press at a
+      // time on a panel that takes two seconds to redraw, so the list it holds
+      // is deliberately shorter than the list the app holds — see
+      // kDeviceTagSlots.
+      await _sync.writeTags(
+        id,
+        tags.take(kDeviceTagSlots).toList(),
+        onPairCodeNeeded: _neverPrompt,
+      );
       return true;
     } on Exception catch (e) {
       _lastError = e is SyncException ? e.message : e.toString();

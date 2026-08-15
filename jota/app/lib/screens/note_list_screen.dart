@@ -17,6 +17,7 @@ import 'package:provider/provider.dart';
 
 import '../data/note.dart';
 import '../design/format.dart';
+import '../design/script.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
@@ -298,7 +299,12 @@ class _NoteRow extends StatelessWidget {
             const SizedBox(height: JotaGrid.gapS),
             // Prose line: sans, because at this width mono would fit about
             // fifteen characters and shred the sentence.
-            Text(
+            //
+            // NoteText, not Text: these are the note's own words, so an Arabic
+            // one flips to right-to-left and picks up the Arabic face. The id,
+            // duration and tag above it deliberately do not — they are chrome
+            // and follow the app.
+            NoteText(
               transcribing ? 'Transcribing…' : note.preview,
               style: t.prose.copyWith(
                 fontSize: 15,
