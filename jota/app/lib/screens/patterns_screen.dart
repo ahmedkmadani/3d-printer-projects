@@ -8,6 +8,11 @@
 //  Each topic gets its count and a bar per week, so "this is getting worse" and
 //  "this was a bad month, once" look different at a glance — which is the only
 //  reason to draw the weeks at all.
+//
+//  Laid out against the design lock: the serif title in the body under the
+//  status line, the window said in words, one hairline, then the topics. The
+//  window figure sits in the status line's right slot, which is exactly what
+//  that slot is for — it is the one figure that describes the whole screen.
 // ============================================================================
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -41,6 +46,7 @@ class PatternsScreen extends StatelessWidget {
     return JotaScreen(
       label: 'Patterns',
       upcase: false,
+      value: '$weeks WEEKS',
       onBack: () => Navigator.of(context).pop(),
       child: week.topics.isEmpty
           ? Center(
@@ -51,18 +57,27 @@ class PatternsScreen extends StatelessWidget {
               ),
             )
           : ListView(
-              padding: const EdgeInsets.only(top: JotaGrid.gapM),
+              padding: const EdgeInsets.only(
+                top: JotaGrid.gapM,
+                bottom: JotaGrid.gapXL,
+              ),
               children: <Widget>[
+                Text('What keeps coming back', style: t.headline),
+                const SizedBox(height: JotaGrid.gapS),
                 Text(
                   'Across your last $weeks weeks',
                   style: t.prose.copyWith(color: c.inkMuted),
                 ),
                 const SizedBox(height: JotaGrid.gapL),
-                for (final Topic topic in week.topics) ...<Widget>[
-                  _TopicRow(topic: topic),
+                const JotaRule(),
+                for (int i = 0; i < week.topics.length; i++) ...<Widget>[
                   const SizedBox(height: JotaGrid.gapM),
-                  const JotaRule(),
+                  _TopicRow(topic: week.topics[i]),
                   const SizedBox(height: JotaGrid.gapM),
+                  // No rule after the last one: a hairline under the final row
+                  // draws a floor across nothing, and the list should simply
+                  // stop where the topics do.
+                  if (i < week.topics.length - 1) const JotaRule(),
                 ],
               ],
             ),
@@ -98,7 +113,7 @@ class _TopicRow extends StatelessWidget {
             const SizedBox(width: JotaGrid.gapM),
             Text(
               '${topic.noteCount} NOTES',
-              style: t.reading.copyWith(color: c.inkMuted, fontSize: 11),
+              style: t.reading.copyWith(color: c.inkMuted, fontSize: 12),
             ),
           ],
         ),
@@ -107,17 +122,24 @@ class _TopicRow extends StatelessWidget {
         // rather than a shared maximum: the shape of one thread over time is
         // the question, not how it ranks against the others.
         SizedBox(
-          height: 26,
+          height: _barMax,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: <Widget>[
               for (final int v in topic.weeklyCounts) ...<Widget>[
                 Container(
-                  width: 14,
-                  height: v == 0 ? JotaGrid.hairline : 26 * (v / peak),
-                  color: v == 0 ? c.rule : c.ink,
+                  width: 16,
+                  // A week with nothing in it is drawn as a hairline rather
+                  // than left blank: an absent bar and a bar of height zero
+                  // look identical, and only one of them is a week you were
+                  // quiet.
+                  height: v == 0 ? JotaGrid.hairline : _barMax * (v / peak),
+                  decoration: BoxDecoration(
+                    color: v == 0 ? c.rule : c.ink,
+                    borderRadius: const BorderRadius.all(Radius.circular(1)),
+                  ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: JotaGrid.unit),
               ],
             ],
           ),
@@ -125,4 +147,8 @@ class _TopicRow extends StatelessWidget {
       ],
     );
   }
+
+  /// The tallest a bar gets — the peak week for this topic. Everything else in
+  /// the row is scaled against it.
+  static const double _barMax = 30;
 }

@@ -103,7 +103,14 @@ void main() {
     await tester.pumpWidget(JotaApp(services: services));
     await pumpAwake(tester);
 
-    await tester.tap(find.text('N-012'));
+    // Open it the way a person does now: from the archive, by the words on
+    // the row. Home's latest card no longer prints the id — it leads with the
+    // stamp and the note's own words, so there is no `N-012` to tap there.
+    await tester.tap(find.bySemanticsLabel('Notes'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.textContaining('call the dentist about moving the appointment'),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 

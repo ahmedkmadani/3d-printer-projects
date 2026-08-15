@@ -1,28 +1,28 @@
 // ============================================================================
-//  Jota — pairing
+//  Jota — pairing again
 //
-//  The mirror of the device's PAIR screen (11_pair.png): the six digits set in
-//  the display face, split `428 913`, a rule under them, and one line of
-//  instruction. The device shows the code; the phone shows the same shape with
-//  the digits empty, waiting to be filled.
+//  The sync engine blocks mid-sync when the device refuses the bond and asks
+//  for the six digits on its e-paper; this screen collects them and hands them
+//  back. First-run pairing does NOT come through here — connect_screen.dart
+//  owns that, with the device list still on screen underneath the boxes.
+//
+//  One box per digit, exactly as on first run. It used to be six characters of
+//  the display face with dashes standing in for the digits you had not typed,
+//  which read as a code the app was SHOWING you rather than a field. Only the
+//  device ever shows the code — the phone only ever asks for it.
 //
 //  This is the entire security model — possession of the device. Once, then the
 //  bond is remembered.
 // ============================================================================
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../ble/jota_protocol.dart';
-import '../design/format.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 
 class PairScreen extends StatefulWidget {
   const PairScreen({super.key});
-
-  /// True when this is the last step of the first-run flow: there is no route
-  /// to pop back to (onboarding was replaced), so submitting or skipping moves
 
   @override
   State<PairScreen> createState() => _PairScreenState();
@@ -66,160 +66,74 @@ class _PairScreenState extends State<PairScreen> {
     final JotaType t = context.type;
     final JotaColors c = context.ink;
 
-    // No status bar: the device's PAIR screen is a code and a line, so the
-    // phone's is too. The headline and the six digits are the whole screen;
-    // everything else recedes to muted ink and a single faded hairline.
-    return Scaffold(
-      backgroundColor: c.bg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            // A quiet back chevron. No label, no rule — just the affordance;
-            // cancelling here cancels the pairing the engine is waiting on.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                JotaGrid.gapS,
-                JotaGrid.gapS,
-                JotaGrid.margin,
-                0,
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Semantics(
-                  button: true,
-                  label: 'Back',
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => Navigator.of(context).pop(),
-                    child: const Padding(
-                      padding: EdgeInsets.all(JotaGrid.gapM),
-                      child: _BackChevron(),
+    // The app's own chrome, not a bespoke chevron: this is a pushed screen like
+    // any other, and popping it cancels the pairing the engine is waiting on.
+    return JotaScreen(
+      label: 'Pair',
+      upcase: false,
+      onBack: () => Navigator.of(context).pop(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const SizedBox(height: JotaGrid.gapM),
+          Text('Pair with Jota', style: t.headline),
+          const SizedBox(height: JotaGrid.gapS),
+          Text(
+            // The device only accepts a code while its PAIR screen is up, and
+            // nothing else in the app says how to get there.
+            'Press PAIR on Jota to see the code.',
+            style: t.prose.copyWith(color: c.inkMuted),
+          ),
+          const SizedBox(height: JotaGrid.gapL),
+          const JotaRule(),
+
+          const Spacer(),
+
+          Text(
+            'Enter the code showing on Jota',
+            style: t.prose.copyWith(color: c.inkMuted),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: JotaGrid.gapM),
+          // The boxes are the visible field; the real one is invisible behind
+          // them, which is how the digits can be mono and evenly spaced without
+          // fighting a text cursor. Tapping anywhere on them takes the keyboard.
+          GestureDetector(
+            onTap: () => _focus.requestFocus(),
+            behavior: HitTestBehavior.opaque,
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                JotaCodeBoxes(digits: _digits, length: kPairCodeLength),
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: 0,
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focus,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: <TextInputFormatter>[
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(kPairCodeLength),
+                      ],
+                      onSubmitted: (_) => _submit(),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: JotaGrid.margin,
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      // The one warm, elegant line on the screen — everything
-                      // below it is the device's own mono discipline.
-                      Text('Enter the code', style: t.headline),
-                      const SizedBox(height: JotaGrid.gapXL),
-
-                      // Same big-figure pattern as the device: a code is a
-                      // figure, so it gets the display face.
-                      Stack(
-                        alignment: Alignment.center,
-                        children: <Widget>[
-                          // The real field, invisible: it owns the keyboard and
-                          // the clipboard, while the boxes below own the look.
-                          Opacity(
-                            opacity: 0,
-                            child: SizedBox(
-                              height: 1,
-                              child: TextField(
-                                controller: _controller,
-                                focusNode: _focus,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: <TextInputFormatter>[
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(
-                                    kPairCodeLength,
-                                  ),
-                                ],
-                                onSubmitted: (_) => _submit(),
-                              ),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => _focus.requestFocus(),
-                            behavior: HitTestBehavior.opaque,
-                            child: _CodeDisplay(digits: _digits),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: JotaGrid.gapL),
-                      // Faded hairline, not the heavy status rule: soft under
-                      // the code so the digits stay the focus.
-                      const JotaRule(),
-                      const SizedBox(height: JotaGrid.gapL),
-                      // One quiet line, and only one: the whole instruction.
-                      Text(
-                        'Press PAIR on Jota to see the code.',
-                        textAlign: TextAlign.center,
-                        style:
-                            t.prose.copyWith(color: c.inkMuted, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Footer pinned above the safe area, mirroring JotaScreen.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                JotaGrid.margin,
-                JotaGrid.gapM,
-                JotaGrid.margin,
-                JotaGrid.gapM,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  JotaButton(
-                    label: 'Pair',
-                    primary: true,
-                    upcase: false,
-                    height: JotaRows.heightTall,
-                    onTap: _complete ? _submit : null,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// A small, quiet back affordance — the same chevron the status bar used, at
-/// the same size, in ink. No label, no rule; just the arrow.
-class _BackChevron extends StatelessWidget {
-  const _BackChevron();
-
-  @override
-  Widget build(BuildContext context) {
-    return Icon(LucideIcons.arrowLeft, size: 18, color: context.ink.ink);
-  }
-}
-
-/// `428 913` in the display face, with an underscore for each digit not yet
-/// typed. The gap after three is exactly how the e-paper renders it.
-class _CodeDisplay extends StatelessWidget {
-  const _CodeDisplay({required this.digits});
-
-  final String digits;
-
-  @override
-  Widget build(BuildContext context) {
-    final String padded = digits.padRight(kPairCodeLength, '-');
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Text(
-        fmtPairCode(padded),
-        style: context.type.display,
+          ),
+          const SizedBox(height: JotaGrid.gapL),
+          JotaButton(
+            label: 'Pair',
+            primary: true,
+            upcase: false,
+            // Dimmed until six digits exist. A live button on an incomplete
+            // code invites a press that can only fail.
+            onTap: _complete ? _submit : null,
+          ),
+          const SizedBox(height: JotaGrid.gapM),
+        ],
       ),
     );
   }

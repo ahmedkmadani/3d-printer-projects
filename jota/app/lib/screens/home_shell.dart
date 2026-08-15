@@ -267,9 +267,20 @@ class _NavItem extends StatelessWidget {
             children: <Widget>[
               Icon(icon, size: 20, color: fg),
               // The active tab earns its label; the rest stay icon-only.
+              //
+              // Mono caps, not the sans label style: the design lock draws the
+              // nav in the figure face, and it is the same treatment the
+              // device's own status strip uses for the screen it is on.
               if (active) ...<Widget>[
                 const SizedBox(width: JotaGrid.gapS),
-                Text(label, style: t.label.copyWith(color: fg, fontSize: 12)),
+                Text(
+                  label.toUpperCase(),
+                  style: t.reading.copyWith(
+                    color: fg,
+                    fontSize: 12,
+                    letterSpacing: 1.2,
+                  ),
+                ),
               ],
             ],
           ),

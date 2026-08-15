@@ -7,6 +7,11 @@
 //
 //  Max 8 tags, 12 characters each — the device's limits, shown rather than
 //  enforced silently.
+//
+//  Drawn against the Jota Design Lock: a serif title, the one line that says
+//  what dragging does, a hairline, then flat rows — grip, name, note count —
+//  with the cut line across them. The rows were stadiums, which read as "pick
+//  one of these"; nothing here is selected, it is a list you sort.
 // ============================================================================
 import 'dart:async';
 
@@ -16,9 +21,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../ble/jota_protocol.dart';
+import '../data/note.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
+import '../state/notes_controller.dart';
 import '../state/services.dart';
 
 class TagEditorScreen extends StatefulWidget {
@@ -92,6 +99,12 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
   }
 
   Future<void> _add() async {
+    // The ceiling is the device's, so it is explained rather than enforced by a
+    // button that has quietly gone grey.
+    if (_tags.length >= kMaxTags) {
+      _say(context, '$kMaxTags is the most your Jota holds');
+      return;
+    }
     final String? value = await promptForTag(context);
     if (value == null || value.isEmpty || !mounted) return;
     // The edit path has always refused duplicates; this one never did, so the
@@ -115,22 +128,135 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
     await saveTags(context, _tags);
   }
 
+  /// How many notes carry each tag. The count is the reason to keep a tag or
+  /// drag it above the cut, so it is on the row rather than a screen away.
+  Map<String, int> _counts(List<Note> notes) {
+    final Map<String, int> counts = <String, int>{};
+    for (final Note n in notes) {
+      final String? tag = n.tag?.toUpperCase();
+      if (tag == null || tag.isEmpty) continue;
+      counts[tag] = (counts[tag] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return JotaScreen(
-      label: 'Tags',
-      upcase: false,
-      onBack: widget.embedded ? null : () => Navigator.of(context).pop(),
-      child: _tags.isEmpty && _readingDevice
-          ? Center(
-              child: Text('Reading Jota…', style: context.type.label),
-            )
-          : TagList(
-              tags: _tags,
-              onEdit: _edit,
-              onAdd: _tags.length < kMaxTags ? _add : null,
-              onReorder: _reorder,
+    final JotaColors c = context.ink;
+    final JotaType t = context.type;
+    final NotesController notes = context.watch<NotesController>();
+
+    return Scaffold(
+      backgroundColor: c.bg,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            // The design's top strip: where you are, in the muted mono, with
+            // the back affordance beside it. No rule under it — the screen's
+            // one hairline belongs under the title.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                JotaGrid.margin,
+                JotaGrid.gapS,
+                JotaGrid.margin,
+                0,
+              ),
+              child: SizedBox(
+                height: JotaGrid.statusHeight,
+                child: Row(
+                  children: <Widget>[
+                    if (!widget.embedded)
+                      _BackChevron(onTap: () => Navigator.of(context).pop()),
+                    const Spacer(),
+                    Text(
+                      'SETTINGS · TAGS',
+                      style: t.reading.copyWith(
+                        color: c.inkMuted,
+                        fontSize: 11,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
+            Expanded(
+              child: _tags.isEmpty && _readingDevice
+                  ? Center(child: Text('Reading Jota…', style: t.label))
+                  : TagList(
+                      tags: _tags,
+                      counts: _counts(notes.notes),
+                      header: const _TagsHeader(),
+                      onEdit: _edit,
+                      onReorder: _reorder,
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                JotaGrid.margin,
+                JotaGrid.gapM,
+                JotaGrid.margin,
+                JotaGrid.gapM,
+              ),
+              child: JotaButton(
+                label: 'Add tag',
+                upcase: false,
+                onTap: _add,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The title block, above the list and scrolling with it: what this screen is,
+/// and the one sentence that says the order is the setting.
+class _TagsHeader extends StatelessWidget {
+  const _TagsHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text('Tags', style: t.headline),
+        const SizedBox(height: JotaGrid.gapS),
+        Text(
+          'Drag to reorder. Only the top five fit on the device.',
+          style: t.prose.copyWith(color: c.inkMuted),
+        ),
+        const SizedBox(height: JotaGrid.gapM),
+        const JotaRule(),
+      ],
+    );
+  }
+}
+
+/// The back affordance, matching the one [JotaStatusBar] draws — these screens
+/// build their own top strip because the design has no rule under it.
+class _BackChevron extends StatelessWidget {
+  const _BackChevron({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Back',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.only(right: JotaGrid.gapM),
+          child: Icon(LucideIcons.arrowLeft, size: 18, color: context.ink.ink),
+        ),
+      ),
     );
   }
 }
@@ -273,27 +399,39 @@ class _TagSheetState extends State<_TagSheet> {
   }
 }
 
-/// The editable tag list — a row per tag plus an "Add a tag" row (when [onAdd]
-/// is non-null). Shared by the Tags tab and the first-run tag-setup step.
+/// The editable tag list — a row per tag, under [header].
 ///
 /// Drag to reorder when [onReorder] is given, and the order is not cosmetic:
 /// the top [kDeviceTagSlots] are the ones Jota will offer you after a
 /// recording. A line across the list says where that cut falls, so the rule is
 /// visible instead of documented — reordering IS the setting, and there is no
-/// second switch to fall out of step with it.
+/// second switch to fall out of step with it. Everything under the line is
+/// dimmed, which is the same statement made twice: those are not on the device.
+///
+/// The "add" affordance is NOT here. It is a button pinned to the bottom of the
+/// screen, where the design puts it, so it stays reachable while the list
+/// scrolls.
 class TagList extends StatelessWidget {
   const TagList({
     super.key,
     required this.tags,
     required this.onEdit,
-    required this.onAdd,
+    this.counts = const <String, int>{},
+    this.header,
     this.onReorder,
-    this.padding = const EdgeInsets.only(top: JotaGrid.gapL),
+    this.padding = const EdgeInsets.symmetric(horizontal: JotaGrid.margin),
   });
 
   final List<String> tags;
   final ValueChanged<int> onEdit;
-  final VoidCallback? onAdd;
+
+  /// Notes per tag, keyed by the uppercase tag. A tag nothing carries yet shows
+  /// a zero rather than a blank — an empty slot on the row would read as a
+  /// missing figure, not as none.
+  final Map<String, int> counts;
+
+  /// Scrolls with the list, so the title leaves the screen as the rows arrive.
+  final Widget? header;
 
   /// (oldIndex, newIndex) in the caller's own list. Null means a plain,
   /// non-draggable list — which is what the first-run step wants, since there
@@ -301,70 +439,125 @@ class TagList extends StatelessWidget {
   final void Function(int oldIndex, int newIndex)? onReorder;
   final EdgeInsets padding;
 
-  Widget _row(BuildContext context, int i) {
-    return JotaRow(
-      label: tags[i],
-      trailing: Icon(
-        onReorder != null ? LucideIcons.gripVertical : LucideIcons.pencil,
-      ),
+  Widget _row(BuildContext context, int i, {required bool belowCut}) {
+    final Widget row = _TagRow(
+      name: tags[i],
+      count: counts[tags[i]] ?? 0,
+      // The grip is the drag affordance and the row itself is the edit one, so
+      // a press on the left edge sorts and a tap anywhere else renames. The
+      // pencil takes the grip's place when the list cannot be sorted.
+      handle: onReorder == null
+          ? const Icon(LucideIcons.pencil, size: 16)
+          : ReorderableDragStartListener(
+              index: i,
+              child: const Icon(LucideIcons.gripVertical, size: 16),
+            ),
       onTap: () => onEdit(i),
     );
+    return belowCut ? Opacity(opacity: 0.45, child: row) : row;
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool showCut = tags.length > kDeviceTagSlots;
+
     if (onReorder == null) {
       return ListView(
         padding: padding,
         children: <Widget>[
+          if (header != null) header!,
           for (int i = 0; i < tags.length; i++) ...<Widget>[
-            _row(context, i),
-            const SizedBox(height: JotaRows.gap),
+            _row(context, i, belowCut: showCut && i >= kDeviceTagSlots),
+            if (showCut && i == kDeviceTagSlots - 1) const _DeviceCutLine(),
           ],
-          if (onAdd != null)
-            JotaRow(
-              label: 'Add a tag',
-              onTap: onAdd,
-              trailing: const Icon(LucideIcons.plus),
-            ),
         ],
       );
     }
 
-    final bool showCut = tags.length > kDeviceTagSlots;
-
     return ReorderableListView.builder(
       padding: padding,
-      buildDefaultDragHandles: true,
+      header: header,
+      buildDefaultDragHandles: false,
       itemCount: tags.length,
       onReorderItem: onReorder!,
       // The cut line is a footer of the row above it rather than its own list
       // item: ReorderableListView requires every child to be reorderable and
       // keyed, and a divider that could be dragged is nonsense.
       itemBuilder: (BuildContext context, int i) {
-        final bool isCut = showCut && i == kDeviceTagSlots - 1;
-        return Padding(
+        return Column(
           key: ValueKey<String>('tag-${tags[i]}-$i'),
-          padding: const EdgeInsets.only(bottom: JotaRows.gap),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              _row(context, i),
-              if (isCut) const _DeviceCutLine(),
-            ],
-          ),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            _row(context, i, belowCut: showCut && i >= kDeviceTagSlots),
+            if (showCut && i == kDeviceTagSlots - 1) const _DeviceCutLine(),
+          ],
         );
       },
-      footer: onAdd == null
-          ? null
-          : Padding(
-              padding: const EdgeInsets.only(bottom: JotaGrid.gapL),
-              child: JotaRow(
-                label: 'Add a tag',
-                onTap: onAdd,
-                trailing: const Icon(LucideIcons.plus),
+    );
+  }
+}
+
+/// Grip, name, count, hairline. Flat like the settings rows: nothing in this
+/// list is selected, so nothing here is a stadium.
+class _TagRow extends StatelessWidget {
+  const _TagRow({
+    required this.name,
+    required this.count,
+    required this.handle,
+    required this.onTap,
+  });
+
+  final String name;
+  final int count;
+  final Widget handle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              child: Row(
+                children: <Widget>[
+                  IconTheme(
+                    data: IconThemeData(color: c.inkMuted, size: 16),
+                    child: handle,
+                  ),
+                  const SizedBox(width: JotaGrid.gapM),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: t.prose,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: JotaGrid.gapM),
+                  Text(
+                    '$count',
+                    style: t.reading.copyWith(
+                      color: c.inkMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
+            const JotaRule(),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -380,7 +573,7 @@ class _DeviceCutLine extends StatelessWidget {
     final JotaColors c = context.ink;
     final JotaType t = context.type;
     return Padding(
-      padding: const EdgeInsets.only(top: JotaRows.gap, bottom: JotaGrid.gapS),
+      padding: const EdgeInsets.only(top: JotaGrid.gapM, bottom: JotaGrid.gapS),
       child: Row(
         children: <Widget>[
           Expanded(child: Container(height: JotaGrid.hairline, color: c.rule)),
@@ -388,10 +581,12 @@ class _DeviceCutLine extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: JotaGrid.gapM),
             child: Text(
               'ON JOTA ↑',
-              style: t.label.copyWith(
+              // Mono: it is a label on a rule, the same voice as every other
+              // piece of chrome on this screen.
+              style: t.reading.copyWith(
                 color: c.inkMuted,
                 fontSize: 11,
-                letterSpacing: 1.2,
+                letterSpacing: 1.4,
               ),
             ),
           ),

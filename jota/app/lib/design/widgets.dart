@@ -61,6 +61,7 @@ class JotaStatusBar extends StatelessWidget {
     this.trailing,
     this.showSignalDot = false,
     this.upcase = true,
+    this.rule = true,
   });
 
   /// Left slot: what this screen is. `label` role, uppercased unless a screen
@@ -83,6 +84,11 @@ class JotaStatusBar extends StatelessWidget {
   /// The signal dot — "the device is holding notes for you". One of exactly
   /// two places the accent colour is allowed to appear.
   final bool showSignalDot;
+
+  /// Draw the strong hairline beneath the status line. False on screens whose
+  /// heading lives in the body and is ruled there instead — one hairline is
+  /// the whole chrome, and the only question is which one.
+  final bool rule;
 
   @override
   Widget build(BuildContext context) {
@@ -129,8 +135,14 @@ class JotaStatusBar extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: JotaGrid.statusRuleGap),
-        const JotaRuleStrong(),
+        // Screens whose title lives in the BODY draw their own hairline under
+        // it, and a second rule up here would fence off a status line that is
+        // only holding the app's name. One hairline is the whole chrome — the
+        // question is only which one.
+        if (rule) ...<Widget>[
+          const SizedBox(height: JotaGrid.statusRuleGap),
+          const JotaRuleStrong(),
+        ],
       ],
     );
   }
@@ -180,6 +192,7 @@ class JotaScreen extends StatelessWidget {
     this.footer,
     this.padded = true,
     this.upcase = true,
+    this.rule = true,
   });
 
   final String label;
@@ -187,6 +200,11 @@ class JotaScreen extends StatelessWidget {
   final VoidCallback? onBack;
   final Widget? trailing;
   final bool showSignalDot;
+
+  /// Draw the strong hairline under the status line. False on screens that
+  /// carry their heading in the body and rule it there instead.
+  final bool rule;
+
   final Widget child;
 
   /// See [JotaButton.upcase]. Forwarded to the status bar's label.
@@ -221,6 +239,7 @@ class JotaScreen extends StatelessWidget {
                 trailing: trailing,
                 showSignalDot: showSignalDot,
                 upcase: upcase,
+                rule: rule,
               ),
             ),
             Expanded(
@@ -421,7 +440,14 @@ class JotaButton extends StatelessWidget {
     final Color fill = enabled
         ? (primary ? c.ink : Colors.transparent)
         : (primary ? c.field : Colors.transparent);
-    final Color border = enabled ? c.ink : (primary ? c.field : c.rule);
+    // A danger control's OUTLINE carries the warning too, not just its label.
+    // The border used to stay ink while the text went to signal, so at a
+    // glance the one destructive button on a screen looked like every other
+    // outlined button — and glance is all anyone gives a button they are about
+    // to press by accident.
+    final Color border = !enabled
+        ? (primary ? c.field : c.rule)
+        : (danger && !primary ? c.signal : c.ink);
     Color fg = enabled ? (primary ? c.onInk : c.ink) : c.inkMuted;
     if (danger && enabled && !primary) fg = c.signal;
 

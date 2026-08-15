@@ -1,14 +1,17 @@
 // ============================================================================
 //  Jota — note list
 //
-//  Home. Mirrors the device's MENU/NOTES screens: a status line with the count
-//  in the right slot, a hairline, and rows. The device's own list is stadiums
-//  because it has five items and no scrolling; a phone list of a hundred notes
-//  is hairline-separated rows instead — a hundred stadiums would be noise.
+//  The archive, drawn exactly as the design lock draws it: a serif title, the
+//  one line that says how to sync, a hairline, and then nothing but notes.
 //
-//  Each row is the same three facts the device shows: the id, the duration, and
-//  what was said. Id and duration in mono because they are figures; the
-//  transcript in sans because it is prose. That split is the product.
+//  Each row is the two facts you actually reach for — WHEN it was said and what
+//  it was filed under — over the note's own words. The id and the duration are
+//  gone from the row: nobody finds a note by remembering it was N-012 and ran
+//  47 seconds. Both still exist on the note itself, where they are facts rather
+//  than the headline.
+//
+//  Stamp and tag in mono because they are figures and identifiers; the summary
+//  in sans because it is prose. That split is the product.
 // ============================================================================
 
 import 'package:flutter/material.dart';
@@ -63,24 +66,52 @@ class _NoteListScreenState extends State<NoteListScreen>
   Widget build(BuildContext context) {
     final NotesController notes = context.watch<NotesController>();
     final DeviceController device = context.watch<DeviceController>();
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
     final List<Note> visible = notes.visible;
 
-    // STATUS RIGHT SLOT RULE: the one defining figure. Here it is how many
-    // notes are in the archive.
     return JotaScreen(
-      label: 'Notes',
+      // The screen's name is the serif title in the body, as drawn, so the
+      // status label is empty rather than saying "Notes" twice within forty
+      // pixels of itself.
+      label: '',
       upcase: false,
-      value: fmtCount(visible.length),
-      showSignalDot: (device.pendingOnDevice ?? 0) > 0,
-      padded: false,
-      trailing: _HeaderActions(
-        archived: visible.length,
+      // No signal dot here. The design carries "is the device holding
+      // something" in the words — `2 NEW` — and the accent dot lives on the
+      // device chip above the nav, where it is about the device rather than
+      // about this list.
+      trailing: _PendingSlot(
         pending: device.pendingOnDevice,
         syncing: device.isSyncing,
       ),
+      padded: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              JotaGrid.margin,
+              JotaGrid.gapM,
+              JotaGrid.margin,
+              0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('Notes', style: t.headline),
+                const SizedBox(height: JotaGrid.gapS),
+                // The only instruction on the screen, and it is one line. It
+                // names the gesture that covers the times the OS refuses to
+                // wake the app for the device.
+                Text(
+                  'Pull down to sync',
+                  style: t.prose.copyWith(color: c.inkMuted),
+                ),
+                const SizedBox(height: JotaGrid.gapL),
+                const JotaRule(),
+              ],
+            ),
+          ),
           // No filter strip and no "add a key" banner. Both were chrome
           // sitting between you and the list: the strip spent a row of the
           // screen on a control for an archive that is usually short enough to
@@ -93,8 +124,8 @@ class _NoteListScreenState extends State<NoteListScreen>
                 : visible.isEmpty
                     ? _EmptyArchive(hasDevice: device.hasPairedDevice)
                     : RefreshIndicator(
-                        color: context.ink.ink,
-                        backgroundColor: context.ink.bg,
+                        color: c.ink,
+                        backgroundColor: c.bg,
                         onRefresh: () => device.syncNow().then((_) {}),
                         child: ListView.separated(
                           padding: const EdgeInsets.only(bottom: JotaGrid.gapL),
@@ -130,19 +161,16 @@ class _NoteListScreenState extends State<NoteListScreen>
 /// this screen has.
 ///
 ///   syncing            SYNC   — something is happening right now
-///   notes waiting      003    — at full ink, because it is a call to action
-///   otherwise          008    — how many notes are in the archive
+///   notes waiting      2 NEW  — the device is holding something for you
+///   otherwise          empty
 ///
-/// Never two figures, never a figure plus an icon. The device's status line has
-/// room for one thing and so does this one.
-class _HeaderActions extends StatelessWidget {
-  const _HeaderActions({
-    required this.archived,
-    required this.pending,
-    required this.syncing,
-  });
+/// The archive count used to sit here when nothing was pending. It is gone: a
+/// number that never changes is not news, and the design's slot only ever holds
+/// something worth acting on. The count is not zero-padded here because it is
+/// read as words — "two new" — not as a measurement.
+class _PendingSlot extends StatelessWidget {
+  const _PendingSlot({required this.pending, required this.syncing});
 
-  final int archived;
   final int? pending;
   final bool syncing;
 
@@ -150,22 +178,21 @@ class _HeaderActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final JotaType t = context.type;
     final JotaColors c = context.ink;
-
-    if (syncing) {
-      return Text('SYNC', style: t.reading.copyWith(color: c.inkMuted));
-    }
-    if (pending != null && pending! > 0) {
-      return Text(fmtCount(pending!), style: t.reading.copyWith(color: c.ink));
-    }
-    return Text(
-      fmtCount(archived),
-      style: t.reading.copyWith(color: c.inkMuted),
+    // 9px mono at the design's phone width; the app's grid is ~1.28x that.
+    final TextStyle style = t.reading.copyWith(
+      color: c.inkMuted,
+      fontSize: 11,
+      letterSpacing: 0.8,
     );
+
+    if (syncing) return Text('SYNC', style: style);
+    if (pending != null && pending! > 0) {
+      return Text('$pending NEW', style: style);
+    }
+    return const SizedBox.shrink();
   }
 }
 
-/// Selection by inversion, exactly like the device's rows — filled ink, label
-/// knocked out. No tint, no colour, no checkmark.
 class _NoteRow extends StatelessWidget {
   const _NoteRow({
     required this.note,
@@ -189,32 +216,28 @@ class _NoteRow extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: JotaGrid.margin,
-          vertical: JotaGrid.gapM + 2,
+          vertical: JotaGrid.gapM,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             // Meta line: WHEN it was said, and what it was filed under. The
-            // note's id and its duration used to lead here — but neither is
-            // how anyone finds a note. You remember the afternoon, not that it
-            // was N-012 and ran 47 seconds. Both still exist, on the note
-            // itself, where they are facts rather than the headline.
-            //
-            // The tag is a pill, and it inverts when set — the same selection
-            // vocabulary as every other surface on both objects.
+            // tag is a stadium, outlined — it is a label here, not a choice,
+            // and inversion is reserved for selection everywhere in this
+            // product. It inverts on the note's own screen, where it is the
+            // one that was chosen.
             Row(
               children: <Widget>[
                 Text(
                   fmtNoteStamp(note.recordedAt),
-                  style: t.reading.copyWith(color: c.inkMuted, fontSize: 11),
+                  style: t.reading.copyWith(
+                    color: c.inkMuted,
+                    fontSize: 11,
+                    letterSpacing: 0.7,
+                  ),
                 ),
                 const SizedBox(width: JotaGrid.gapS),
                 if (note.tag != null) JotaTagPill(label: note.tag!),
-                const Spacer(),
-                Text(
-                  note.displayDuration,
-                  style: t.reading.copyWith(color: c.inkMuted, fontSize: 11),
-                ),
               ],
             ),
             const SizedBox(height: JotaGrid.gapS),
@@ -222,13 +245,12 @@ class _NoteRow extends StatelessWidget {
             // fifteen characters and shred the sentence.
             //
             // NoteText, not Text: these are the note's own words, so an Arabic
-            // one flips to right-to-left and picks up the Arabic face. The id,
-            // duration and tag above it deliberately do not — they are chrome
-            // and follow the app.
+            // one flips to right-to-left and picks up the Arabic face. The
+            // stamp and tag above it deliberately do not — they are chrome and
+            // follow the app.
             NoteText(
               transcribing ? 'Transcribing…' : note.preview,
               style: t.prose.copyWith(
-                fontSize: 15,
                 color: note.hasTranscript ? c.ink : c.inkMuted,
               ),
               maxLines: 2,
@@ -267,11 +289,3 @@ class _EmptyArchive extends StatelessWidget {
     );
   }
 }
-
-/// Says why nothing is being transcribed, where the silence is actually
-/// noticed.
-///
-/// Without this the app is quietly broken in the most confusing way possible:
-/// notes arrive, play back perfectly, and simply never grow text. The only
-/// hint was a message on the detail screen pointing at a Settings section that
-/// did not exist.

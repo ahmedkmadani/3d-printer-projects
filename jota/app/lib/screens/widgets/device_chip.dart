@@ -8,6 +8,11 @@
 //  a dot that is filled when present and hollow when not, the same figure
 //  treatment for the count, and the device's own JOTA-91C4 so the two screens
 //  can be read against each other.
+//
+//  Drawn as a stadium with TWO slots, per the design lock: which Jota on the
+//  left, how it is on the right (`84% · SYNCED`). It used to be one centred
+//  sentence, which meant the name and the state grew and shrank against each
+//  other and nothing ever sat still between rebuilds.
 // ============================================================================
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -31,32 +36,63 @@ class DeviceChip extends StatelessWidget {
 
     final _DeviceLine line = _DeviceLine.of(device);
 
+    // Mono, small, tracked and muted: the chip is chrome about a device, not a
+    // sentence, and every figure in it (the id, the charge, the count) is one
+    // the device itself prints in the same face.
+    final TextStyle style = t.reading.copyWith(
+      color: c.inkMuted,
+      fontSize: 12,
+      letterSpacing: 0.8,
+    );
+
     return Semantics(
-      label: 'Jota status: ${line.text}',
+      label: 'Jota status: ${line.name} ${line.status}',
       button: onTap != null,
-      child: InkWell(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: JotaGrid.margin,
-            vertical: JotaGrid.gapS,
+          padding: const EdgeInsets.fromLTRB(
+            JotaGrid.margin,
+            0,
+            JotaGrid.margin,
+            JotaGrid.gapS,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              _Dot(present: line.present, busy: line.busy),
-              const SizedBox(width: JotaGrid.gapS),
-              Flexible(
-                child: Text(
-                  line.text,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: t.label.copyWith(
-                    color: line.present ? c.ink : c.inkMuted,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: JotaGrid.gapM + JotaGrid.unit,
+              vertical: JotaGrid.gapS + 2,
+            ),
+            decoration: BoxDecoration(
+              border: Border.all(color: c.rule, width: JotaGrid.hairline),
+              borderRadius: const BorderRadius.all(Radius.circular(999)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                // The name yields first: the status is the half you are
+                // reading the chip for, so it never gets truncated.
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      _Dot(present: line.present, busy: line.busy),
+                      const SizedBox(width: JotaGrid.gapS),
+                      Flexible(
+                        child: Text(
+                          line.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: style,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: JotaGrid.gapM),
+                Text(line.status, maxLines: 1, style: style),
+              ],
+            ),
           ),
         ),
       ),
@@ -66,6 +102,10 @@ class DeviceChip extends StatelessWidget {
 
 /// Filled when the device is there, hollow when it is not. Same language as the
 /// e-paper's ring and dot, so the two objects read as one product.
+///
+/// This is one of the two places the accent is allowed: a Jota in range and
+/// talking is the definition of LIVE. Out of range it is a hollow outline, so
+/// the state survives without the colour.
 class _Dot extends StatelessWidget {
   const _Dot({required this.present, required this.busy});
 
@@ -77,9 +117,9 @@ class _Dot extends StatelessWidget {
     final JotaColors c = context.ink;
     if (busy) {
       return SizedBox(
-        width: 10,
-        height: 10,
-        child: CircularProgressIndicator(strokeWidth: 1.5, color: c.ink),
+        width: 9,
+        height: 9,
+        child: CircularProgressIndicator(strokeWidth: 1.5, color: c.signal),
       );
     }
     return Container(
@@ -87,8 +127,8 @@ class _Dot extends StatelessWidget {
       height: 8,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: present ? c.ink : Colors.transparent,
-        border: Border.all(color: present ? c.ink : c.inkMuted, width: 1),
+        color: present ? c.signal : Colors.transparent,
+        border: Border.all(color: present ? c.signal : c.inkMuted, width: 1),
       ),
     );
   }
@@ -97,51 +137,69 @@ class _Dot extends StatelessWidget {
 /// The whole state machine, in one place, so the wording cannot drift between
 /// the chip and the Sync screen.
 class _DeviceLine {
-  const _DeviceLine(this.text, {this.present = false, this.busy = false});
+  const _DeviceLine({
+    required this.name,
+    required this.status,
+    this.present = false,
+    this.busy = false,
+  });
 
-  final String text;
+  /// Left slot: WHICH Jota. The same id the device prints on its own splash.
+  final String name;
+
+  /// Right slot: HOW it is, in caps, charge first when it is known.
+  final String status;
+
   final bool present;
   final bool busy;
 
-  /// ` · 62%`, or nothing at all when the charge is unknown.
+  /// `84% · `, or nothing at all when the charge is unknown — which it is on
+  /// every device built so far, because BATTERY_ADC_PIN is still -1.
   static String _charge(DeviceController device) {
     final int? pct = device.batteryOnDevice;
-    return pct == null ? '' : ' · $pct%';
+    return pct == null ? '' : '$pct% · ';
   }
 
   static _DeviceLine of(DeviceController device) {
     if (!device.hasPairedDevice) {
-      return const _DeviceLine('No Jota paired · tap to connect');
+      return const _DeviceLine(name: 'NO JOTA', status: 'TAP TO CONNECT');
     }
+    final String name = device.pairedName;
+
     if (device.isSyncing) {
       return _DeviceLine(
-        '${device.pairedName} · saving your notes',
+        name: name,
+        status: '${_charge(device)}SAVING',
         present: true,
         busy: true,
       );
     }
     if (device.adapter == AdapterStatus.unauthorized) {
-      return _DeviceLine('${device.pairedName} · needs permission');
+      return _DeviceLine(name: name, status: 'NEEDS PERMISSION');
     }
     if (!device.bluetoothReady) {
-      return _DeviceLine('${device.pairedName} · Bluetooth is off');
+      return _DeviceLine(name: name, status: 'BLUETOOTH OFF');
     }
 
     final int? pending = device.pendingOnDevice;
     if (pending == null) {
       // Out of range is NOT the same as "nothing waiting", and saying "up to
       // date" for a device we cannot see would be a lie the app told for weeks.
-      return _DeviceLine('${device.pairedName}${_charge(device)} · not in range');
+      return _DeviceLine(
+        name: name,
+        status: '${_charge(device)}NOT IN RANGE',
+      );
     }
     if (pending == 0) {
       return _DeviceLine(
-        '${device.pairedName}${_charge(device)} · up to date',
+        name: name,
+        status: '${_charge(device)}SYNCED',
         present: true,
       );
     }
     return _DeviceLine(
-      '${device.pairedName}${_charge(device)} · '
-      '${pending == 1 ? '1 note' : '$pending notes'} waiting',
+      name: name,
+      status: '${_charge(device)}$pending WAITING',
       present: true,
     );
   }

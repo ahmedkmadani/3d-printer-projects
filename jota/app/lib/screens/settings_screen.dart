@@ -1,19 +1,26 @@
 // ============================================================================
 //  Jota — settings
 //
-//  Your device, transcription, background sync, storage, and a couple of
-//  "about" actions. No account and no telemetry — but transcription DOES need
-//  a Google Cloud key, and this is where it goes.
+//  Drawn against the Jota Design Lock: a serif title, one hairline, and then a
+//  FLAT list of label/value rows — sans label on the left, mono muted figure on
+//  the right, a hairline under each. Then the "what leaves your phone" card on
+//  the field colour, and the one destructive action pinned at the bottom.
 //
-//  That section was missing entirely until now, which made the product's one
-//  promise unreachable: notes arrived, played back, and sat untranscribed
-//  forever while the error message pointed at a Settings field that did not
-//  exist. The preview swapped in a transcriber that always succeeds, so nobody
-//  saw it.
+//  It used to be six labelled sections of stadium rows, buttons and paragraphs.
+//  Every explanation was a paragraph you had to read to find the control it
+//  belonged to, and each section header re-stated what the row beneath it
+//  already said. The design cuts all of it: a setting is a name and its current
+//  value, and the value IS the affordance — tapping the row changes it.
+//
+//  The design shows four rows (Tags, Device, Battery, Unlock). The rest of the
+//  app's real settings follow in the same shape below them, because they are
+//  behaviours that exist and must stay reachable — the transcription key above
+//  all, which is the one thing that makes a note become words.
 // ============================================================================
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../data/settings_store.dart';
@@ -84,7 +91,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// The key sheet. Obscured while typing, trimmed on the way in — a pasted
   /// key almost always arrives with a trailing newline, and the API rejects it
   /// with a 401 that reads like a wrong key rather than a stray character.
-  Future<void> _editKey(Services s) async {
+  ///
+  /// An empty result removes the key, which is why "Remove key" is no longer a
+  /// row of its own: it is the same decision as replacing it, so it belongs in
+  /// the same sheet — the convention [promptForTag] already uses.
+  Future<void> _editKey(Services s, {required bool hasKey}) async {
     final TextEditingController controller = TextEditingController();
     final String? value = await showModalBottomSheet<String>(
       context: context,
@@ -120,21 +131,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.of(sheetContext).pop(v.trim()),
             ),
             const SizedBox(height: JotaGrid.gapM),
-            JotaButton(
-              label: 'Save',
-              primary: true,
-              upcase: false,
-              height: JotaRows.heightCompact,
-              onTap: () => Navigator.of(sheetContext).pop(
-                controller.text.trim(),
-              ),
+            Row(
+              children: <Widget>[
+                if (hasKey) ...<Widget>[
+                  Expanded(
+                    child: JotaButton(
+                      label: 'Remove',
+                      danger: true,
+                      upcase: false,
+                      height: JotaRows.heightCompact,
+                      onTap: () => Navigator.of(sheetContext).pop(''),
+                    ),
+                  ),
+                  const SizedBox(width: JotaRows.gap),
+                ],
+                Expanded(
+                  child: JotaButton(
+                    label: 'Save',
+                    primary: true,
+                    upcase: false,
+                    height: JotaRows.heightCompact,
+                    onTap: () => Navigator.of(sheetContext).pop(
+                      controller.text.trim(),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
     controller.dispose();
-    if (value == null || value.isEmpty) return;
+    if (value == null) return; // dismissed
+
+    if (value.isEmpty) {
+      await s.settings.setApiKey(null);
+      await _load();
+      return;
+    }
 
     await s.settings.setApiKey(value);
     await _load();
@@ -150,249 +185,300 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final LockController lock = context.watch<LockController>();
     final JotaType t = context.type;
     final JotaColors c = context.ink;
+    final bool hasKey = (_apiKey ?? '').isNotEmpty;
 
-    return JotaScreen(
-      label: 'Settings',
-      upcase: false,
-      onBack: widget.embedded ? null : () => Navigator.of(context).pop(),
-      child: _loading
-          ? const SizedBox.shrink()
-          : ListView(
-              padding: const EdgeInsets.only(top: JotaGrid.gapL),
-              children: <Widget>[
-                const _SectionLabel('Device'),
-                JotaKeyValue(
-                  name: 'Your Jota',
-                  value:
-                      device.hasPairedDevice ? device.pairedName : 'Not set up',
-                ),
-                const SizedBox(height: JotaRows.gap),
-                // The pair of ids, together, because the question they answer is
-                // a comparison: which device is this, and which phone owns it.
-                // The Jota prints its own four characters on its PAIR screen and
-                // at boot, so the two can be held side by side.
-                JotaKeyValue(
-                  name: 'This phone',
-                  value: _shortAppId(device.appId),
-                ),
-                JotaKeyValue(
-                  name: 'Battery',
-                  // "Unknown" rather than a dash or a zero: this board may
-                  // simply have no way to measure it, which is a different
-                  // thing from a flat pack.
-                  value: device.batteryOnDevice == null
-                      ? 'Unknown'
-                      : '${device.batteryOnDevice}%',
-                ),
-                if (device.hasPairedDevice) ...<Widget>[
-                  const SizedBox(height: JotaGrid.gapM),
-                  Text(
-                    'Your Jota remembers this phone, so it reconnects without a '
-                    'code. Another phone can take it over only by entering the '
-                    'six digits shown on the device.',
-                    style: t.prose.copyWith(color: c.inkMuted),
-                  ),
-                  const SizedBox(height: JotaGrid.gapM),
-                  JotaButton(
-                    label: 'Forget this Jota',
-                    danger: true,
-                    upcase: false,
-                    height: JotaRows.heightCompact,
-                    onTap: () async {
-                      await device.forgetDevice();
-                      setState(() {});
-                    },
-                  ),
-                ],
-
-                const SizedBox(height: JotaGrid.gapXL),
-                const _SectionLabel('Tags'),
-                Text(
-                  'The words you sort notes by — here and on your Jota.',
-                  style: t.prose.copyWith(color: c.inkMuted),
-                ),
-                const SizedBox(height: JotaGrid.gapM),
-                JotaButton(
-                  label: 'Edit tags',
-                  upcase: false,
-                  height: JotaRows.heightCompact,
-                  onTap: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const TagEditorScreen(),
+    return Scaffold(
+      backgroundColor: c.bg,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            // The design's top strip. The clock on its left belongs to the
+            // phone, and Settings has no meta label on its right, so all this
+            // holds is the back affordance — and nothing at all in the shell,
+            // where there is no route to pop. No rule under it: the screen's
+            // one hairline sits under the title, where the design puts it.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                JotaGrid.margin,
+                JotaGrid.gapS,
+                JotaGrid.margin,
+                0,
+              ),
+              child: SizedBox(
+                height: JotaGrid.statusHeight,
+                child: widget.embedded
+                    ? null
+                    : Align(
+                        alignment: Alignment.centerLeft,
+                        child: _BackChevron(
+                          onTap: () => Navigator.of(context).pop(),
+                        ),
                       ),
-                    );
-                    if (mounted) setState(() {});
-                  },
-                ),
-
-                const SizedBox(height: JotaGrid.gapXL),
-                const _SectionLabel('Transcription'),
-                Text(
-                  'Jota has no internet of its own. Your phone sends the audio '
-                  'to OpenAI and keeps the text here — so it needs your key.',
-                  style: t.prose.copyWith(color: c.inkMuted),
-                ),
-                const SizedBox(height: JotaGrid.gapM),
-                JotaKeyValue(
-                  name: 'API key',
-                  // Masked, never shown whole: enough to tell two keys apart,
-                  // not enough to use one over someone's shoulder.
-                  value: (_apiKey ?? '').isEmpty
-                      ? 'Not set'
-                      : SettingsStore.maskKey(_apiKey!),
-                ),
-                const SizedBox(height: JotaRows.gap),
-                JotaButton(
-                  label: (_apiKey ?? '').isEmpty ? 'Add a key' : 'Replace key',
-                  upcase: false,
-                  height: JotaRows.heightCompact,
-                  onTap: () => _editKey(s),
-                ),
-                if ((_apiKey ?? '').isNotEmpty) ...<Widget>[
-                  const SizedBox(height: JotaRows.gap),
-                  JotaButton(
-                    label: 'Remove key',
-                    danger: true,
-                    upcase: false,
-                    height: JotaRows.heightCompact,
-                    onTap: () async {
-                      await s.settings.setApiKey(null);
-                      await _load();
-                    },
-                  ),
-                ],
-                const SizedBox(height: JotaGrid.gapM),
-                _ToggleRow(
-                  label: 'Transcribe automatically',
-                  value: s.settings.autoTranscribe,
-                  onChanged: (bool v) async {
-                    await s.settings.setAutoTranscribe(v);
-                    setState(() {});
-                  },
-                ),
-
-                const SizedBox(height: JotaGrid.gapXL),
-                const _SectionLabel('Background'),
-                _ToggleRow(
-                  label: 'Sync in the background',
-                  value: s.settings.backgroundSync,
-                  onChanged: (bool v) async {
-                    await device.setBackgroundSync(v);
-                    setState(() {});
-                  },
-                ),
-
-                const SizedBox(height: JotaGrid.gapXL),
-                const _SectionLabel('Privacy'),
-                _ToggleRow(
-                  label: 'Lock the app',
-                  value: lock.enabled,
-                  onChanged: (bool v) => _setLock(lock, v),
-                ),
-                const SizedBox(height: JotaGrid.gapS),
-                Text(
-                  'Ask for your face, fingerprint or passcode each time you '
-                  'open Jota. Your notes stay on this phone — this keeps them '
-                  'yours.',
-                  style: t.prose.copyWith(color: c.inkMuted),
-                ),
-
-                const SizedBox(height: JotaGrid.gapL),
-                // Story T2, and the reason problem.md calls privacy a
-                // FUNCTIONAL requirement: if you are not sure where a recording
-                // goes, you speak differently, and a thought you softened while
-                // saying it is not the thought.
-                //
-                // So this says the awkward part out loud. The audio does leave,
-                // today, to become text. Anything vaguer would be the product
-                // quietly buying itself room, which is exactly what would make
-                // someone hesitate before speaking.
-                _LeavesCard(
-                  hasKey: (_apiKey ?? '').isNotEmpty,
-                ),
-
-                const SizedBox(height: JotaGrid.gapXL),
-                const _SectionLabel('Storage'),
-                JotaKeyValue(name: 'Notes', value: fmtBytes(_archiveBytes)),
-                JotaKeyValue(
-                  name: 'Playback cache',
-                  value: fmtBytes(_cacheBytes),
-                ),
-                const SizedBox(height: JotaRows.gap),
-                JotaButton(
-                  label: 'Clear cache',
-                  upcase: false,
-                  height: JotaRows.heightCompact,
-                  onTap: () async {
-                    await s.audio.clearCache();
-                    await _load();
-                  },
-                ),
-
-                const SizedBox(height: JotaGrid.gapXL),
-                const _SectionLabel('Erase'),
-                Text(
-                  'Wipes every recording on the Jota itself and makes it '
-                  'forget this phone. Your notes here are not touched.',
-                  style: t.prose.copyWith(color: c.inkMuted),
-                ),
-                const SizedBox(height: JotaGrid.gapM),
-                JotaButton(
-                  label: 'Erase device',
-                  danger: true,
-                  upcase: false,
-                  height: JotaRows.heightCompact,
-                  // PLACEHOLDER. The firmware can erase itself — both buttons,
-                  // held twice — but there is no BLE command for it, so the app
-                  // cannot ask. Wiring it means a new characteristic on both
-                  // sides of docs/ble-service.md. Until then this says what it
-                  // cannot do rather than pretending to do it, because a
-                  // destructive button that silently does nothing is the worst
-                  // possible thing to be wrong about.
-                  onTap: () => _say(
-                    context,
-                    'Not yet — hold both buttons on the Jota for five seconds',
-                  ),
-                ),
-
-                const SizedBox(height: JotaGrid.gapXL),
-                const _SectionLabel('About'),
-                JotaButton(
-                  label: 'Replay onboarding',
-                  upcase: false,
-                  height: JotaRows.heightCompact,
-                  onTap: () async {
-                    await s.settings.setHasSeenOnboarding(false);
-                    if (!context.mounted) return;
-                    await Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const SplashScreen(),
-                      ),
-                      (Route<dynamic> route) => false,
-                    );
-                  },
-                ),
-
-                const SizedBox(height: JotaGrid.gapXL),
-                Center(
-                  child: Text('JOTA', style: t.wordmark.copyWith(fontSize: 28)),
-                ),
-                const SizedBox(height: JotaGrid.gapS),
-                Center(
-                  child: Text(
-                    kVersionLabel,
-                    style: t.reading.copyWith(color: c.inkMuted),
-                  ),
-                ),
-                const SizedBox(height: JotaGrid.gapXL),
-              ],
+              ),
             ),
+            Expanded(
+              child: _loading
+                  ? const SizedBox.shrink()
+                  : ListView(
+                      // Room under the last row so the scroll ends in
+                      // whitespace. Without it the viewport edge lands
+                      // mid-row, and a hairline-separated row sliced in half
+                      // just above a pinned button reads as a broken layout
+                      // rather than as "there is more below".
+                      padding: const EdgeInsets.fromLTRB(
+                        JotaGrid.margin,
+                        0,
+                        JotaGrid.margin,
+                        JotaGrid.gapL,
+                      ),
+                      children: <Widget>[
+                        Text('Settings', style: t.headline),
+                        const SizedBox(height: JotaGrid.gapM),
+                        const JotaRule(),
+
+                        // The four the design names, in its order.
+                        _SettingRow(
+                          label: 'Tags',
+                          value: '${s.settings.tags.length} →',
+                          onTap: () async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const TagEditorScreen(),
+                              ),
+                            );
+                            if (mounted) setState(() {});
+                          },
+                        ),
+                        _SettingRow(
+                          label: 'Device',
+                          value: device.hasPairedDevice
+                              ? device.pairedName
+                              : 'NOT SET UP',
+                        ),
+                        _SettingRow(
+                          label: 'Battery',
+                          // "Unknown" rather than a dash or a zero: this board
+                          // may simply have no way to measure it, which is a
+                          // different thing from a flat pack.
+                          value: device.batteryOnDevice == null
+                              ? 'UNKNOWN'
+                              : '${device.batteryOnDevice}%',
+                        ),
+                        _SettingRow(
+                          label: 'Unlock with fingerprint',
+                          value: lock.enabled ? 'ON' : 'OFF',
+                          onTap: () => _setLock(lock, !lock.enabled),
+                        ),
+
+                        // Everything below is a real behaviour the design's
+                        // four rows do not cover. Same shape, so the list stays
+                        // one list rather than growing sections again.
+                        _SettingRow(
+                          label: 'Transcription key',
+                          // Masked, never shown whole: enough to tell two keys
+                          // apart, not enough to use one over someone's
+                          // shoulder.
+                          value: hasKey
+                              ? SettingsStore.maskKey(_apiKey!)
+                              : 'NOT SET →',
+                          onTap: () => _editKey(s, hasKey: hasKey),
+                        ),
+                        _SettingRow(
+                          label: 'Transcribe automatically',
+                          value: s.settings.autoTranscribe ? 'ON' : 'OFF',
+                          onTap: () async {
+                            await s.settings.setAutoTranscribe(
+                              !s.settings.autoTranscribe,
+                            );
+                            setState(() {});
+                          },
+                        ),
+                        _SettingRow(
+                          label: 'Sync in the background',
+                          value: s.settings.backgroundSync ? 'ON' : 'OFF',
+                          onTap: () async {
+                            await device.setBackgroundSync(
+                              !s.settings.backgroundSync,
+                            );
+                            setState(() {});
+                          },
+                        ),
+                        // Kept next to Device because the question the pair
+                        // answers is a comparison: which Jota is this, and
+                        // which phone owns it.
+                        _SettingRow(
+                          label: 'This phone',
+                          value: _shortAppId(device.appId),
+                        ),
+                        _SettingRow(
+                          label: 'Notes',
+                          value: fmtBytes(_archiveBytes),
+                        ),
+                        _SettingRow(
+                          label: 'Playback cache',
+                          value: '${fmtBytes(_cacheBytes)} →',
+                          onTap: () async {
+                            await s.audio.clearCache();
+                            await _load();
+                          },
+                        ),
+                        _SettingRow(
+                          label: 'Replay onboarding',
+                          value: '→',
+                          onTap: () async {
+                            await s.settings.setHasSeenOnboarding(false);
+                            if (!context.mounted) return;
+                            await Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const SplashScreen(),
+                              ),
+                              (Route<dynamic> route) => false,
+                            );
+                          },
+                        ),
+                        if (device.hasPairedDevice)
+                          _SettingRow(
+                            label: 'Forget this Jota',
+                            value: '→',
+                            onTap: () async {
+                              await device.forgetDevice();
+                              setState(() {});
+                            },
+                          ),
+                        const _SettingRow(
+                          label: 'Version',
+                          value: kVersionLabel,
+                        ),
+
+                        const SizedBox(height: JotaGrid.gapL),
+                        // Story T2, and the reason problem.md calls privacy a
+                        // FUNCTIONAL requirement: if you are not sure where a
+                        // recording goes, you speak differently, and a thought
+                        // you softened while saying it is not the thought.
+                        //
+                        // So this says the awkward part out loud. The audio
+                        // does leave, today, to become text. Anything vaguer
+                        // would be the product quietly buying itself room,
+                        // which is exactly what would make someone hesitate
+                        // before speaking.
+                        _LeavesCard(hasKey: hasKey),
+                        const SizedBox(height: JotaGrid.gapL),
+                      ],
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                JotaGrid.margin,
+                JotaGrid.gapM,
+                JotaGrid.margin,
+                JotaGrid.gapM,
+              ),
+              child: JotaButton(
+                label: 'Erase device',
+                danger: true,
+                upcase: false,
+                // PLACEHOLDER. The firmware can erase itself — both buttons,
+                // held twice — but there is no BLE command for it, so the app
+                // cannot ask. Wiring it means a new characteristic on both
+                // sides of docs/ble-service.md. Until then this says what it
+                // cannot do rather than pretending to do it, because a
+                // destructive button that silently does nothing is the worst
+                // possible thing to be wrong about.
+                onTap: () => _say(
+                  context,
+                  'Not yet — hold both buttons on the Jota for five seconds',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-/// What actually leaves this phone, in plain words.
+/// One setting: its name in sans on the left, its current value in mono on the
+/// right, a hairline under it. Flat, not a stadium — a stadium per setting was
+/// a wall of pills, and the device's stadium means "one of these is selected",
+/// which a list of unrelated settings never is.
+///
+/// A trailing `→` in the value is the whole affordance for a row that goes
+/// somewhere; a row that toggles simply shows ON or OFF and flips on tap.
+class _SettingRow extends StatelessWidget {
+  const _SettingRow({required this.label, required this.value, this.onTap});
+
+  final String label;
+  final String value;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+
+    return Semantics(
+      button: onTap != null,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: <Widget>[
+                  Expanded(child: Text(label, style: t.prose)),
+                  const SizedBox(width: JotaGrid.gapM),
+                  Text(
+                    value,
+                    style: t.reading.copyWith(
+                      color: c.inkMuted,
+                      letterSpacing: 0.8,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const JotaRule(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The back affordance, matching the one [JotaStatusBar] draws — this screen
+/// builds its own top strip because the design has no rule under it.
+class _BackChevron extends StatelessWidget {
+  const _BackChevron({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Back',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.only(right: JotaGrid.gapM),
+          child: Icon(LucideIcons.arrowLeft, size: 18, color: context.ink.ink),
+        ),
+      ),
+    );
+  }
+}
+
+/// What actually leaves this phone, in plain words. The one card on the field
+/// colour, and the only place on this screen that is not a row.
 class _LeavesCard extends StatelessWidget {
   const _LeavesCard({required this.hasKey});
 
@@ -405,28 +491,35 @@ class _LeavesCard extends StatelessWidget {
     final JotaColors c = context.ink;
     final JotaType t = context.type;
     return Container(
-      padding: const EdgeInsets.all(JotaGrid.gapM),
+      padding: const EdgeInsets.all(JotaGrid.gapL),
       decoration: BoxDecoration(
         color: c.field,
-        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        borderRadius: const BorderRadius.all(
+          Radius.circular(JotaCards.radius),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
             'WHAT LEAVES YOUR PHONE',
-            style: t.label.copyWith(color: c.inkMuted, fontSize: 11),
+            // Mono, like every other label in a card in the design — this is
+            // chrome on a figure-shaped surface, not prose.
+            style: t.reading.copyWith(
+              color: c.inkMuted,
+              fontSize: 11,
+              letterSpacing: 1.5,
+            ),
           ),
           const SizedBox(height: JotaGrid.gapS),
           Text(
             hasKey
-                ? 'Audio is sent to Google to be turned into words. Nothing '
-                    'else leaves: no account, nothing posted, and the sorting '
-                    'runs here on this phone.'
+                ? 'Audio goes to Google to become text. Nothing else leaves — '
+                    'the sorting runs here, on this phone.'
                 : 'Nothing. Without a key nothing is transcribed, so no audio '
                     'is sent anywhere. Your notes are recorded, stored and '
                     'played back entirely on this phone.',
-            style: t.prose.copyWith(color: c.ink, height: 1.5),
+            style: t.prose,
           ),
         ],
       ),
@@ -439,55 +532,6 @@ void _say(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message)));
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: JotaGrid.gapM),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Text(
-            text,
-            style: context.type.label.copyWith(color: context.ink.inkMuted),
-          ),
-          const SizedBox(height: JotaGrid.gapS),
-          const JotaRule(),
-        ],
-      ),
-    );
-  }
-}
-
-/// A toggle that obeys the shape rules: a stadium that inverts when on, rather
-/// than a Material Switch with its own colour and its own radius.
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return JotaRow(
-      label: label,
-      selected: value,
-      leading: const SizedBox.shrink(),
-      trailing: Text(value ? 'On' : 'Off'),
-      onTap: () => onChanged(!value),
-    );
-  }
 }
 
 /// A uuid is 36 characters of noise. The first eight are plenty to tell two

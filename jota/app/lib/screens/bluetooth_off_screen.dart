@@ -42,51 +42,71 @@ class BluetoothOffScreen extends StatelessWidget {
       });
     }
 
-    return JotaScreen(
-      label: '',
-      upcase: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          const Spacer(),
-          Center(
-            child: _CrossedBluetooth(color: c.ink, signal: c.signal),
+    // A bare Scaffold, not JotaScreen: this screen has no name and no back
+    // chevron, and the status bar's strong rule was drawing a heavy line across
+    // an otherwise empty notice. Mark, headline, one line, two doors.
+    return Scaffold(
+      backgroundColor: c.bg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: JotaGrid.margin),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              const Spacer(),
+              Center(
+                child: _CrossedBluetooth(color: c.ink, signal: c.signal),
+              ),
+              const SizedBox(height: JotaGrid.gapL),
+              Text(
+                unauthorized ? 'Jota needs Bluetooth' : 'Bluetooth is off',
+                // A shade under the full headline: it is a centred line on a
+                // near-empty screen, and the same size the onboarding pages use
+                // in the same position.
+                style: t.headline.copyWith(fontSize: 24, height: 1.2),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: JotaGrid.gapM),
+              // Centred and held to ~26 characters a line: one sentence should
+              // look like one, not like a paragraph run out to the margins.
+              // (The Center matters — the column stretches, which would
+              // otherwise hand the box a tight full-width constraint.)
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 300),
+                  child: Text(
+                    unauthorized
+                        ? 'Allow Bluetooth in Settings and your notes will '
+                            'come across on their own.'
+                        : 'Jota talks to your phone over Bluetooth. Your '
+                            'notes are still here.',
+                    style: t.prose.copyWith(color: c.inkMuted),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (!unauthorized) ...<Widget>[
+                JotaButton(
+                  label: 'Turn on Bluetooth',
+                  primary: true,
+                  upcase: false,
+                  // Android can flip the radio from here. iOS cannot — it only
+                  // opens its own prompt — so this may do nothing visible
+                  // there, and the offline door below is what gets you out.
+                  onTap: () => device.turnOnBluetooth(),
+                ),
+                const SizedBox(height: JotaRows.gap),
+              ],
+              JotaButton(
+                label: 'Keep reading offline',
+                upcase: false,
+                onTap: () => Navigator.of(context).pop(),
+              ),
+              const SizedBox(height: JotaGrid.gapL),
+            ],
           ),
-          const SizedBox(height: JotaGrid.gapXL),
-          Text(
-            unauthorized ? 'Jota needs Bluetooth' : 'Bluetooth is off',
-            style: t.headline,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: JotaGrid.gapM),
-          Text(
-            unauthorized
-                ? 'Allow Bluetooth in Settings and your notes will come '
-                    'across on their own.'
-                : 'Jota talks to your phone over Bluetooth. Your notes are '
-                    'still here.',
-            style: t.prose.copyWith(color: c.inkMuted),
-            textAlign: TextAlign.center,
-          ),
-          const Spacer(),
-          if (!unauthorized)
-            JotaButton(
-              label: 'Turn on Bluetooth',
-              primary: true,
-              upcase: false,
-              // Android can flip the radio from here. iOS cannot — it only
-              // opens its own prompt — so this may do nothing visible there,
-              // and the offline door below is what actually gets you out.
-              onTap: () => device.turnOnBluetooth(),
-            ),
-          const SizedBox(height: JotaRows.gap),
-          JotaButton(
-            label: 'Keep reading offline',
-            upcase: false,
-            onTap: () => Navigator.of(context).pop(),
-          ),
-          const SizedBox(height: JotaGrid.gapL),
-        ],
+        ),
       ),
     );
   }
@@ -104,8 +124,8 @@ class _CrossedBluetooth extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 64,
-      height: 64,
+      width: 52,
+      height: 52,
       child: CustomPaint(painter: _BtPainter(color: color, signal: signal)),
     );
   }
@@ -121,27 +141,38 @@ class _BtPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final double w = size.width;
     final double h = size.height;
+    // The design draws this on a 24-unit grid at 1.4 units of stroke; keeping
+    // the ratio means the mark holds its weight if the size ever changes.
     final Paint stroke = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
+      ..strokeWidth = w * 1.4 / 24
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     // The rune: a vertical spine with two bowties crossing it.
     final Path p = Path()
-      ..moveTo(w * 0.30, h * 0.32)
-      ..lineTo(w * 0.70, h * 0.68)
-      ..lineTo(w * 0.50, h * 0.84)
-      ..lineTo(w * 0.50, h * 0.16)
-      ..lineTo(w * 0.70, h * 0.32)
-      ..lineTo(w * 0.30, h * 0.68);
+      ..moveTo(w * 7 / 24, h * 7 / 24)
+      ..lineTo(w * 17 / 24, h * 17 / 24)
+      ..lineTo(w * 12 / 24, h * 21 / 24)
+      ..lineTo(w * 12 / 24, h * 3 / 24)
+      ..lineTo(w * 17 / 24, h * 7 / 24)
+      ..lineTo(w * 7 / 24, h * 17 / 24);
     canvas.drawPath(p, stroke);
 
+    // The slash alone takes the accent — "off" is the one thing here that is
+    // not neutral, and the rune underneath stays ink. A separate Paint rather
+    // than recolouring the one above, which left the ink stroke holding the
+    // signal colour for whatever drew next.
+    final Paint slash = Paint()
+      ..color = signal
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke.strokeWidth
+      ..strokeCap = StrokeCap.round;
     canvas.drawLine(
-      Offset(w * 0.12, h * 0.12),
-      Offset(w * 0.88, h * 0.88),
-      stroke..color = signal,
+      Offset(w * 3 / 24, h * 3 / 24),
+      Offset(w * 21 / 24, h * 21 / 24),
+      slash,
     );
   }
 

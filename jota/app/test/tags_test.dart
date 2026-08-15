@@ -143,7 +143,7 @@ void main() {
     await letTheRadioAnswer(tester);
     expect(find.text('WORK'), findsOneWidget);
 
-    await tester.tap(find.text('Add a tag'));
+    await tester.tap(find.text('Add tag'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
