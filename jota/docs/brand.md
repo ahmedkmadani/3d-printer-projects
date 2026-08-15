@@ -141,8 +141,8 @@ Nothing else ever makes a sound.
 ## Open
 
 - App icon not exported yet.
-- **Arabic is bundled but not yet used.** `JotaFonts.arabic` exists and Plex
-  Arabic ships, but no screen picks it per note yet, and nothing flips a note
-  to right-to-left. Needs script detection on the note text.
-- The app screens still use the old layout — only the tokens have moved to
-  this doc's values. Home, Bluetooth-off and Tags do not exist in the app yet.
+- The onboarding illustrations in the app do not yet move. The design has slow
+  ambient loops; the app's are still.
+- Onboarding shows **Skip** on the first two screens only — the last one's
+  action is "Get started", so there is nothing to skip past. The design sheet
+  shows it on all three; the app is right.

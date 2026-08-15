@@ -169,6 +169,20 @@ The app must warn clearly: *this deletes all recordings on the device.*
 - Arabic app language (chrome flips; see [brand.md](brand.md))
 - Export
 
+## Built / not built
+
+**Built:** Home, Patterns, Notes, One note, Tags (drag to reorder), Settings,
+Lock, Onboarding, Connect, Bluetooth off. Arabic notes read right to left.
+Three tabs. 44 tests, analyze clean.
+
+**Not built:** everything on the device side of this doc — it still has ten
+screens, not five. Recording, tagging and the erase gesture are unchanged.
+
+**Standing in for Gemma:** "what keeps coming back" counts words that return
+across separate notes (`lib/insights/insights.dart`). It is honest and local,
+but it cannot tell that "my brother" and "family" are one thread. Gemma
+replaces it behind the same shape.
+
 ## Open
 
 - Which Google STT setting handles Sudanese Arabic mixed with English.
