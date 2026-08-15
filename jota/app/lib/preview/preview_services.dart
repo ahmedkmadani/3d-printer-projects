@@ -10,6 +10,7 @@ import '../state/services.dart';
 import '../transcribe/transcriber.dart';
 import '../transcribe/transcription_queue.dart';
 import 'fake_authenticator.dart';
+import '../data/settings_store.dart';
 import 'fake_device.dart';
 import 'fake_playback.dart';
 import 'fake_transcriber.dart';
@@ -31,7 +32,7 @@ abstract final class PreviewServices {
     // the first thing a new user sees, and the pair flow is one of the things
     // this preview exists to show.
     final InMemorySettingsStore settings = InMemorySettingsStore(
-      tags: <String>['WORK', 'BUY', 'IDEA', 'LATER'],
+      tags: kDefaultTags,
     );
 
     final FakeJota device = FakeJota();
@@ -56,7 +57,12 @@ abstract final class PreviewServices {
       audio: audio,
       partials: partials,
       scanner: FakeScanner(device),
-      sync: FakeSyncService(device: device, notes: notes, audio: audio),
+      sync: FakeSyncService(
+        device: device,
+        notes: notes,
+        audio: audio,
+        settings: settings,
+      ),
       background: FakeBackgroundSync(),
       transcription: TranscriptionQueue(
         notes: notes,
@@ -65,7 +71,6 @@ abstract final class PreviewServices {
         transcriber: buildTranscriber,
       ),
       auth: FakeAuthenticator(),
-
       newPlayer: () => FakeNotePlayer(durationFor: durationFor),
       isPreview: true,
     );

@@ -21,6 +21,7 @@ class PrefsSettingsStore implements SettingsStore {
   final SharedPreferences _prefs;
   final FlutterSecureStorage _secure;
 
+  static const String _kAppId = 'app_id';
   static const String _kApiKey = 'openai_api_key';
   static const String _kDeviceId = 'device_id';
   static const String _kDeviceName = 'device_name';
@@ -39,8 +40,26 @@ class PrefsSettingsStore implements SettingsStore {
       aOptions: AndroidOptions(encryptedSharedPreferences: true),
       iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
     );
+    // Minted once, on the first launch of an install, and never again — the
+    // device stores it as its owner, so regenerating it would silently break
+    // the bond and send the user back to the pairing screen.
+    if ((prefs.getString(_kAppId) ?? '').isEmpty) {
+      await prefs.setString(_kAppId, newAppId());
+    }
+    // Seed the starter tags once, on a genuinely fresh install. Keyed on the
+    // KEY being absent rather than the list being empty: someone who deletes
+    // every tag has made a choice, and having all three reappear next launch
+    // would be the app arguing with them.
+    if (!prefs.containsKey(_kTags)) {
+      await prefs.setStringList(_kTags, kDefaultTags);
+    }
     return PrefsSettingsStore(prefs, secure);
   }
+
+  // ---- identity -----------------------------------------------------------
+
+  @override
+  String get appId => _prefs.getString(_kAppId) ?? '';
 
   // ---- API key ------------------------------------------------------------
 

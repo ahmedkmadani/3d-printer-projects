@@ -14,11 +14,14 @@
 // ============================================================================
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
 
 import '../design/theme.dart';
+import '../state/device_controller.dart';
 import 'note_list_screen.dart';
 import 'settings_screen.dart';
 import 'sync_screen.dart';
+import 'widgets/device_chip.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, this.initialIndex = 0});
@@ -29,9 +32,29 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   late int _index = widget.initialIndex;
   late final Set<int> _visited = <int>{widget.initialIndex};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Coming back to the app is the other moment a person expects their notes
+    // to just be there. Un-park the automatic path and look again.
+    final DeviceController device = context.read<DeviceController>();
+    device.resumeAutoSync(foreground: state == AppLifecycleState.resumed);
+  }
 
   void _select(int i) {
     if (i == _index) return;
@@ -66,7 +89,15 @@ class _HomeShellState extends State<HomeShell> {
             _visited.contains(i) ? _tab(i) : const SizedBox.shrink(),
         ],
       ),
-      bottomNavigationBar: HomeNavBar(current: _index, onSelect: _select),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          // Above the nav, under every tab: the answer to "is it there" without
+          // having to open Sync and ask.
+          DeviceChip(onTap: () => _select(1)),
+          HomeNavBar(current: _index, onSelect: _select),
+        ],
+      ),
     );
   }
 }

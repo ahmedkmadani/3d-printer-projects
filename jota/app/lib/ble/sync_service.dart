@@ -93,6 +93,20 @@ class SyncResult {
   bool get ok => error == null;
 }
 
+/// A failed operation, already phrased for a human.
+///
+/// The engine's exceptions come from flutter_blue_plus and read like stack
+/// traces; the controller is not allowed to import that layer to unwrap them, so
+/// the engine translates on the way out and everything above sees this.
+class SyncException implements Exception {
+  const SyncException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 /// Asks the user for the six digits on the e-paper. Returns null if they cancel —
 /// the engine then gives up rather than guessing, because three wrong codes cost
 /// a 30-second advertising blackout.
@@ -116,9 +130,22 @@ abstract class SyncService {
     bool autoConnect,
   });
 
-  Future<List<String>> readTags(String remoteId);
+  /// Read the device's tag list.
+  ///
+  /// Takes [onPairCodeNeeded] for the same reason `run` does: `tags` sits behind
+  /// the same auth gate as everything else, so a tag operation on a link that
+  /// has not authenticated is discarded by the device.
+  Future<List<String>> readTags(
+    String remoteId, {
+    required PairCodeRequest onPairCodeNeeded,
+  });
 
-  Future<void> writeTags(String remoteId, List<String> tags);
+  /// Replace the device's whole tag list.
+  Future<void> writeTags(
+    String remoteId,
+    List<String> tags, {
+    required PairCodeRequest onPairCodeNeeded,
+  });
 
   Future<void> dispose();
 }

@@ -48,6 +48,10 @@ class DeviceController extends ChangeNotifier {
 
     _scanSub = _scanner.devices.listen((List<JotaAdvertisement> ads) {
       _inRange = ads;
+      // Remember the last real reading, so a device that walks out of range
+      // leaves its charge behind rather than blanking it.
+      final int? seen = pairedAdvertisement?.battery;
+      if (seen != null) _lastBattery = seen;
       notifyListeners();
       unawaited(_maybeAutoSync());
     });
@@ -88,6 +92,10 @@ class DeviceController extends ChangeNotifier {
 
   BackgroundMode get backgroundMode => _background.mode;
 
+  /// Whether the scan belongs to background sync rather than to whatever screen
+  /// happens to be open — a screen must not stop a scan it does not own.
+  bool get wantsBackgroundScan => _settings.backgroundSync;
+
   /// The paired device's advertisement, if it is in range right now. This is the
   /// object that answers "how many notes are waiting" WITHOUT connecting.
   JotaAdvertisement? get pairedAdvertisement {
@@ -102,6 +110,19 @@ class DeviceController extends ChangeNotifier {
   /// Notes waiting on the device, straight from the advertisement. Null when the
   /// device is not in range — which is different from zero, and the UI says so.
   int? get pendingOnDevice => pairedAdvertisement?.pending;
+
+  /// Charge on the paired device, 0..100.
+  ///
+  /// Null covers three different things that all mean "do not show a figure":
+  /// out of range, no sense pin wired on that board, or firmware that predates
+  /// the field. None of them is 0%, and showing 0% for any of them would send
+  /// someone looking for a charger.
+  ///
+  /// Comes from the advertisement, so it is current WITHOUT connecting; the
+  /// last connected reading stands in while the device is away.
+  int? get batteryOnDevice => pairedAdvertisement?.battery ?? _lastBattery;
+
+  int? _lastBattery;
 
   String? _lastError;
   String? get lastError => _lastError;
@@ -132,10 +153,23 @@ class DeviceController extends ChangeNotifier {
   // ---- pairing -------------------------------------------------------------
 
   Future<void> pairWith(JotaAdvertisement ad) async {
-    await _settings.setDevice(ad.remoteId, name: ad.name);
+    // Store the id-bearing name, not the bare local name: every Jota advertises
+    // as "JOTA", so remembering that tells you nothing later. `JOTA-91C4` is the
+    // same four characters the device prints on its own screen.
+    await _settings.setDevice(ad.remoteId, name: ad.shortName);
     notifyListeners();
+    _autoSyncBlocked = false;
     await syncNow();
   }
+
+  /// What to call the paired device in the UI. Prefers what it is broadcasting
+  /// right now, so a device that has been re-flashed still reads correctly.
+  String get pairedName =>
+      pairedAdvertisement?.shortName ?? _settings.deviceName ?? kJotaLocalName;
+
+  /// This phone's own id, shown in Settings so two people can see which phone a
+  /// Jota belongs to.
+  String get appId => _settings.appId;
 
   Future<void> forgetDevice() async {
     await _settings.setDevice(null);
@@ -160,7 +194,16 @@ class DeviceController extends ChangeNotifier {
   // ---- sync ----------------------------------------------------------------
 
   /// Sync with the paired device, or with [ad] if given.
-  Future<SyncResult?> syncNow({JotaAdvertisement? ad}) async {
+  ///
+  /// [interactive] is what separates "the user pressed Save" from "the device
+  /// wandered into range". Only a deliberate sync may stop and ask for the six
+  /// digits: the prompt is surfaced by the Sync screen, so an automatic run that
+  /// asked while the user was reading their notes would block on a dialog
+  /// nobody could see.
+  Future<SyncResult?> syncNow({
+    JotaAdvertisement? ad,
+    bool interactive = true,
+  }) async {
     final String? id = ad?.remoteId ?? pairedId;
     if (id == null) {
       _lastError = 'no device paired';
@@ -170,19 +213,27 @@ class DeviceController extends ChangeNotifier {
     if (_sync.isRunning) return null;
 
     _lastError = null;
-    await _scanner.stop(); // scanning while connecting is slow and pointless
+    // Scanning while connecting is slow and pointless — but it has to come
+    // BACK afterwards, or the screen that was watching for this device goes
+    // dark the moment it succeeds and reports it as out of range.
+    final bool wasScanning = _scanner.isScanning;
+    await _scanner.stop();
     notifyListeners();
 
     final SyncResult result = await _sync.run(
       id,
-      onPairCodeNeeded: _requestPairCode,
+      onPairCodeNeeded: interactive ? _requestPairCode : _neverPrompt,
     );
 
     // App-first tags: the phone owns the tag list, so push it to the device on
     // every successful sync (covers tags added while it was out of range).
     if (result.ok) {
       try {
-        await _sync.writeTags(id, _settings.tags);
+        await _sync.writeTags(
+          id,
+          _settings.tags,
+          onPairCodeNeeded: _neverPrompt,
+        );
       } on Exception catch (_) {
         // Non-fatal: tags will try again next sync.
       }
@@ -190,23 +241,53 @@ class DeviceController extends ChangeNotifier {
 
     if (!result.ok) _lastError = result.error;
     if (result.notesAdded > 0) await _notes.refresh();
+    if (wasScanning) await _scanner.start(timeout: null);
     notifyListeners();
     return result;
   }
 
   /// Opportunistic: the paired device just appeared and says it has notes.
   ///
-  /// This is the whole background story in three lines — the advertisement says
-  /// there is work, so we connect; if it says zero, we never do.
+  /// This is the whole story in a few lines — the advertisement says there is
+  /// work, so we connect; if it says zero, we never do.
+  ///
+  /// Being in range IS the trigger. It used to require the background-sync
+  /// setting even while the app was open and the user was watching the Sync
+  /// screen, so a Jota sitting on the desk with three notes on it would be
+  /// found, listed, counted — and then wait to be told to sync. Coming into
+  /// range is the entire signal a person expects to be enough.
   Future<void> _maybeAutoSync() async {
     if (_sync.isRunning) return;
-    if (!_settings.backgroundSync) return;
     final JotaAdvertisement? ad = pairedAdvertisement;
     if (ad == null || !ad.hasWork) return;
 
-    await _background.report('Pulling ${ad.pending} note(s)');
-    await syncNow(ad: ad);
-    await _background.report('Listening for notes');
+    // Don't re-attempt a device that just failed on us — a bad code or a
+    // device out of reach would otherwise retry on every advertisement, a few
+    // seconds apart, forever.
+    if (_autoSyncBlocked) return;
+
+    final bool background = !_foreground;
+    if (background && !_settings.backgroundSync) return;
+
+    if (background) await _background.report('Pulling ${ad.pending} note(s)');
+    final SyncResult? r = await syncNow(ad: ad, interactive: false);
+    if (background) await _background.report('Listening for notes');
+
+    // One failure parks the automatic path until something changes: the user
+    // taps sync, or the app comes back to the foreground.
+    if (r != null && !r.ok) _autoSyncBlocked = true;
+  }
+
+  /// True while the app is on screen. Set by the shell.
+  bool _foreground = true;
+  bool _autoSyncBlocked = false;
+
+  /// Called when the Sync surface is shown or the app resumes: try again, and
+  /// keep watching rather than giving up after one scan window.
+  void resumeAutoSync({bool foreground = true}) {
+    _foreground = foreground;
+    _autoSyncBlocked = false;
+    unawaited(_maybeAutoSync());
   }
 
   Future<void> _afterSync() async {
@@ -216,28 +297,43 @@ class DeviceController extends ChangeNotifier {
 
   // ---- tags ----------------------------------------------------------------
 
+  /// Tag work never interrupts anyone for a pair code.
+  ///
+  /// Opening the Tags tab is not a request to pair, and a phone that is not the
+  /// device's owner must not be answered with a modal asking for six digits off
+  /// a device that may be in a drawer. Returning null cancels the handshake, the
+  /// operation gives up, and the phone's own list — which is the authority
+  /// anyway — carries on unaffected.
+  static Future<String?> _neverPrompt() async => null;
+
   /// Read the device's tag list. Null if no device is reachable, so the editor can
   /// fall back to what is stored locally.
   Future<List<String>?> readDeviceTags() async {
     final String? id = pairedId;
-    if (id == null) return null;
+    if (id == null || _sync.isRunning) return null;
     try {
-      return await _sync.readTags(id);
+      return await _sync.readTags(id, onPairCodeNeeded: _neverPrompt);
     } on Exception catch (e) {
-      _lastError = e.toString();
+      _lastError = e is SyncException ? e.message : e.toString();
       notifyListeners();
       return null;
     }
   }
 
+  /// Push the phone's list to the device. False means it did not land — the list
+  /// is still saved locally, and the next sync pushes it again.
   Future<bool> writeDeviceTags(List<String> tags) async {
     final String? id = pairedId;
     if (id == null) return false;
+    // A sync already ends by pushing the tags, so there is nothing to gain by
+    // fighting it for the radio — and a great deal to lose: a second connection
+    // to the same device tears down the one the transfer is using.
+    if (_sync.isRunning) return false;
     try {
-      await _sync.writeTags(id, tags);
+      await _sync.writeTags(id, tags, onPairCodeNeeded: _neverPrompt);
       return true;
     } on Exception catch (e) {
-      _lastError = e.toString();
+      _lastError = e is SyncException ? e.message : e.toString();
       notifyListeners();
       return false;
     }
@@ -258,8 +354,21 @@ class DeviceController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _disposed = false;
+
+  /// Nearly everything here finishes after an `await` on a radio. Any of those
+  /// can land after the controller is gone — a screen closing mid-scan is the
+  /// ordinary case, not an edge one — and notifying a disposed ChangeNotifier
+  /// throws. Swallow it in one place rather than guarding a dozen call sites.
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     _progressSub?.cancel();
     _adapterSub?.cancel();
     _scanSub?.cancel();

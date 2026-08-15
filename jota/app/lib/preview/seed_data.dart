@@ -21,6 +21,10 @@ import 'in_memory_stores.dart';
 /// The simulated device's id, used everywhere a remote id is needed.
 const String kPreviewDeviceId = 'JOTA-PREVIEW-01';
 
+/// The fake device's own id, in the same form the firmware derives from its
+/// efuse MAC. The last four characters are what a person sees: JOTA-91C4.
+const String kPreviewDeviceIdHex = '7f3a91c4';
+
 /// What the fake device "shows on its e-paper" during pairing.
 const String kPreviewPairCode = '428913';
 
@@ -177,11 +181,16 @@ class PendingNote {
     required this.secs,
     required this.minutesAgo,
     this.transcript,
+    this.tag,
   });
 
   final int id;
   final int secs;
   final int minutesAgo;
+
+  /// The tag armed on the device when it was recorded. Null for a note taken
+  /// with nothing armed — which is the common case, and has to look right too.
+  final String? tag;
 
   /// What the simulated Whisper will "hear" once this note is pulled.
   final String? transcript;
@@ -193,12 +202,14 @@ const List<PendingNote> kPendingOnDevice = <PendingNote>[
     secs: 8,
     minutesAgo: 26,
     transcript: 'check whether the lid still closes with the thicker gasket',
+    tag: 'WORK',
   ),
   PendingNote(
     id: 14,
     secs: 5,
     minutesAgo: 18,
     transcript: 'book the ferry before Thursday',
+    tag: 'PERSONAL',
   ),
   PendingNote(
     id: 15,

@@ -1,13 +1,22 @@
 // ============================================================================
 //  Jota — settings
 //
-//  Your device, background sync, storage, and a couple of "about" actions. No
-//  account, no server key, no telemetry — transcription is handled elsewhere —
-//  so this is the whole configuration surface of the product.
+//  Your device, transcription, background sync, storage, and a couple of
+//  "about" actions. No account and no telemetry — but transcription DOES need
+//  an OpenAI key, and this is where it goes.
+//
+//  That section was missing entirely until now, which made the product's one
+//  promise unreachable: notes arrived, played back, and sat untranscribed
+//  forever while the error message pointed at a Settings field that did not
+//  exist. The preview swapped in a transcriber that always succeeds, so nobody
+//  saw it.
 // ============================================================================
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../data/settings_store.dart';
 import '../design/format.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
@@ -32,6 +41,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _loading = true;
   int _archiveBytes = 0;
   int _cacheBytes = 0;
+  String? _apiKey;
 
   @override
   void initState() {
@@ -43,10 +53,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final Services s = context.read<Services>();
     final int archive = await s.audio.archiveBytes();
     final int cache = await s.audio.cacheBytes();
+    final String? key = await s.settings.apiKey();
     if (!mounted) return;
     setState(() {
       _archiveBytes = archive;
       _cacheBytes = cache;
+      _apiKey = key;
       _loading = false;
     });
   }
@@ -69,6 +81,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {});
   }
 
+  /// The key sheet. Obscured while typing, trimmed on the way in — a pasted
+  /// key almost always arrives with a trailing newline, and the API rejects it
+  /// with a 401 that reads like a wrong key rather than a stray character.
+  Future<void> _editKey(Services s) async {
+    final TextEditingController controller = TextEditingController();
+    final String? value = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.ink.bg,
+      builder: (BuildContext sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          left: JotaGrid.margin,
+          right: JotaGrid.margin,
+          top: JotaGrid.gapL,
+          bottom: MediaQuery.of(sheetContext).viewInsets.bottom + JotaGrid.gapL,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text('OpenAI API key', style: context.type.label),
+            const SizedBox(height: JotaGrid.gapS),
+            Text(
+              'Starts with sk-. Stored in your phone\'s secure keychain, and '
+              'sent only to OpenAI.',
+              style: context.type.prose.copyWith(color: context.ink.inkMuted),
+            ),
+            const SizedBox(height: JotaGrid.gapM),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: const InputDecoration(hintText: 'sk-…'),
+              onSubmitted: (String v) =>
+                  Navigator.of(sheetContext).pop(v.trim()),
+            ),
+            const SizedBox(height: JotaGrid.gapM),
+            JotaButton(
+              label: 'Save',
+              primary: true,
+              upcase: false,
+              height: JotaRows.heightCompact,
+              onTap: () => Navigator.of(sheetContext).pop(
+                controller.text.trim(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (value == null || value.isEmpty) return;
+
+    await s.settings.setApiKey(value);
+    await _load();
+    // A key is only useful if something uses it: pick up whatever has been
+    // sitting untranscribed while there was none.
+    unawaited(s.transcription.drain());
+  }
+
   @override
   Widget build(BuildContext context) {
     final Services s = context.read<Services>();
@@ -89,12 +163,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SectionLabel('Device'),
                 JotaKeyValue(
                   name: 'Your Jota',
-                  value: device.hasPairedDevice
-                      ? (s.settings.deviceName ?? 'Connected')
-                      : 'Not set up',
+                  value:
+                      device.hasPairedDevice ? device.pairedName : 'Not set up',
+                ),
+                const SizedBox(height: JotaRows.gap),
+                // The pair of ids, together, because the question they answer is
+                // a comparison: which device is this, and which phone owns it.
+                // The Jota prints its own four characters on its PAIR screen and
+                // at boot, so the two can be held side by side.
+                JotaKeyValue(
+                  name: 'This phone',
+                  value: _shortAppId(device.appId),
+                ),
+                JotaKeyValue(
+                  name: 'Battery',
+                  // "Unknown" rather than a dash or a zero: this board may
+                  // simply have no way to measure it, which is a different
+                  // thing from a flat pack.
+                  value: device.batteryOnDevice == null
+                      ? 'Unknown'
+                      : '${device.batteryOnDevice}%',
                 ),
                 if (device.hasPairedDevice) ...<Widget>[
-                  const SizedBox(height: JotaRows.gap),
+                  const SizedBox(height: JotaGrid.gapM),
+                  Text(
+                    'Your Jota remembers this phone, so it reconnects without a '
+                    'code. Another phone can take it over only by entering the '
+                    'six digits shown on the device.',
+                    style: t.prose.copyWith(color: c.inkMuted),
+                  ),
+                  const SizedBox(height: JotaGrid.gapM),
                   JotaButton(
                     label: 'Forget this Jota',
                     danger: true,
@@ -125,6 +223,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     );
                     if (mounted) setState(() {});
+                  },
+                ),
+
+                const SizedBox(height: JotaGrid.gapXL),
+                const _SectionLabel('Transcription'),
+                Text(
+                  'Jota has no internet of its own. Your phone sends the audio '
+                  'to OpenAI and keeps the text here — so it needs your key.',
+                  style: t.prose.copyWith(color: c.inkMuted),
+                ),
+                const SizedBox(height: JotaGrid.gapM),
+                JotaKeyValue(
+                  name: 'API key',
+                  // Masked, never shown whole: enough to tell two keys apart,
+                  // not enough to use one over someone's shoulder.
+                  value: (_apiKey ?? '').isEmpty
+                      ? 'Not set'
+                      : SettingsStore.maskKey(_apiKey!),
+                ),
+                const SizedBox(height: JotaRows.gap),
+                JotaButton(
+                  label: (_apiKey ?? '').isEmpty ? 'Add a key' : 'Replace key',
+                  upcase: false,
+                  height: JotaRows.heightCompact,
+                  onTap: () => _editKey(s),
+                ),
+                if ((_apiKey ?? '').isNotEmpty) ...<Widget>[
+                  const SizedBox(height: JotaRows.gap),
+                  JotaButton(
+                    label: 'Remove key',
+                    danger: true,
+                    upcase: false,
+                    height: JotaRows.heightCompact,
+                    onTap: () async {
+                      await s.settings.setApiKey(null);
+                      await _load();
+                    },
+                  ),
+                ],
+                const SizedBox(height: JotaGrid.gapM),
+                _ToggleRow(
+                  label: 'Transcribe automatically',
+                  value: s.settings.autoTranscribe,
+                  onChanged: (bool v) async {
+                    await s.settings.setAutoTranscribe(v);
+                    setState(() {});
                   },
                 ),
 
@@ -255,3 +399,9 @@ class _ToggleRow extends StatelessWidget {
     );
   }
 }
+
+/// A uuid is 36 characters of noise. The first eight are plenty to tell two
+/// phones apart by eye, which is the only thing anyone does with it.
+String _shortAppId(String appId) => appId.isEmpty
+    ? '—'
+    : appId.substring(0, appId.length.clamp(0, 8)).toUpperCase();

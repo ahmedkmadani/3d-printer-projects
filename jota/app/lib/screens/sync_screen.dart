@@ -14,9 +14,12 @@
 //  Everything technical (signal strength, byte progress, background policy) is
 //  gone from the surface; the engine still does all of it underneath.
 // ============================================================================
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../ble/device_scanner.dart';
 import '../ble/jota_protocol.dart';
 import '../ble/sync_service.dart';
 import '../design/theme.dart';
@@ -42,8 +45,35 @@ class _SyncScreenState extends State<SyncScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DeviceController>().startScan();
+      final DeviceController device = context.read<DeviceController>();
+      // No timeout: while this screen is open, keep watching. A 15-second
+      // window meant a Jota switched on twenty seconds after you opened Sync
+      // was never seen, and the screen sat on "isn't nearby" with a button
+      // asking you to look again — for a device that was, by then, right there.
+      device.startScan(timeout: null);
+      device.resumeAutoSync();
     });
+  }
+
+  /// Held rather than looked up in [dispose]: by then the element is
+  /// deactivated and an ancestor lookup is unsafe.
+  DeviceController? _device;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _device = context.read<DeviceController>();
+  }
+
+  @override
+  void dispose() {
+    // Scanning is not free. Hand the radio back when this screen goes away,
+    // unless background sync owns it.
+    final DeviceController? device = _device;
+    if (device != null && !device.wantsBackgroundScan) {
+      unawaited(device.stopScan());
+    }
+    super.dispose();
   }
 
   /// The engine blocks mid-sync waiting for the six digits on the e-paper.
@@ -71,11 +101,36 @@ class _SyncScreenState extends State<SyncScreen> {
       upcase: false,
       onBack: widget.embedded ? null : () => Navigator.of(context).pop(),
       footer: _footer(device),
-      child: _body(device),
+      child: Column(
+        children: <Widget>[
+          Expanded(child: _body(device)),
+          // lastError was set on every failed sync and read by nothing, so a
+          // wrong code, a refusal from an owned device or a dropped link all
+          // ended with the screen quietly back on "3 notes ready to save".
+          if (device.lastError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: JotaGrid.gapM),
+              child: Text(
+                device.lastError!,
+                style: context.type.prose.copyWith(color: context.ink.signal),
+                textAlign: TextAlign.center,
+              ),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _body(DeviceController device) {
+    // "Denied" and "off" need different things from the person, and a button
+    // offering to switch Bluetooth on cannot fix a refused permission.
+    if (device.adapter == AdapterStatus.unauthorized) {
+      return const _Status(
+        title: 'Jota needs permission',
+        body: 'Allow Nearby devices for Jota in your phone settings, so it '
+            'can find your device. Nothing is sent anywhere.',
+      );
+    }
     if (!device.bluetoothReady) {
       return const _Status(
         title: 'Bluetooth is off',
@@ -89,22 +144,37 @@ class _SyncScreenState extends State<SyncScreen> {
       return _Connect(device: device);
     }
     if (device.pairedAdvertisement == null) {
+      // Still watching — there is no "look again", because it never stopped.
       return const _Status(
-        title: "Jota isn't nearby",
-        body: 'Turn it on and keep it close, then look again.',
+        title: "Waiting for your Jota",
+        body: 'Turn it on and keep it close. This syncs on its own as soon as '
+            'it comes into range.',
       );
     }
+    // Notes first, ALWAYS. A low battery is exactly when the waiting notes
+    // matter most — burying them under a charge warning would hide the one
+    // thing worth acting on, and the notes are what a dying Jota takes with it.
     final int pending = device.pendingOnDevice ?? 0;
-    if (pending == 0) {
-      return const _Status(
-        title: 'All caught up',
-        body: 'Everything on your Jota is saved here.',
+    if (pending > 0) return _Ready(count: pending);
+
+    final int? battery = device.batteryOnDevice;
+    if (battery != null && battery <= 15) {
+      return _Status(
+        title: 'Jota is low — $battery%',
+        body: 'Charge it over USB-C soon. Everything it had is saved here.',
       );
     }
-    return _Ready(count: pending);
+
+    return const _Status(
+      title: 'All caught up',
+      body: 'Everything on your Jota is saved here.',
+    );
   }
 
   Widget? _footer(DeviceController device) {
+    // Nothing this screen can do about a refused permission — offering a
+    // button that cannot work is worse than offering none.
+    if (device.adapter == AdapterStatus.unauthorized) return null;
     if (!device.bluetoothReady) {
       // Android: one tap raises the system enable dialog. iOS: turnOn returns
       // false, so we start a scan, which makes iOS show its own power alert.
@@ -131,7 +201,10 @@ class _SyncScreenState extends State<SyncScreen> {
       return JotaButton(
         label: 'Look again',
         upcase: false,
-        onTap: () => device.startScan(),
+        onTap: () {
+          device.startScan(timeout: null);
+          device.resumeAutoSync();
+        },
       );
     }
     if ((device.pendingOnDevice ?? 0) == 0) {
@@ -248,17 +321,24 @@ class _Connect extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text('Connect your Jota', style: t.headline, textAlign: TextAlign.center),
+        Text(
+          'Connect your Jota',
+          style: t.headline,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: JotaGrid.gapXL),
         if (found.isEmpty)
           Text(
-            device.isScanning ? 'Looking for your Jota…' : 'No Jota found nearby.',
+            device.isScanning
+                ? 'Looking for your Jota…'
+                : 'No Jota found nearby.',
             style: t.prose.copyWith(color: c.inkMuted),
             textAlign: TextAlign.center,
           )
         else
           for (final JotaAdvertisement ad in found) ...<Widget>[
-            JotaRow(label: ad.name, onTap: () => device.pairWith(ad)),
+            // The id-bearing name: every Jota advertises as plain "JOTA".
+            JotaRow(label: ad.shortName, onTap: () => device.pairWith(ad)),
             const SizedBox(height: JotaRows.gap),
           ],
         const SizedBox(height: JotaGrid.gapXL),

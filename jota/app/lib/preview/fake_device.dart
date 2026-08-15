@@ -21,6 +21,7 @@ import '../ble/jota_protocol.dart';
 import '../ble/sync_service.dart';
 import '../data/note.dart';
 import '../data/note_repository.dart';
+import '../data/settings_store.dart';
 import 'in_memory_stores.dart';
 import 'seed_data.dart';
 
@@ -37,7 +38,24 @@ class FakeJota {
 
   bool paired = false;
 
-  List<String> tags = <String>['WORK', 'HOME', 'IDEA', 'BUY', 'LATER'];
+  /// This fake device's own id, and the uuid of the phone that owns it.
+  ///
+  /// The owner is what makes "pair once" real: a phone presenting a matching
+  /// uuid is let in with no code. Modelled here so the preview and the tests
+  /// walk the same handshake the firmware implements, rather than a shortcut
+  /// that would hide a broken one.
+  final String deviceId = kPreviewDeviceIdHex;
+  String? ownerAppId;
+
+  /// Charge, or null to simulate a board with no battery sense wired — which
+  /// is what the firmware reports until the ADC pin is known.
+  int? battery = 62;
+
+  bool get owned => ownerAppId != null;
+
+  /// What a Jota holds before a phone has ever written to it — the same three
+  /// the firmware seeds in `tagsSetDefaults`.
+  List<String> tags = List<String>.of(kDefaultTags);
 
   int get pendingCount => pending.length;
 
@@ -46,6 +64,12 @@ class FakeJota {
         name: kJotaLocalName,
         pending: pendingCount,
         paired: paired,
+        owned: owned,
+        deviceId: int.parse(
+          deviceId.substring(deviceId.length - 4),
+          radix: 16,
+        ),
+        battery: battery,
         // A plausible in-the-same-room signal, drifting a little so the SYNC
         // screen's dBm readout is not suspiciously static.
         rssi: -52 - (DateTime.now().second % 7),
@@ -133,13 +157,16 @@ class FakeSyncService implements SyncService {
     required FakeJota device,
     required NoteRepository notes,
     required InMemoryAudioStore audio,
+    required SettingsStore settings,
   })  : _device = device,
         _notes = notes,
-        _audio = audio;
+        _audio = audio,
+        _settings = settings;
 
   final FakeJota _device;
   final NoteRepository _notes;
   final InMemoryAudioStore _audio;
+  final SettingsStore _settings;
 
   final StreamController<SyncProgress> _progress =
       StreamController<SyncProgress>.broadcast();
@@ -164,6 +191,42 @@ class FakeSyncService implements SyncService {
 
   static Future<void> _beat([int ms = 420]) =>
       Future<void>.delayed(Duration(milliseconds: ms));
+
+  /// The bonding handshake, modelled the way the firmware implements it.
+  /// Returns null on success, or the message to show.
+  ///
+  /// Worth simulating rather than shortcutting: an app that syncs only because
+  /// the fake never challenges it is an app that fails the first time it meets
+  /// real hardware — which is exactly what happened.
+  Future<String?> _authenticate(PairCodeRequest onPairCodeNeeded) async {
+    // The owner reconnecting: no code, no prompt, nothing on the e-paper.
+    if (_device.ownerAppId == _settings.appId) {
+      _device.paired = true;
+      return null;
+    }
+
+    _emit(
+      SyncProgress(
+        phase: SyncPhase.authenticating,
+        message: _device.owned
+            ? 'This Jota is paired to another phone — enter the code it shows'
+            : 'Enter the code shown on the device',
+      ),
+    );
+    final String? code = await onPairCodeNeeded();
+    if (code == null) return 'pairing cancelled';
+
+    await _beat();
+    if (code.replaceAll(RegExp(r'\D'), '') != _device.pairCode) {
+      return 'device rejected the pair code';
+    }
+
+    // A correct code takes ownership, even from another phone: possession of
+    // the device outranks the stored bond.
+    _device.ownerAppId = _settings.appId;
+    _device.paired = true;
+    return null;
+  }
 
   @override
   Future<SyncResult> run(
@@ -192,42 +255,17 @@ class FakeSyncService implements SyncService {
       await _beat(700);
 
       // ---- auth ---------------------------------------------------------
-      if (!_device.paired) {
-        _emit(
-          const SyncProgress(
-            phase: SyncPhase.authenticating,
-            message: 'Enter the code shown on the device',
-          ),
+      // The owner is let straight back in. That is the whole point of the bond,
+      // and modelling it here is what keeps the preview honest: an app that
+      // only works because the fake never asks would fail on real hardware.
+      final String? authError = await _authenticate(onPairCodeNeeded);
+      if (authError != null) {
+        _emit(SyncProgress(phase: SyncPhase.failed, error: authError));
+        return SyncResult(
+          notesAdded: 0,
+          notesRemaining: _device.pendingCount,
+          error: authError,
         );
-        final String? code = await onPairCodeNeeded();
-        if (code == null) {
-          _emit(
-            const SyncProgress(
-              phase: SyncPhase.failed,
-              error: 'pairing cancelled',
-            ),
-          );
-          return const SyncResult(
-            notesAdded: 0,
-            notesRemaining: 0,
-            error: 'pairing cancelled',
-          );
-        }
-        await _beat();
-        if (code != _device.pairCode) {
-          _emit(
-            const SyncProgress(
-              phase: SyncPhase.failed,
-              error: 'device rejected the pair code',
-            ),
-          );
-          return const SyncResult(
-            notesAdded: 0,
-            notesRemaining: 0,
-            error: 'device rejected the pair code',
-          );
-        }
-        _device.paired = true;
       }
 
       _emit(
@@ -311,6 +349,9 @@ class FakeSyncService implements SyncService {
             bytes: totalBytes,
             crc: Crc32.toHex(Crc32.compute(adpcm)),
             adpcmPath: _audio.archivePathFor(kPreviewDeviceId, p.id),
+            // The tag the device armed when this was recorded, carried up in
+            // `index` exactly as the firmware sends it.
+            tag: p.tag,
             // Arrives untranscribed, exactly as a real note does — the text
             // catches up afterwards through the queue.
             syncedAt: DateTime.now(),
@@ -348,15 +389,36 @@ class FakeSyncService implements SyncService {
   }
 
   @override
-  Future<List<String>> readTags(String remoteId) async {
+  Future<List<String>> readTags(
+    String remoteId, {
+    required PairCodeRequest onPairCodeNeeded,
+  }) async {
+    if (_running) throw const SyncException('a sync is using the connection');
     await _beat(600);
+    final String? error = await _authenticate(onPairCodeNeeded);
+    if (error != null) throw SyncException(error);
     return List<String>.of(_device.tags);
   }
 
   @override
-  Future<void> writeTags(String remoteId, List<String> tags) async {
+  Future<void> writeTags(
+    String remoteId,
+    List<String> tags, {
+    required PairCodeRequest onPairCodeNeeded,
+  }) async {
+    if (_running) throw const SyncException('a sync is using the connection');
     await _beat(600);
-    _device.tags = List<String>.of(tags);
+    final String? error = await _authenticate(onPairCodeNeeded);
+    if (error != null) throw SyncException(error);
+    // The device clamps to the contract's ceiling, so the fake must too —
+    // otherwise the preview happily shows nine tags that real hardware drops.
+    _device.tags = tags
+        .take(kMaxTags)
+        .map(
+          (String t) =>
+              t.length > kMaxTagLength ? t.substring(0, kMaxTagLength) : t,
+        )
+        .toList();
   }
 
   @override

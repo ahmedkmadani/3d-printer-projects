@@ -8,6 +8,8 @@
 //  flutter_secure_storage for the API key, shared_preferences for everything
 //  else. Nothing outside that file needs to know which is which.
 // ============================================================================
+import 'dart:math';
+
 abstract class SettingsStore {
   // ---- API key ------------------------------------------------------------
   // Async because on the real implementation it is a Keychain read.
@@ -23,6 +25,17 @@ abstract class SettingsStore {
     if (key.length <= 8) return '••••';
     return '${key.substring(0, 3)}…${key.substring(key.length - 4)}';
   }
+
+  // ---- identity -----------------------------------------------------------
+
+  /// This phone's own id — a uuid generated once, on first run, and never
+  /// changed.
+  ///
+  /// It is what the device stores as its owner, and presenting it is what makes
+  /// "pair once" true: a bonded phone reconnects with no code and no prompt.
+  /// It is also what stops two phones from silently sharing a Jota, and what
+  /// lets a person see which phone a device belongs to.
+  String get appId;
 
   // ---- device -------------------------------------------------------------
 
@@ -75,4 +88,28 @@ abstract class SettingsStore {
   /// Which Transcriber implementation to use. See lib/transcribe/.
   String get backend;
   Future<void> setBackend(String v);
+}
+
+/// What a fresh install starts with, and what an un-paired Jota shows on its
+/// TAGS screen — the same three, defined once on each side (the firmware's copy
+/// is `tagsSetDefaults` in `app/tags.cpp`).
+///
+/// Three rather than a longer list: a tag is chosen with one button on a
+/// 200x200 panel, and a list you have to think about is a list you skip. These
+/// are seeded, not enforced — all three can be renamed or removed.
+const List<String> kDefaultTags = <String>['WORK', 'PERSONAL', 'IDEAS'];
+
+/// A random uuid v4, from the platform's secure generator.
+///
+/// Not worth a package: this is called once in the lifetime of an install, and
+/// the only property that matters is that two installs never collide.
+String newAppId() {
+  final Random r = Random.secure();
+  final List<int> b = List<int>.generate(16, (_) => r.nextInt(256));
+  b[6] = (b[6] & 0x0f) | 0x40; // version 4
+  b[8] = (b[8] & 0x3f) | 0x80; // variant 1
+  final String hex =
+      b.map((int x) => x.toRadixString(16).padLeft(2, '0')).join();
+  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+      '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
 }

@@ -148,11 +148,12 @@ void main() {
     expect(find.text('Connect your Jota'), findsOneWidget);
 
     // The fake advertises after a beat, the way a real one does; the device
-    // then appears in range as a tappable row named after the local name —
-    // discovered WITHOUT connecting, which is the point of the advertisement.
+    // then appears in range as a tappable row named by its ID — discovered
+    // WITHOUT connecting, which is the point of the advertisement. The bare
+    // local name would be "JOTA" for every device ever made.
     await tester.pump(const Duration(milliseconds: 900));
     await tester.pump();
-    expect(find.text('JOTA'), findsWidgets);
+    expect(find.text('JOTA-91C4'), findsWidgets);
 
     await quiesce(tester, services);
   });

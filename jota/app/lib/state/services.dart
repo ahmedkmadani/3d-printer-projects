@@ -108,7 +108,12 @@ class Services {
       audio: audio,
       partials: partials,
       scanner: JotaScanner(),
-      sync: SyncEngine(notes: notes, partials: partials, audio: audio),
+      sync: SyncEngine(
+        notes: notes,
+        partials: partials,
+        audio: audio,
+        settings: settings,
+      ),
       background: background,
       transcription: TranscriptionQueue(
         notes: notes,

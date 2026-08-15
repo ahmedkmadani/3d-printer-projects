@@ -9,27 +9,20 @@
 //  This is the entire security model — possession of the device. Once, then the
 //  bond is remembered.
 // ============================================================================
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:provider/provider.dart';
 
 import '../ble/jota_protocol.dart';
 import '../design/format.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
-import '../state/services.dart';
-import 'tag_setup_screen.dart';
 
 class PairScreen extends StatefulWidget {
-  const PairScreen({super.key, this.firstRun = false});
+  const PairScreen({super.key});
 
   /// True when this is the last step of the first-run flow: there is no route
   /// to pop back to (onboarding was replaced), so submitting or skipping moves
-  /// forward into the app instead of returning the code to a caller.
-  final bool firstRun;
 
   @override
   State<PairScreen> createState() => _PairScreenState();
@@ -56,28 +49,16 @@ class _PairScreenState extends State<PairScreen> {
     super.dispose();
   }
 
+  /// Hand the code back to the caller, which writes it to the device inside
+  /// the pairing it already started.
+  ///
+  /// There is no longer a "first run" branch here. It used to swallow the six
+  /// digits and walk on — the field was collected, discarded, and the app then
+  /// told the user no device was paired. A code screen with nothing behind it
+  /// is worse than no code screen.
   void _submit() {
     if (!_complete) return;
-    if (widget.firstRun) {
-      unawaited(_enterApp());
-      return;
-    }
-    // Normal path (reached from SYNC): hand the code back to the caller, which
-    // writes it to the device inside the sync it already started.
     Navigator.of(context).pop(_digits);
-  }
-
-  /// First-run only: the real scan → connect → auth is wired in a later phase;
-  /// for now finishing the flow means marking onboarding done and landing on
-  /// the notes.
-  Future<void> _enterApp() async {
-    await context.read<Services>().settings.setHasSeenOnboarding(true);
-    if (!mounted) return;
-    unawaited(
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const TagSetupScreen()),
-      ),
-    );
   }
 
   @override
@@ -94,33 +75,31 @@ class _PairScreenState extends State<PairScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            // A quiet back chevron, and only when there is somewhere to go:
-            // in first-run onboarding was replaced, so nothing pops. No label,
-            // no rule — just the affordance.
-            if (!widget.firstRun)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  JotaGrid.gapS,
-                  JotaGrid.gapS,
-                  JotaGrid.margin,
-                  0,
-                ),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Semantics(
-                    button: true,
-                    label: 'Back',
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => Navigator.of(context).pop(),
-                      child: const Padding(
-                        padding: EdgeInsets.all(JotaGrid.gapM),
-                        child: _BackChevron(),
-                      ),
+            // A quiet back chevron. No label, no rule — just the affordance;
+            // cancelling here cancels the pairing the engine is waiting on.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                JotaGrid.gapS,
+                JotaGrid.gapS,
+                JotaGrid.margin,
+                0,
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Semantics(
+                  button: true,
+                  label: 'Back',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(JotaGrid.gapM),
+                      child: _BackChevron(),
                     ),
                   ),
                 ),
               ),
+            ),
 
             Expanded(
               child: Padding(
@@ -178,7 +157,8 @@ class _PairScreenState extends State<PairScreen> {
                       Text(
                         'Press PAIR on Jota to see the code.',
                         textAlign: TextAlign.center,
-                        style: t.prose.copyWith(color: c.inkMuted, fontSize: 14),
+                        style:
+                            t.prose.copyWith(color: c.inkMuted, fontSize: 14),
                       ),
                     ],
                   ),
@@ -197,38 +177,13 @@ class _PairScreenState extends State<PairScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  if (widget.firstRun) ...<Widget>[
-                    JotaButton(
-                      label: 'Continue',
-                      primary: true,
-                      upcase: false,
-                      height: JotaRows.heightTall,
-                      onTap: _complete ? _submit : null,
-                    ),
-                    const SizedBox(height: JotaGrid.gapS),
-                    Semantics(
-                      button: true,
-                      label: 'Skip for now',
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: _enterApp,
-                        child: Padding(
-                          padding: const EdgeInsets.all(JotaGrid.gapM),
-                          child: Text(
-                            'Skip for now',
-                            style: t.label.copyWith(color: c.inkMuted),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ] else
-                    JotaButton(
-                      label: 'Pair',
-                      primary: true,
-                      upcase: false,
-                      height: JotaRows.heightTall,
-                      onTap: _complete ? _submit : null,
-                    ),
+                  JotaButton(
+                    label: 'Pair',
+                    primary: true,
+                    upcase: false,
+                    height: JotaRows.heightTall,
+                    onTap: _complete ? _submit : null,
+                  ),
                 ],
               ),
             ),

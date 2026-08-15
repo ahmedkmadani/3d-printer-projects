@@ -16,6 +16,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../ble/jota_protocol.dart';
+import '../data/settings_store.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/services.dart';
@@ -33,15 +34,16 @@ class _TagSetupScreenState extends State<TagSetupScreen> {
   /// A calm set of everyday buckets for a crowded head. Uppercase because that
   /// is how a tag reads on the device's mono panel, and how `promptForTag`
   /// stores a custom one — so a picked chip and a typed tag agree.
+  /// The three the product ships with come first, so the chips a person sees
+  /// already selected are the ones at the front of the row. The rest are there
+  /// for anyone who wants more than the starting set.
   static const List<String> _suggested = <String>[
-    'WORK',
-    'IDEAS',
+    ...kDefaultTags,
     'TODO',
     'BUY',
     'PEOPLE',
     'MONEY',
     'HEALTH',
-    'LATER',
   ];
 
   /// The tags the user has chosen, in the order they picked them. Seeded from

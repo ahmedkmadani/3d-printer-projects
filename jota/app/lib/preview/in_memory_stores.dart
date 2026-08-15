@@ -380,6 +380,9 @@ class InMemorySettingsStore implements SettingsStore {
   bool get hasDevice => (_deviceId ?? '').isNotEmpty;
 
   @override
+  final String appId = newAppId();
+
+  @override
   List<String> get tags => _tags;
 
   @override

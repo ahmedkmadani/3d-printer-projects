@@ -129,16 +129,16 @@ class JotaLink {
 
   // ---- auth ---------------------------------------------------------------
 
-  /// Write the 6 digits shown on the e-paper.
+  /// Present this phone to the device: its uuid, and the 6 digits if we have
+  /// them.
   ///
-  /// "Nothing else responds until this matches." A wrong code shows up as a
-  /// write error or an immediate disconnect rather than a typed response, so
-  /// both are reported as an auth failure and the caller must ask the user
-  /// again rather than retrying the same digits.
-  Future<void> authenticate(String code) async {
+  /// Writing succeeds either way — the characteristic acks the bytes whatever
+  /// the device decides — so this returns nothing useful and the caller MUST
+  /// read `status.authed` to find out what happened.
+  Future<void> authenticate(String appId, {String? code}) async {
     final BluetoothCharacteristic c = _require(JotaUuid.auth, 'auth');
     try {
-      await c.write(JotaPayload.auth(code));
+      await c.write(JotaPayload.auth(appId, code: code));
     } on FlutterBluePlusException catch (e) {
       throw JotaLinkException(
         'device rejected the pair code (${e.description ?? e.code})',

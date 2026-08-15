@@ -28,6 +28,7 @@ import '../data/audio_store.dart';
 import '../data/note.dart';
 import '../data/note_repository.dart';
 import '../data/partial_store.dart';
+import '../data/settings_store.dart';
 import 'jota_link.dart';
 import 'jota_protocol.dart';
 import 'jota_scanner.dart';
@@ -38,13 +39,19 @@ class SyncEngine implements SyncService {
     required NoteRepository notes,
     required PartialStore partials,
     required AudioStore audio,
+    required SettingsStore settings,
   })  : _notes = notes,
         _partials = partials,
-        _audio = audio;
+        _audio = audio,
+        _settings = settings;
 
   final NoteRepository _notes;
   final PartialStore _partials;
   final AudioStore _audio;
+
+  /// Read for one thing only: this phone's [SettingsStore.appId], which every
+  /// connection presents so the device can recognise its owner.
+  final SettingsStore _settings;
 
   final StreamController<SyncProgress> _progress =
       StreamController<SyncProgress>.broadcast();
@@ -74,6 +81,59 @@ class SyncEngine implements SyncService {
   void _emit(SyncProgress p) {
     _last = p;
     if (!_progress.isClosed) _progress.add(p);
+  }
+
+  /// Bring a freshly opened link up to authenticated, and return the status it
+  /// answered with.
+  ///
+  /// The device's `authed` is PER CONNECTION, so every link starts
+  /// unauthenticated — a sync run, a tag read, a clock write, all of them.
+  ///
+  /// This used to decide it was already paired if `readStatus()` merely
+  /// succeeded. It always succeeds: `status` is deliberately ungated, precisely
+  /// so an unauthenticated phone can discover that it is unauthenticated. So the
+  /// app never sent anything, `index` answered `[]` to an unauthenticated
+  /// reader, and every sync reported "all caught up" while the notes sat on the
+  /// device and the advertisement kept saying three were waiting.
+  Future<JotaStatus> _authenticate(
+    JotaLink link,
+    PairCodeRequest onPairCodeNeeded,
+  ) async {
+    JotaStatus status = await link.readStatus();
+    if (status.authed) return status;
+
+    // Introduce ourselves. If this phone is the owner, that is the whole
+    // handshake — no code, no prompt, nothing shown on the e-paper.
+    await link.authenticate(_settings.appId);
+    status = await link.readStatus();
+    if (status.authed) return status;
+
+    // Not the owner (or nobody is). Now the six digits are genuinely needed.
+    _emit(
+      SyncProgress(
+        phase: SyncPhase.authenticating,
+        message: status.owned
+            ? 'This Jota is paired to another phone — enter the code it shows'
+            : 'Enter the code shown on the device',
+      ),
+    );
+    final String? code = await onPairCodeNeeded();
+    if (code == null) {
+      throw const JotaLinkException('pairing cancelled');
+    }
+
+    await link.authenticate(_settings.appId, code: code);
+    status = await link.readStatus();
+    if (status.authed) return status;
+
+    // Be specific: "wrong code" and "press PAIR on the device first" need
+    // different things from the person holding it.
+    throw JotaLinkException(
+      status.owned
+          ? 'wrong code — open PAIR on the Jota and use the code it shows'
+          : 'the code did not match; open PAIR on the Jota for a fresh one',
+      isAuthFailure: true,
+    );
   }
 
   @override
@@ -110,27 +170,7 @@ class SyncEngine implements SyncService {
 
       final String deviceId = link.remoteId;
 
-      // ---- auth ---------------------------------------------------------
-      // "Nothing else responds until this matches." Rather than guess whether we
-      // are bonded, just try to read status: if the device answers, we are
-      // already paired and the bond survived. If it does not, ask for the code.
-      JotaStatus status;
-      try {
-        status = await link.readStatus();
-      } on Exception {
-        _emit(
-          const SyncProgress(
-            phase: SyncPhase.authenticating,
-            message: 'Enter the code shown on the device',
-          ),
-        );
-        final String? code = await onPairCodeNeeded();
-        if (code == null) {
-          throw const JotaLinkException('pairing cancelled');
-        }
-        await link.authenticate(code);
-        status = await link.readStatus();
-      }
+      final JotaStatus status = await _authenticate(link, onPairCodeNeeded);
 
       // ---- clock --------------------------------------------------------
       // Unconditional, every connect. The device has no other time source, so
@@ -484,6 +524,10 @@ class SyncEngine implements SyncService {
         bytes: entry.bytes,
         crc: entry.crc,
         adpcmPath: dest,
+        // Whatever was armed on the device's TAGS screen when this was
+        // recorded. The phone can still change it later; this is just the
+        // filing the device already did for you.
+        tag: entry.tag,
         syncedAt: DateTime.now(),
       ),
     );
@@ -503,27 +547,84 @@ class SyncEngine implements SyncService {
     return true;
   }
 
-  /// Read the tag list off the device. Separate from a sync run so the tag editor
-  /// can open a link of its own without pulling notes.
-  @override
-  Future<List<String>> readTags(String remoteId) async {
-    final JotaLink link = await JotaLink.open(JotaScanner.deviceFor(remoteId));
-    try {
-      return await link.readTags();
-    } finally {
-      await link.close();
+  // ---- tags -----------------------------------------------------------------
+  //
+  // A tag operation opens a link of its own, so it must not collide with one.
+  // Two things enforce that:
+  //
+  //  * it refuses to run while a sync holds the radio. flutter_blue_plus hands
+  //    out ONE BluetoothDevice per remote id, so a second `open` re-discovers
+  //    services underneath the sync and the matching `close` disconnects the
+  //    link the sync is still using — which showed up as the app hanging until
+  //    the transfer's timeouts expired.
+  //  * tag operations queue behind each other on [_tagOp], so editing three
+  //    tags in a row is three writes over one connection at a time rather than
+  //    three overlapping connects.
+  //
+  // The connect timeout is also much shorter than a sync's. A tag write is a
+  // background courtesy — the list is already saved on the phone — so it should
+  // give up quickly rather than sit on the radio.
+
+  static const Duration _tagTimeout = Duration(seconds: 8);
+
+  Future<void> _tagOp = Future<void>.value();
+
+  /// Run [body] against an authenticated link, serialised against every other
+  /// tag operation.
+  Future<T> _withTagLink<T>(
+    String remoteId,
+    PairCodeRequest onPairCodeNeeded,
+    Future<T> Function(JotaLink link) body,
+  ) async {
+    if (_running) {
+      throw const SyncException('a sync is using the connection');
     }
+
+    final Completer<T> result = Completer<T>();
+
+    _tagOp = _tagOp.then((_) async {
+      JotaLink? link;
+      try {
+        link = await JotaLink.open(
+          JotaScanner.deviceFor(remoteId),
+          timeout: _tagTimeout,
+        );
+        await _authenticate(link, onPairCodeNeeded);
+        result.complete(await body(link));
+      } on Object catch (e, st) {
+        result.completeError(SyncException(_humanise(e)), st);
+      } finally {
+        await link?.close();
+      }
+    });
+
+    return result.future;
+  }
+
+  /// Read the tag list off the device. Separate from a sync run so the tag editor
+  /// can show what the device holds without pulling notes.
+  @override
+  Future<List<String>> readTags(
+    String remoteId, {
+    required PairCodeRequest onPairCodeNeeded,
+  }) {
+    return _withTagLink(
+      remoteId,
+      onPairCodeNeeded,
+      (JotaLink link) => link.readTags(),
+    );
   }
 
   @override
-  Future<void> writeTags(String remoteId, List<String> tags) async {
-    final JotaLink link = await JotaLink.open(JotaScanner.deviceFor(remoteId));
-    try {
+  Future<void> writeTags(
+    String remoteId,
+    List<String> tags, {
+    required PairCodeRequest onPairCodeNeeded,
+  }) {
+    return _withTagLink(remoteId, onPairCodeNeeded, (JotaLink link) async {
       await link.setClock();
       await link.writeTags(tags);
-    } finally {
-      await link.close();
-    }
+    });
   }
 
   @override

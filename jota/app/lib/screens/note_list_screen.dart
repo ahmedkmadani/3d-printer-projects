@@ -10,6 +10,8 @@
 //  what was said. Id and duration in mono because they are figures; the
 //  transcript in sans because it is prose. That split is the product.
 // ============================================================================
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -19,7 +21,9 @@ import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
 import '../state/notes_controller.dart';
+import '../state/services.dart';
 import 'note_detail_screen.dart';
+import 'settings_screen.dart';
 import 'sync_screen.dart';
 
 class NoteListScreen extends StatefulWidget {
@@ -57,10 +61,22 @@ class _NoteListScreenState extends State<NoteListScreen>
     super.dispose();
   }
 
+  /// Whether transcription is unconfigured. Checked once per appearance rather
+  /// than watched: a keychain read is async and the answer changes only when
+  /// the user sets a key, which comes back through _refreshKeyState.
+  bool _needsKey = false;
+
+  Future<void> _refreshKeyState() async {
+    final bool has = await context.read<Services>().settings.hasApiKey();
+    if (!mounted || has == !_needsKey) return;
+    setState(() => _needsKey = !has);
+  }
+
   @override
   Widget build(BuildContext context) {
     final NotesController notes = context.watch<NotesController>();
     final DeviceController device = context.watch<DeviceController>();
+    unawaited(_refreshKeyState());
     final List<Note> visible = notes.visible;
 
     // STATUS RIGHT SLOT RULE: the one defining figure. Here it is how many
@@ -79,6 +95,7 @@ class _NoteListScreenState extends State<NoteListScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          if (_needsKey) const _NoKeyBanner(),
           if (notes.tagsInUse.isNotEmpty)
             _TagFilterStrip(
               tags: notes.tagsInUse,
@@ -324,3 +341,51 @@ class _EmptyArchive extends StatelessWidget {
   }
 }
 
+/// Says why nothing is being transcribed, where the silence is actually
+/// noticed.
+///
+/// Without this the app is quietly broken in the most confusing way possible:
+/// notes arrive, play back perfectly, and simply never grow text. The only
+/// hint was a message on the detail screen pointing at a Settings section that
+/// did not exist.
+class _NoKeyBanner extends StatelessWidget {
+  const _NoKeyBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+    return InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+      ),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(
+          JotaGrid.margin,
+          JotaGrid.gapS,
+          JotaGrid.margin,
+          0,
+        ),
+        padding: const EdgeInsets.all(JotaGrid.gapM),
+        decoration: BoxDecoration(
+          border: Border.all(color: c.inkMuted),
+          borderRadius: BorderRadius.circular(JotaGrid.gapM),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('Not transcribing yet', style: t.label),
+            const SizedBox(height: JotaGrid.gapS),
+            Text(
+              // Lead with the reassurance. The notes ARE safe; only the text is
+              // missing, and that distinction is the whole anxiety here.
+              'Your notes are saved and playable. Add an OpenAI key to turn '
+              'them into text.',
+              style: t.prose.copyWith(color: c.inkMuted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
