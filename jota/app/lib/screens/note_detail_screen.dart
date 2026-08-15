@@ -1,10 +1,11 @@
 // ============================================================================
 //  Jota — note detail
 //
-//  The design lock's "One note", top to bottom: the stamp and the tag, the
-//  note's date as a serif headline, what it was ABOUT on a field-coloured card,
-//  the player as a single stadium, then the raw words. Gemma's summary above,
-//  the transcript below — audio is there, never required.
+//  The design lock's "One note", top to bottom: the stamp and the tag, what it
+//  was ABOUT on a field-coloured card, the player as a single stadium, then the
+//  raw words. Gemma's summary above, the transcript below — audio is there,
+//  never required. The design's serif headline is the note's subject, and there
+//  is no subject to draw yet; see the note where it would go.
 //
 //  The device's NOTE VIEW screen (screens.cpp, screenNoteView) stops at a meta
 //  line and the transcript because it has 200x200 pixels. The phone adds the
@@ -13,7 +14,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../audio/note_player.dart';
@@ -61,6 +61,10 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       upcase: false,
       value: _note.displayId,
       onBack: () => Navigator.of(context).pop(),
+      // The design draws this screen with NO hairline anywhere: the meta line,
+      // the card and the pill already separate themselves, and a rule under the
+      // status line would be the only divider on a page that needs none.
+      rule: false,
       // Pinned, as drawn: everything above it scrolls, the one action does
       // not. Outlined rather than filled — this screen is for reading, and a
       // solid pill would read as the thing you came here to do.
@@ -95,15 +99,21 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 JotaTagPill(label: _note.tag!, selected: true),
             ],
           ),
-          const SizedBox(height: JotaGrid.gapM),
-          // The note's own date is its title, in Plex Serif. A hair smaller
-          // than the archive's own headline — the list names the app, this
-          // names one thing inside it.
-          Text(
-            DateFormat('MMMM d').format(_note.recordedAt),
-            style: t.headline.copyWith(fontSize: 28),
-          ),
           const SizedBox(height: JotaGrid.gapL),
+
+          // NO serif headline here. There was one — `August 15`, under a meta
+          // line already reading `SAT 15 AUG · 15:22` — which is the same datum
+          // twice at two sizes, and put a numeral in the serif face, which
+          // docs/brand.md forbids outright (numbers are never serif).
+          //
+          // The design's headline on this screen is the note's SUBJECT
+          // ("After the session"), and there is no subject field: Gemma is what
+          // would write one and Gemma is not wired up. The first words of the
+          // transcript were the other candidate and are worse — they repeat,
+          // verbatim, the paragraph two blocks below, and an Arabic note would
+          // put a right-to-left fragment in a Latin serif. So the date stays in
+          // the meta line where it costs one line, and the headline waits for
+          // the thing it is meant to hold.
 
           // What the note was ABOUT, above the words themselves — the design's
           // first block, and the half problem.md says every voice recorder

@@ -84,6 +84,9 @@ class _NoteListScreenState extends State<NoteListScreen>
         pending: device.pendingOnDevice,
         syncing: device.isSyncing,
       ),
+      // The title and its hairline are in the body, below. A second rule under
+      // the status line made two hairlines of chrome where the design has one.
+      rule: false,
       padded: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

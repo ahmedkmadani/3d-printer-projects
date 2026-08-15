@@ -55,6 +55,11 @@ class HomeScreen extends StatelessWidget {
       // datum twice at two sizes — the exact failure theme.h was written to
       // prevent.
       label: 'Jota',
+      // The heading and its hairline are in the BODY, so the status line does
+      // not get one too. Two rules within forty pixels is two pieces of chrome
+      // where the rule says there is one, and it fenced off a strip holding
+      // nothing but the app's name.
+      rule: false,
       child: ListView(
         padding: const EdgeInsets.only(
           top: JotaGrid.gapM,

@@ -44,10 +44,18 @@ class PatternsScreen extends StatelessWidget {
     );
 
     return JotaScreen(
-      label: 'Patterns',
+      // Empty label: the status line's right slot now sits hard against the
+      // right edge, so a name there would butt straight into the figure. The
+      // screen already says what it is, in serif, four lines down — the label
+      // was the second copy.
+      label: '',
       upcase: false,
       value: '$weeks WEEKS',
       onBack: () => Navigator.of(context).pop(),
+      // The hairline this screen keeps is the one under its serif title, in the
+      // body. Drawing a second one under the status line spent two pieces of
+      // chrome on a screen the design gives one.
+      rule: false,
       child: week.topics.isEmpty
           ? Center(
               child: Text(

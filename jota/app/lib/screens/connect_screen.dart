@@ -100,6 +100,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
     return JotaScreen(
       label: 'Connect',
       upcase: false,
+      // The hairline under "Connect your Jota" in the body is this screen's
+      // one piece of chrome; the status line does not get a second.
+      rule: false,
       footer: wantsCode
           ? null
           : JotaButton(label: 'Set up later', upcase: false, onTap: _onwards),
@@ -124,18 +127,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
           // advertises as plain "JOTA" and the bare local name cannot tell two
           // of them apart — these are the same four characters the device
           // prints on its own screen.
-          for (final JotaAdvertisement ad in found) ...<Widget>[
-            JotaRow(
-              label: ad.shortName,
-              selected: device.pairedId == ad.remoteId,
-              trailing: Text(
-                'NEARBY',
-                style: t.reading.copyWith(color: c.inkMuted, fontSize: 11),
-              ),
+          for (final JotaAdvertisement ad in found)
+            _FoundRow(
+              name: ad.shortName,
+              state: device.pairedId == ad.remoteId ? 'PAIRED' : 'NEARBY',
               onTap: wantsCode ? null : () => device.pairWith(ad),
             ),
-            const SizedBox(height: JotaRows.gap),
-          ],
 
           if (found.isEmpty || device.isScanning)
             Padding(
@@ -208,6 +205,62 @@ class _ConnectScreenState extends State<ConnectScreen> {
             const SizedBox(height: JotaGrid.gapM),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// One Jota in range: its id on the left, what it is to us on the right, a
+/// hairline under it — the same flat line Settings draws, and the design's
+/// `.row` exactly.
+///
+/// It used to be a [JotaRow], an outlined stadium. A stadium in this product
+/// means "one of these is selected", and a list of devices you have not chosen
+/// between yet is not that; two of them read as two buttons on a screen whose
+/// only button is Pair. Both halves are mono because both are identifiers, not
+/// prose — the id and the one word that says what the radio can see.
+class _FoundRow extends StatelessWidget {
+  const _FoundRow({required this.name, required this.state, this.onTap});
+
+  final String name;
+  final String state;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+
+    return Semantics(
+      button: onTap != null,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: <Widget>[
+                  Expanded(child: Text(name, style: t.reading)),
+                  const SizedBox(width: JotaGrid.gapM),
+                  Text(
+                    state,
+                    style: t.reading.copyWith(
+                      color: c.inkMuted,
+                      fontSize: 11,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const JotaRule(),
+          ],
+        ),
       ),
     );
   }

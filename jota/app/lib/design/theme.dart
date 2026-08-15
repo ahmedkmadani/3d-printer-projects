@@ -194,7 +194,11 @@ abstract final class JotaIndicators {
 // else is a stadium (radius = h/2). The card is still flat — a hairline and a
 // fill, never a shadow — because the device is a flat panel and so is this.
 abstract final class JotaCards {
-  static const double radius = 20;
+  /// 16, from the drawing. It was 20, which is enough curvature to read as its
+  /// own soft-UI idiom rather than as a panel with its corners taken off — and
+  /// on a card that sits beside 48pt stadiums, the two radii started arguing
+  /// about what shape language this app is in.
+  static const double radius = 16;
 }
 
 // ---- Motion ----------------------------------------------------------------

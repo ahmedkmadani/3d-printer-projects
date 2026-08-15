@@ -20,7 +20,6 @@
 //  tab its own navigation stack, which a package would be needed for.
 // ============================================================================
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../ble/device_scanner.dart';
@@ -158,9 +157,15 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 }
 
 /// A floating bottom bar — the app's three destinations, detached from the edges
-/// so it reads as floating. The active tab is shown by INVERSION, exactly like a
-/// selected row: an ink pill with the icon and label knocked out. The rest are
-/// quiet muted icons. The one element in the app that carries a soft shadow.
+/// so it reads as floating. Three WORDS, in mono caps, all three always legible;
+/// the active one is shown by INVERSION, exactly like a selected row.
+///
+/// It used to draw a Lucide glyph per tab and reveal the word only on the tab
+/// you were already on — so the two places you were not going were a house and a
+/// cog, and the label was spent naming the screen you could already see. The
+/// design lock's `.nav` has no glyphs in it at all: this product says things in
+/// words, and an icon set borrowed from another product's drawing style was the
+/// loudest foreign object in the app. The one element that carries a soft shadow.
 class HomeNavBar extends StatelessWidget {
   const HomeNavBar({super.key, required this.current, required this.onSelect});
 
@@ -199,19 +204,16 @@ class HomeNavBar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: <Widget>[
                 _NavItem(
-                  icon: LucideIcons.house,
                   label: 'Home',
                   active: current == 0,
                   onTap: () => onSelect(0),
                 ),
                 _NavItem(
-                  icon: LucideIcons.notebook,
                   label: 'Notes',
                   active: current == 1,
                   onTap: () => onSelect(1),
                 ),
                 _NavItem(
-                  icon: LucideIcons.settings,
                   label: 'Settings',
                   active: current == 2,
                   onTap: () => onSelect(2),
@@ -227,13 +229,11 @@ class HomeNavBar extends StatelessWidget {
 
 class _NavItem extends StatelessWidget {
   const _NavItem({
-    required this.icon,
     required this.label,
     required this.active,
     required this.onTap,
   });
 
-  final IconData icon;
   final String label;
   final bool active;
   final VoidCallback onTap;
@@ -248,41 +248,34 @@ class _NavItem extends StatelessWidget {
       button: true,
       selected: active,
       label: label,
+      // Exclude the child's own text from the node. Every tab now draws its
+      // word all the time (it used to appear only when active), so without
+      // this the rendered `NOTES` merges into the node and the tab stops
+      // answering to the name a screen reader — or a test — asks for.
+      excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: AnimatedContainer(
           duration: JotaMotion.fast,
           curve: JotaMotion.curve,
-          padding: EdgeInsets.symmetric(
-            horizontal: active ? 16 : 12,
-            vertical: 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: active ? c.ink : Colors.transparent,
             borderRadius: const BorderRadius.all(Radius.circular(20)),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(icon, size: 20, color: fg),
-              // The active tab earns its label; the rest stay icon-only.
-              //
-              // Mono caps, not the sans label style: the design lock draws the
-              // nav in the figure face, and it is the same treatment the
-              // device's own status strip uses for the screen it is on.
-              if (active) ...<Widget>[
-                const SizedBox(width: JotaGrid.gapS),
-                Text(
-                  label.toUpperCase(),
-                  style: t.reading.copyWith(
-                    color: fg,
-                    fontSize: 12,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ],
-            ],
+          // Mono caps, not the sans label style: the design lock draws the nav
+          // in the figure face, and it is the same treatment the device's own
+          // status strip uses for the screen it is on. The padding no longer
+          // grows on the active tab — the pill has to sit around a word that
+          // was always there, not around one that just appeared.
+          child: Text(
+            label.toUpperCase(),
+            style: t.reading.copyWith(
+              color: fg,
+              fontSize: 12,
+              letterSpacing: 1.2,
+            ),
           ),
         ),
       ),

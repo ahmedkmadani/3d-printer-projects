@@ -444,13 +444,21 @@ class TagList extends StatelessWidget {
       name: tags[i],
       count: counts[tags[i]] ?? 0,
       // The grip is the drag affordance and the row itself is the edit one, so
-      // a press on the left edge sorts and a tap anywhere else renames. The
-      // pencil takes the grip's place when the list cannot be sorted.
+      // a press on the left edge sorts and a tap anywhere else renames.
+      //
+      // Drawn from dots rather than an icon-set glyph. The design sheet shows
+      // `⠿`, which is a braille character none of the bundled Plex faces
+      // carries — on the phone it would render as a tofu box. Six circles are
+      // the same mark, in the product's own vocabulary, and need no font.
+      //
+      // When the list cannot be sorted there is nothing to grip, so the slot is
+      // simply empty: the pencil that used to sit there was decoration for an
+      // affordance the whole row already provides.
       handle: onReorder == null
-          ? const Icon(LucideIcons.pencil, size: 16)
+          ? const SizedBox(width: 16)
           : ReorderableDragStartListener(
               index: i,
-              child: const Icon(LucideIcons.gripVertical, size: 16),
+              child: const _GripDots(),
             ),
       onTap: () => onEdit(i),
     );
@@ -500,6 +508,35 @@ class TagList extends StatelessWidget {
 
 /// Grip, name, count, hairline. Flat like the settings rows: nothing in this
 /// list is selected, so nothing here is a stadium.
+/// Two columns of three dots — the drag handle, in circles, which is the only
+/// mark vocabulary this product has.
+class _GripDots extends StatelessWidget {
+  const _GripDots();
+
+  @override
+  Widget build(BuildContext context) {
+    final Color c = context.ink.inkMuted;
+    Widget dot() => Container(
+          width: 3,
+          height: 3,
+          decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+        );
+    Widget column() => Column(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 3,
+          children: <Widget>[dot(), dot(), dot()],
+        );
+    return SizedBox(
+      width: 16,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        spacing: 3,
+        children: <Widget>[column(), column()],
+      ),
+    );
+  }
+}
+
 class _TagRow extends StatelessWidget {
   const _TagRow({
     required this.name,

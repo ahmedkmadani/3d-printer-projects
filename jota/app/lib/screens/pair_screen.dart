@@ -72,6 +72,9 @@ class _PairScreenState extends State<PairScreen> {
       label: 'Pair',
       upcase: false,
       onBack: () => Navigator.of(context).pop(),
+      // One hairline, and it is the one under "Pair with Jota" in the body. The
+      // status rule as well made two.
+      rule: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[

@@ -52,6 +52,16 @@ class JotaRuleStrong extends StatelessWidget {
 // always holds the screen's ONE defining figure. A count on the note list, a
 // ratio while syncing, a position in a note. Never decoration, never two
 // things. If a screen has no defining figure, the slot is empty.
+//
+// WHICH EDGE. The device owns its whole panel, so its status line runs label
+// left, figure right. The phone does not: the OS has already written the time,
+// the battery and the carrier across the top, and that band sits directly above
+// this row. The app used to answer it by planting its own label hard left,
+// where it lined up under the clock and read as a second, competing system
+// line. So the whole app group — label, dot, figure — is set to the RIGHT edge,
+// as drawn, and the left is left to the phone. The one exception is the back
+// chevron: a way back belongs under the thumb on the left, and it is an
+// affordance rather than a piece of the status text.
 class JotaStatusBar extends StatelessWidget {
   const JotaStatusBar({
     super.key,
@@ -64,15 +74,16 @@ class JotaStatusBar extends StatelessWidget {
     this.rule = true,
   });
 
-  /// Left slot: what this screen is. `label` role, uppercased unless a screen
-  /// in the handwriting voice opts out.
+  /// What this screen is. `label` role, uppercased unless a screen in the
+  /// handwriting voice opts out. Empty on screens that title themselves in the
+  /// body, and then nothing is drawn — not an empty box holding a gap open.
   final String label;
 
   /// See [JotaButton.upcase]. Defaults true so existing screens are untouched.
   final bool upcase;
 
-  /// Right slot: the one defining figure. `reading` role — lighter than the
-  /// label, because it is data and the label is chrome.
+  /// The one defining figure, drawn last in the right-hand group. `reading`
+  /// role — lighter than the label, because it is data and the label is chrome.
   final String? value;
 
   /// Back affordance. The device uses a long-press; the phone gets a chevron.
@@ -109,29 +120,40 @@ class JotaStatusBar extends StatelessWidget {
                   onTap: onBack!,
                   semanticLabel: 'Back',
                 ),
+              // Expanded, then aligned to its end: the group hugs the right
+              // edge whatever it contains, and the label — the only part that
+              // can run long — is the only part allowed to give up width.
               Expanded(
-                child: Text(
-                  upcase ? label.toUpperCase() : label,
-                  style: t.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  spacing: JotaGrid.gapS,
+                  children: <Widget>[
+                    if (label.isNotEmpty)
+                      Flexible(
+                        child: Text(
+                          upcase ? label.toUpperCase() : label,
+                          style: t.label,
+                          textAlign: TextAlign.right,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    if (showSignalDot)
+                      Container(
+                        width: JotaIndicators.signalDot,
+                        height: JotaIndicators.signalDot,
+                        decoration: BoxDecoration(
+                          color: c.signal,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    if (trailing != null)
+                      trailing!
+                    else if (value != null)
+                      Text(value!, style: t.reading.copyWith(color: c.inkMuted)),
+                  ],
                 ),
               ),
-              if (showSignalDot) ...<Widget>[
-                Container(
-                  width: JotaIndicators.signalDot,
-                  height: JotaIndicators.signalDot,
-                  decoration: BoxDecoration(
-                    color: c.signal,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: JotaGrid.gapS),
-              ],
-              if (trailing != null)
-                trailing!
-              else if (value != null)
-                Text(value!, style: t.reading.copyWith(color: c.inkMuted)),
             ],
           ),
         ),
@@ -753,8 +775,15 @@ class _IndeterminateFillState extends State<_IndeterminateFill>
 }
 
 // ---- dots ------------------------------------------------------------------
-// widgets.h: dots(). Position within a short sequence. Filled is here, hollow
-// is elsewhere — no colour, no size change.
+// widgets.h: dots(). Position within a short sequence — no colour, no size
+// change, only ink against rule.
+//
+// EXACTLY ONE dot is inked: the one you are on. The old test was `i <= active`,
+// which inked every dot up to the current one, so page 2 of 3 drew ● ● ○ and
+// read as a progress bar filling up rather than as a position within a set.
+// Onboarding is not a download; it is three things to look at, and the reader
+// is at one of them. The others are drawn flat in `rule` — present, unvisited,
+// not "done".
 class JotaDots extends StatelessWidget {
   const JotaDots({super.key, required this.count, required this.active});
 
@@ -775,8 +804,10 @@ class JotaDots extends StatelessWidget {
               height: 7,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: i <= active ? c.ink : Colors.transparent,
-                border: Border.all(color: c.ink, width: JotaGrid.hairline),
+                // A flat disc either way, so the only difference between here
+                // and elsewhere is weight of colour. An ink ring around an
+                // unvisited dot would give it a second, louder reading.
+                color: i == active ? c.ink : c.rule,
               ),
             ),
           ),
@@ -988,12 +1019,12 @@ class JotaCodeBoxes extends StatelessWidget {
         for (int i = 0; i < length; i++) ...<Widget>[
           if (i > 0) const SizedBox(width: 7),
           Container(
-            width: 34,
-            height: 46,
+            width: 32,
+            height: 44,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: c.field,
-              borderRadius: const BorderRadius.all(Radius.circular(10)),
+              borderRadius: const BorderRadius.all(Radius.circular(8)),
               border: Border.all(
                 color: (focused && i == cursor && digits.length < length)
                     ? c.ink

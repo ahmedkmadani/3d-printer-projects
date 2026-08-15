@@ -160,7 +160,13 @@ class _SyncScreenState extends State<SyncScreen> {
     final int? battery = device.batteryOnDevice;
     if (battery != null && battery <= 15) {
       return _Status(
-        title: 'Jota is low — $battery%',
+        // The percentage used to be inside this title, which is serif — and
+        // numbers are never serif (docs/brand.md). It is the same figure the
+        // device chip draws, so it moves to the mono line under the headline
+        // rather than being dropped: "low" is the news, the figure is the
+        // evidence, and each is now in the face for its job.
+        title: 'Jota is nearly out of charge',
+        figure: '$battery%',
         body: 'Charge it over USB-C soon. Everything it had is saved here.',
       );
     }
@@ -224,11 +230,16 @@ class _SyncScreenState extends State<SyncScreen> {
 }
 
 /// One headline and one plain line, centred. The whole screen, most of the time.
+///
+/// [figure] is the optional mono run between them — the one measurement a state
+/// has, when it has one. It is a separate slot rather than a placeholder in the
+/// title because the title is serif and no figure is ever allowed in that face.
 class _Status extends StatelessWidget {
-  const _Status({required this.title, required this.body});
+  const _Status({required this.title, required this.body, this.figure});
 
   final String title;
   final String body;
+  final String? figure;
 
   @override
   Widget build(BuildContext context) {
@@ -238,6 +249,13 @@ class _Status extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
         Text(title, style: t.headline, textAlign: TextAlign.center),
+        if (figure != null) ...<Widget>[
+          const SizedBox(height: JotaGrid.gapS),
+          Text(
+            figure!,
+            style: t.reading.copyWith(color: c.inkMuted, letterSpacing: 0.8),
+          ),
+        ],
         const SizedBox(height: JotaGrid.gapM),
         Text(
           body,

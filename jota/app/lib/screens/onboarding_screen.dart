@@ -36,24 +36,25 @@ class _Page {
   final String body;
 }
 
+// Word for word from product.md and the design lock. Each line had grown a
+// second clause explaining the first ("— the crowd in your head", "come back to
+// it whenever you're ready"), which is the app talking itself out of a sentence
+// that already landed. One line each, as specified.
 const List<_Page> _pages = <_Page>[
   _Page(
     stage: 0,
     headline: 'When your head\nis full.',
-    body: 'Thoughts pile up and talk over each other. '
-        'That’s jota — the crowd in your head.',
+    body: 'Thoughts pile up and talk over each other. That is jota.',
   ),
   _Page(
     stage: 1,
     headline: 'Say it,\nlet it out.',
-    body: 'Press once and speak. Jota takes the thought off '
-        'your mind and holds it for you.',
+    body: 'Press once and speak. Jota holds it for you.',
   ),
   _Page(
     stage: 2,
     headline: 'Feel\nlighter.',
-    body: 'Your head clears. It’s out, it’s saved, and it’s '
-        'yours — come back to it whenever you’re ready.',
+    body: 'It is out, it is saved, and it is yours.',
   ),
 ];
 
@@ -195,9 +196,13 @@ class _OnboardingPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
           const Spacer(),
+          // The drawing's own proportions (150 x 92 in the design lock). A
+          // taller box only padded it with empty space, which pushed the
+          // headline down and made the gap under the picture look uneven
+          // against the gap above it.
           SizedBox(
             width: 180,
-            height: 150,
+            height: 110,
             child: MindIllustration(stage: page.stage),
           ),
           const SizedBox(height: JotaGrid.gapXL),

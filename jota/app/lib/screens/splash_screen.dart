@@ -2,7 +2,7 @@
 //  Jota — splash
 //
 //  The phone's echo of the device's own splash (renders/ui/01_splash.png): the
-//  JOTA wordmark, a strong rule, and the version beneath — on warm paper. Held
+//  Jota wordmark, a strong rule, and the version beneath — on warm paper. Held
 //  for a beat while the service graph settles, then it reads the first-run flag
 //  and routes: a fresh install goes to onboarding, everyone else goes straight
 //  to the notes.
@@ -81,8 +81,14 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             children: <Widget>[
               // Just the wordmark, dead centre. No rule.
+              //
+              // `Jota`, not `JOTA`. The serif wordmark is the name and the name
+              // is capital-J-lowercase (docs/brand.md); the all-caps form is the
+              // MONO identifier, which is what the device prints and what
+              // `JOTA-91C4` is built from. Setting the identifier in the serif
+              // face made the splash the one place the two forms were confused.
               Expanded(
-                child: Center(child: Text('JOTA', style: t.wordmark)),
+                child: Center(child: Text('Jota', style: t.wordmark)),
               ),
               // Version pinned to the bottom, small and quiet.
               Padding(

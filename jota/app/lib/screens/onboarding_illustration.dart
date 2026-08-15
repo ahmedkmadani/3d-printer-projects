@@ -1,23 +1,30 @@
 // ============================================================================
 //  Jota — onboarding illustrations
 //
-//  Three hand-drawn beats of the one idea Jota is about: a head too full, then
-//  the thoughts streaming out, then a head that has cleared. Painted, not
-//  imported — so they live in the same warm palette as everything else: an
-//  espresso line, a soft clay wash for the thoughts, cream underneath. Soft and
-//  human, never a spec drawing.
+//  Three beats of the one idea, drawn with a single shape: an outline circle.
 //
-//    stage 0  a crowded mind — a tangle packed inside, never quite still
-//    stage 1  letting it out — one line streams out and settles below
-//    stage 2  lighter — a clear head but for a calm curve; thoughts drift off
+//    stage 0  the crowd — several circles overlapping, each drifting on its own
+//             slow phase, none of them still, none of them the main one
+//    stage 1  one of them leaves — it travels out of the ring and fades, and a
+//             faint circle is already waiting where it lands
+//    stage 2  what is left — one ring breathing, the rest drifting out of sight
 //
-//  They MOVE, slowly. A full head is restless, a thought leaving travels, and
-//  a clear one breathes — none of which a frozen drawing can say. The loops run
-//  6-9 seconds so the page reads as alive rather than animated, and they stop
-//  dead under prefers-reduced-motion.
+//  Ink only. The previous version washed the head in `signal` and drew half the
+//  waves, both dots and the travelling thought in it. `signal` means LIVE or
+//  DANGEROUS (brand.md) — spending it on decoration is exactly what made it
+//  read as random, and an onboarding page has nothing live or dangerous on it.
+//  It also drew a head with waves inside, which is a diagram of a head; the
+//  locked design says a crowd of plain circles, so that is what this draws.
+//
+//  Everything is laid out in the design's own 150x92 box and scaled to fit, so
+//  the composition cannot drift from the artifact as the box changes; the 1.5
+//  stroke scales with it and stays the one line weight.
+//
+//  They MOVE, slowly — a crowd is restless, a thought leaving travels, and what
+//  remains breathes. The loops run 3.4-7 s per element and stop dead under
+//  prefers-reduced-motion.
 // ============================================================================
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -35,12 +42,19 @@ class MindIllustration extends StatefulWidget {
 
 class _MindIllustrationState extends State<MindIllustration>
     with SingleTickerProviderStateMixin {
+  /// One turn of the whole page. Each element then runs at a whole number of
+  /// turns inside it, which is what lets five circles keep five different
+  /// periods (5.50, 5.92, 6.42, 7.00 s) and still meet exactly at the seam —
+  /// no jump every time the controller wraps.
+  static const List<Duration> _loop = <Duration>[
+    Duration(seconds: 77),
+    Duration(milliseconds: 3400),
+    Duration(seconds: 10),
+  ];
+
   late final AnimationController _c = AnimationController(
     vsync: this,
-    // Long enough that no single element ever looks like it is being animated
-    // AT you. The stages differ so three pages side by side never pulse
-    // together.
-    duration: Duration(milliseconds: 6000 + widget.stage * 1500),
+    duration: _loop[widget.stage],
   );
 
   @override
@@ -62,24 +76,14 @@ class _MindIllustrationState extends State<MindIllustration>
     final bool still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     if (still) {
       return CustomPaint(
-        painter: _MindPainter(
-          line: c.ink,
-          accent: c.signal,
-          stage: widget.stage,
-          t: 0,
-        ),
+        painter: _MindPainter(line: c.ink, stage: widget.stage, t: 0),
         child: const SizedBox.expand(),
       );
     }
     return AnimatedBuilder(
       animation: _c,
       builder: (BuildContext context, Widget? child) => CustomPaint(
-        painter: _MindPainter(
-          line: c.ink,
-          accent: c.signal,
-          stage: widget.stage,
-          t: _c.value,
-        ),
+        painter: _MindPainter(line: c.ink, stage: widget.stage, t: _c.value),
         child: child,
       ),
       child: const SizedBox.expand(),
@@ -87,178 +91,133 @@ class _MindIllustrationState extends State<MindIllustration>
   }
 }
 
+/// A circle in the crowd: where it sits, how present it is, and how it drifts —
+/// `turns` per loop, `delay` in fractions of its own turn, `by` the whole
+/// distance it wanders and comes back from.
+typedef _Drifter = ({
+  double cx,
+  double cy,
+  double r,
+  double alpha,
+  int turns,
+  double delay,
+  Offset by,
+});
+
 class _MindPainter extends CustomPainter {
-  _MindPainter({
-    required this.line,
-    required this.accent,
-    required this.stage,
-    required this.t,
-  });
+  _MindPainter({required this.line, required this.stage, required this.t});
 
   final Color line;
-  final Color accent;
   final int stage;
 
   /// 0..1, wrapping. Every motion below is a function of this and nothing
   /// else, so the drawing is still pure and still testable at any frame.
   final double t;
 
-  /// One turn of the loop, in radians.
-  double get _phase => t * 2 * math.pi;
+  /// The box the locked design draws in. Held here rather than derived from
+  /// the widget so the five stage-0 circles keep the spacing they were
+  /// composed with instead of being re-invented per screen size.
+  static const Size _design = Size(150, 92);
 
-  late final Paint _ink;
-  late final Paint _clay;
-  late final Paint _clayDot;
-
-  Paint _stroke(Color color, double w) => Paint()
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = w
-    ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round
-    ..color = color;
+  static const Offset _drift = Offset(3, -4);
+  static const Offset _drift2 = Offset(-4, 3);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double s = math.min(size.width, size.height);
-    final Offset ctr = Offset(size.width / 2, size.height * 0.44);
-    final double r = s * 0.28;
-    final double w = s * 0.013;
-
-    _ink = _stroke(line, w);
-    _clay = _stroke(accent, w);
-    _clayDot = Paint()
-      ..style = PaintingStyle.fill
-      ..color = accent.withValues(alpha: 0.55);
-
-    // The mind: one soft circle, warm-washed, espresso outline.
-    final Paint wash = Paint()
-      ..style = PaintingStyle.fill
-      ..color = accent.withValues(alpha: 0.10);
-    canvas.drawCircle(ctr, r, wash);
-    canvas.drawCircle(ctr, r, _ink);
+    final double k = math.min(
+      size.width / _design.width,
+      size.height / _design.height,
+    );
+    canvas.save();
+    canvas.translate(
+      (size.width - _design.width * k) / 2,
+      (size.height - _design.height * k) / 2,
+    );
+    canvas.scale(k);
 
     switch (stage) {
       case 0:
-        _full(canvas, ctr, r);
+        _crowd(canvas);
       case 1:
-        _release(canvas, ctr, r);
+        _release(canvas);
       default:
-        _light(canvas, ctr, r);
-    }
-  }
-
-  void _clip(Canvas canvas, Offset ctr, double r) {
-    canvas.clipPath(
-      Path()..addOval(Rect.fromCircle(center: ctr, radius: r * 0.98)),
-    );
-  }
-
-  /// A wavy line across the head, `freq` humps, `amp` fraction of r tall.
-  Path _wave(Offset ctr, double r, double y, double freq, double amp) {
-    final Path p = Path();
-    for (double t = 0; t <= 1.0001; t += 0.04) {
-      final double x = ctr.dx - r + 2 * r * t;
-      final double yy = y + math.sin(t * math.pi * freq) * r * amp;
-      if (t == 0) {
-        p.moveTo(x, yy);
-      } else {
-        p.lineTo(x, yy);
-      }
-    }
-    return p;
-  }
-
-  /// A crowded head: a tangle of wavy lines packed inside, a couple of knots.
-  void _full(Canvas canvas, Offset ctr, double r) {
-    canvas.save();
-    _clip(canvas, ctr, r);
-    for (int i = 0; i < 6; i++) {
-      // Each line drifts on its own phase, so the tangle jostles instead of
-      // sliding about as one piece — a full head is many things at once.
-      final double drift = math.sin(_phase + i * 1.1) * r * 0.045;
-      final double y = ctr.dy - r * 0.7 + (r * 1.4) * (i / 5) + drift;
-      canvas.drawPath(_wave(ctr, r, y, 3.0 + i, 0.13), i.isEven ? _ink : _clay);
+        _calm(canvas);
     }
     canvas.restore();
+  }
+
+  Paint _ink(double alpha) => Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5
+    ..color = line.withValues(alpha: alpha);
+
+  /// Out and back, 0 → 1 → 0, easing at both ends — the shape of every drift
+  /// and breath here. Whole `turns` keep it continuous across the wrap.
+  double _swing(int turns, double delay) =>
+      (1 - math.cos(2 * math.pi * (t * turns - delay))) / 2;
+
+  void _drifter(Canvas canvas, _Drifter d) {
+    final double s = _swing(d.turns, d.delay);
     canvas.drawCircle(
-      ctr.translate(-r * 0.35, -r * 0.35 + math.sin(_phase) * r * 0.05),
-      r * 0.08,
-      _clayDot,
-    );
-    canvas.drawCircle(
-      ctr.translate(r * 0.4, r * 0.25 + math.cos(_phase * 0.8) * r * 0.05),
-      r * 0.06,
-      _clayDot,
+      Offset(d.cx + d.by.dx * s, d.cy + d.by.dy * s),
+      d.r,
+      _ink(d.alpha),
     );
   }
 
-  /// Letting it out: the head quiets, one line streams out and pools below.
-  void _release(Canvas canvas, Offset ctr, double r) {
-    canvas.save();
-    _clip(canvas, ctr, r);
-    canvas.drawPath(_wave(ctr, r, ctr.dy - r * 0.45, 3, 0.10), _ink);
-    canvas.drawPath(_wave(ctr, r, ctr.dy + r * 0.05, 3, 0.10), _ink);
-    canvas.restore();
-
-    final Offset pooled = ctr.translate(r * 0.15, r * 2.15);
-    final Path stream = Path()..moveTo(ctr.dx + r * 0.1, ctr.dy + r * 0.2);
-    stream.cubicTo(
-      ctr.dx + r * 0.9,
-      ctr.dy + r * 0.9,
-      ctr.dx - r * 0.7,
-      ctr.dy + r * 1.6,
-      pooled.dx,
-      pooled.dy,
-    );
-    canvas.drawPath(stream, _clay);
-
-    // A thought travelling the path, rather than a line that merely points
-    // along it. It fades as it arrives, and the pool is always there waiting.
-    final ui.PathMetric metric = stream.computeMetrics().first;
-    final double travel = (t * 1.35) % 1.0;  // pauses at the pool
-    if (travel <= 1.0) {
-      final ui.Tangent? at = metric.getTangentForOffset(
-        metric.length * travel.clamp(0.0, 1.0),
-      );
-      if (at != null) {
-        canvas.drawCircle(
-          at.position,
-          r * 0.085,
-          Paint()
-            ..style = PaintingStyle.fill
-            ..color = accent.withValues(alpha: 0.75 * (1 - travel * 0.6)),
-        );
-      }
+  /// The moment: five circles, overlapping, no one of them in charge. They
+  /// never drift together — that is the whole point of the picture.
+  void _crowd(Canvas canvas) {
+    const List<_Drifter> crowd = <_Drifter>[
+      (cx: 58, cy: 38, r: 18, alpha: 1, turns: 14, delay: 0, by: _drift),
+      (cx: 86, cy: 48, r: 22, alpha: 1, turns: 12, delay: 0.06, by: _drift2),
+      (cx: 70, cy: 60, r: 13, alpha: .70, turns: 11, delay: 0.13, by: _drift),
+      (cx: 98, cy: 32, r: 10, alpha: .55, turns: 13, delay: 0.22, by: _drift2),
+      (cx: 46, cy: 58, r: 8, alpha: .40, turns: 12, delay: 0.06, by: _drift2),
+    ];
+    for (final _Drifter d in crowd) {
+      _drifter(canvas, d);
     }
-    canvas.drawCircle(pooled, r * 0.10, _clayDot);
   }
 
-  /// Lighter: a clear head but for a calm curve; a few marks drift up and fade.
-  void _light(Canvas canvas, Offset ctr, double r) {
-    final Path calm = Path()..moveTo(ctr.dx - r * 0.45, ctr.dy + r * 0.05);
-    calm.quadraticBezierTo(
-      ctr.dx,
-      ctr.dy + r * 0.4,
-      ctr.dx + r * 0.45,
-      ctr.dy + r * 0.05,
-    );
-    canvas.drawPath(calm, _ink);
+  /// The answer: one circle leaves the ring, fades on the way, and something
+  /// faint is already holding the place it is going to.
+  void _release(Canvas canvas) {
+    _breathe(canvas, const Offset(56, 46), 26, 1);
 
-    for (int i = 0; i < 3; i++) {
-      // Each mark rises, thins and fades, then begins again lower down — the
-      // head keeps clearing rather than having cleared once.
-      final double p = ((t + i / 3.0) % 1.0);
-      final double up = r * (1.05 + p * 1.5);
-      final double rad = r * (0.11 * (1 - p * 0.7));
-      final Paint fade = Paint()
-        ..style = PaintingStyle.fill
-        ..color = accent.withValues(alpha: 0.55 * (1 - p));
-      canvas.drawCircle(ctr.translate(r * 0.35 * (i - 1), -up), rad, fade);
-    }
+    // It travels for the first 70% of the loop and then simply is not there:
+    // the pause is what makes it a departure rather than a shuttle.
+    final double p = math.min(t / 0.7, 1.0);
+    final double e = (1 - math.cos(math.pi * p)) / 2;
+    canvas.drawCircle(Offset(56 + 26 * e, 46), 9, _ink(0.9 * (1 - e)));
+
+    canvas.drawCircle(const Offset(112, 46), 12, _ink(0.35));
+  }
+
+  /// Coming back: one ring, calm, and two circles on their way out — still
+  /// drifting, but down to almost nothing.
+  void _calm(Canvas canvas) {
+    _breathe(canvas, const Offset(75, 46), 27, 2);
+
+    final double gone = 0.5 - 0.38 * _swing(1, 0);
+    _drifter(
+      canvas,
+      (cx: 26, cy: 30, r: 7, alpha: gone, turns: 2, delay: 0, by: _drift),
+    );
+    _drifter(
+      canvas,
+      (cx: 128, cy: 58, r: 9, alpha: gone, turns: 1, delay: 0, by: _drift2),
+    );
+  }
+
+  /// A ring that breathes: 6% wider and a shade lighter at the top of the
+  /// breath. Small enough that you feel it rather than watch it.
+  void _breathe(Canvas canvas, Offset at, double r, int turns) {
+    final double s = _swing(turns, 0);
+    canvas.drawCircle(at, r * (1 + 0.06 * s), _ink(1 - 0.15 * s));
   }
 
   @override
   bool shouldRepaint(_MindPainter old) =>
-      old.stage != stage || old.line != line || old.accent != accent ||
-      old.t != t;
+      old.stage != stage || old.line != line || old.t != t;
 }

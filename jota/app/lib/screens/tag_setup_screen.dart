@@ -116,10 +116,12 @@ class _TagSetupScreenState extends State<TagSetupScreen> {
           onTap: () => _toggle(tag),
         ),
       if (!_atMax)
+        // No leading +. The words already say what the tap does, and a glyph
+        // in front of them made this chip look like a different kind of thing
+        // from the eight beside it when it is one more chip in the same row.
         _TagChip(
           label: 'Add your own',
           selected: false,
-          icon: LucideIcons.plus,
           semanticLabel: 'Add your own tag',
           onTap: _addOwn,
         ),
@@ -190,23 +192,16 @@ class _TagSetupScreenState extends State<TagSetupScreen> {
   }
 }
 
-/// A tap-to-pick tag pill. A chosen chip inverts into the onboarding art's clay
-/// — a solid terracotta fill with a knocked-out label — so it reads as *selected*
-/// by the same inversion the whole app uses, just warmed from ink to the
-/// illustration's accent. That keeps the affordance unmistakable (and the label
-/// legible on the fill) while still letting the first-run choice feel like the
-/// warm picture it sits under. Sized to its content and laid out in a [Wrap]
+/// A tap-to-pick tag pill. A chosen chip inverts — filled ink, knocked-out
+/// label — which is the one selection signal this product has, on the phone
+/// exactly as on the panel. Sized to its content and laid out in a [Wrap]
 /// rather than stretched to a full-width row.
-///
-/// This is the one place the accent fills a shape, a deliberate exception to the
-/// theme's "signal in two places only" rule, scoped to this screen alone.
 class _TagChip extends StatelessWidget {
   const _TagChip({
     required this.label,
     required this.selected,
     required this.onTap,
     this.enabled = true,
-    this.icon,
     this.removable = false,
     this.semanticLabel,
   });
@@ -215,7 +210,6 @@ class _TagChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final bool enabled;
-  final IconData? icon;
 
   /// Show a trailing × on a selected chip — used for custom tags so it's clear
   /// a tap takes them off again.
@@ -264,10 +258,6 @@ class _TagChip extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                if (icon != null) ...<Widget>[
-                  Icon(icon, size: 16, color: fg),
-                  const SizedBox(width: JotaGrid.gapS),
-                ],
                 Text(
                   label,
                   style: t.label.copyWith(
