@@ -27,6 +27,7 @@ g++ -std=c++17 -O1 -Wall -Wextra -Wno-unused-parameter \
     "$HERE/main.cpp" \
     "$FW/src/ui/widgets.cpp" \
     "$FW/src/ui/screens.cpp" \
+    "$FW/src/app/tags.cpp" \
     "$GFX/Adafruit_GFX.cpp" \
     -o "$HERE/build/ui_preview"
 

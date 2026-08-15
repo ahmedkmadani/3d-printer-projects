@@ -22,10 +22,15 @@ static const uint32_t GUIDE_MS     = 4000;
 static const uint32_t SAVED_MS     = 1800;
 static const uint32_t SYNC_STEP_MS = 900;
 
-// PHASE 2 STUB: stands in for the BLE provisioning handshake so the flow can
-// be walked on hardware before the radio exists. The real code comes from the
-// provisioning manager, and this timeout becomes its success callback.
-static const uint32_t PAIR_SIM_MS   = 6000;
+// How long the pairing offer stands. The code must live exactly as long as the
+// offer does: this used to be a 6-second animation left over from the simulated
+// handshake, and it CLEARED the code — so by the time a phone got round to
+// writing `auth`, the device had nothing to compare against and every attempt
+// failed. Two minutes is a walk-to-the-other-room's worth of patience.
+static const uint32_t PAIR_WINDOW_MS = 120000;
+
+// How long "PAIRED" stays up before falling back to the menu.
+static const uint32_t PAIR_OK_MS    = 1800;
 static const char    *SIM_PAIR_CODE = "428 913";
 
 // Element regions, so a tick pushes only the pixels that actually change.
@@ -38,7 +43,7 @@ static const Rect kSyncRect  = {MARGIN, STATUS_BASELINE - CAP_LABEL - 2,
 
 void renderScreen(Adafruit_GFX &g, Screen s, const AppModel &m) {
   switch (s) {
-    case Screen::Splash:    screenSplash(g); break;
+    case Screen::Splash:    screenSplash(g, m); break;
     case Screen::Guide:     screenGuide(g); break;
     case Screen::Ready:     screenReady(g, m); break;
     case Screen::Recording: screenRecording(g, m); break;
@@ -78,6 +83,12 @@ static void commitNote(AppModel &m) {
   m.note.secs = m.recSecs;
   m.note.text = nullptr;  // untranscribed until phase 2
   m.noteIndex = m.noteCount;
+
+  // The armed tag belongs to THIS note, and is then spent. Leaving it armed
+  // would silently file every later note under a heading chosen once, which is
+  // worse than not tagging at all.
+  m.note.tag  = tagAt(m.tags, m.tagArmed);
+  m.tagArmed  = TAG_NONE;
 }
 
 void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
@@ -102,7 +113,11 @@ void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
       break;
 
     case Screen::Ready:
-      if (e == BtnEvent::BootShort) {
+      // BootLong starts too. Press-and-hold-to-talk is the first instinct on
+      // any one-button recorder, and it used to do NOTHING here — no ink, no
+      // sound, on a panel that takes two seconds to repaint. The instinct
+      // cannot be allowed to fail silently.
+      if (e == BtnEvent::BootShort || e == BtnEvent::BootLong) {
         m.recSecs = 0;
         // The ONE transition that stays partial: the ring's outer edge does
         // not move and the annulus only thickens inward, so this is purely
@@ -115,11 +130,17 @@ void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
       break;
 
     case Screen::Recording:
-      if (e == BtnEvent::BootShort) {
+      // BOTH stop and SAVE. A long press used to discard, silently, with no
+      // undo — while PwrLong on this very screen committed first. Two long
+      // presses on adjacent buttons with opposite outcomes, and the
+      // destructive one unguarded, is a trap; whoever holds the button to
+      // stop is not asking to throw the recording away.
+      //
+      // Nothing on this device destroys a recording. Deleting a note is the
+      // phone's job, where there is a screen big enough to confirm it.
+      if (e == BtnEvent::BootShort || e == BtnEvent::BootLong) {
         commitNote(m);
         go(Screen::Saved, nowMs);
-      } else if (e == BtnEvent::BootLong) {
-        go(Screen::Ready, nowMs);  // discard — long press is deliberate
       }
       break;
 
@@ -147,12 +168,27 @@ void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
       break;
 
     case Screen::ChooseTag:
-      if (e == BtnEvent::PwrShort) {
-        m.tagSel = (uint8_t)((m.tagSel + 1) % TAG_COUNT);
-        markDirtyRegion(kListRect);
-      } else if (e == BtnEvent::BootShort || e == BtnEvent::BootLong) {
-        // Confirming must never land further out than cancelling: a flow
-        // entered from Menu returns to Menu.
+      if (e == BtnEvent::BootShort) {
+        // Select ARMS the tag for the next recording. This branch used to be
+        // identical to cancel: pressing select on this screen did nothing at
+        // all, which taught that select is sometimes meaningless.
+        if (m.tags.count) {
+          // Choosing the armed tag again disarms it — the only way back to
+          // "no tag" without a sixth screen.
+          m.tagArmed = (m.tagArmed == m.tagSel) ? TAG_NONE : m.tagSel;
+        }
+        go(Screen::Menu, nowMs);
+      } else if (e == BtnEvent::PwrShort) {
+        // The list is whatever the phone last wrote, so it can be empty — and
+        // `% 0` is an integer-divide exception, which on the ESP32 is a panic
+        // and a reboot, not a wrong pixel.
+        if (m.tags.count == 0) break;
+        m.tagSel = (uint8_t)((m.tagSel + 1) % m.tags.count);
+        // Not just the list: the status slot carries the position, and a long
+        // list scrolls every row under the cursor.
+        markDirty();
+      } else if (e == BtnEvent::BootLong) {
+        // Cancel: leave whatever was already armed alone.
         go(Screen::Menu, nowMs);
       }
       break;
@@ -177,6 +213,25 @@ void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
 }
 
 void Nav::tick(uint32_t nowMs, AppModel &m) {
+  // A phone authenticating is worth showing. Jump to MENU so the device is
+  // sitting on the thing you can now drive from it, rather than leaving the
+  // person to guess whether the connection landed.
+  //
+  // Three screens are never interrupted:
+  //   PAIR      — it has its own "PAIRED" confirmation and gets to MENU itself
+  //   RECORDING — nothing preempts a recording, ever
+  //   SAVED     — a 1.8s confirmation that a note exists; cutting it short
+  //               would make the note look like it had not been kept
+  if (m.authed && !wasAuthed_) {
+    wasAuthed_ = true;
+    if (s_ != Screen::Pair && s_ != Screen::Recording && s_ != Screen::Saved) {
+      m.menuSel = 0;
+      go(Screen::Menu, nowMs);
+    }
+  } else if (!m.authed) {
+    wasAuthed_ = false;
+  }
+
   switch (s_) {
     case Screen::Splash:
       // TODO(phase 2): gate GUIDE behind an NVS first-run flag so it appears
@@ -214,9 +269,17 @@ void Nav::tick(uint32_t nowMs, AppModel &m) {
       break;
 
     case Screen::Pair:
-      if (nowMs - enteredMs_ >= PAIR_SIM_MS) {
+      if (m.authed && m.pairCode) {
+        // The phone answered. Drop the code — it has done its job and must not
+        // sit on an unattended panel — and hold the confirmation.
         m.pairCode = nullptr;
         m.paired   = true;
+        enteredMs_ = nowMs;   // the hold starts now, not when PAIR opened
+        markDirty(/*full=*/true);
+      } else if (!m.pairCode) {
+        if (nowMs - enteredMs_ >= PAIR_OK_MS) go(Screen::Menu, nowMs);
+      } else if (nowMs - enteredMs_ >= PAIR_WINDOW_MS) {
+        m.pairCode = nullptr;  // the offer expired; nothing is left showing
         go(Screen::Menu, nowMs);
       }
       break;

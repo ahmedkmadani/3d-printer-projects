@@ -82,7 +82,15 @@ int main(int argc, char **argv) {
   m.syncDone  = 4;
   m.syncTotal = 5;
   m.menuSel   = 1;
-  m.tagSel    = 3;
+  m.tagSel    = 1;   // legal for a 3-tag list
+  m.tagArmed  = 1;   // PERSONAL armed for the next recording
+  // Tags come from the phone now, so the preview seeds them the same way the
+  // device does before it has ever been written to.
+  tagsSetDefaults(m.tags);
+  m.deviceId     = "7f3a91c4";
+  m.batteryKnown = true;
+  m.batteryPct   = 62;
+  m.authed   = true;  // a phone is connected: the link dot is filled
   m.pairCode  = "428 913";
   m.paired    = true;
   m.pending   = 3;
@@ -90,7 +98,7 @@ int main(int argc, char **argv) {
   m.note = {12, "14:32",
             "call the dentist about moving the appointment to next week and "
             "ask whether the referral is still valid",
-            7};
+            7, "PERSONAL"};
 
   struct Item {
     const char *name;
@@ -104,11 +112,11 @@ int main(int argc, char **argv) {
   writePGM(canvas, out + "/00_widgets.pgm");
   sheetRings(canvas);
   writePGM(canvas, out + "/00b_rings.pgm");
-  screenSplash(canvas);
+  screenSplash(canvas, m);
   writePGM(canvas, out + "/01_splash.pgm");
   screenGuide(canvas);
   writePGM(canvas, out + "/02_guide.pgm");
-  screenOff(canvas);
+  screenOff(canvas, m);
   writePGM(canvas, out + "/10_off.pgm");
 
   const Item items[] = {

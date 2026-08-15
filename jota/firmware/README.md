@@ -112,6 +112,29 @@ Verified against Waveshare's official examples
 > board powers itself off on battery. GPIO6 must be **LOW** to power the panel.
 > GPIO42 must be driven before the microphone will do anything at all.
 
+### Battery sense — one unresolved pin
+
+The table above has **no battery-sense pin**, because Waveshare's examples do
+not use one. The gauge is therefore built but switched off: `BATTERY_ADC_PIN`
+in `src/hal/battery.h` is `-1`, and every surface — the e-paper, the
+advertisement, `status`, the app — says the charge is *unknown* rather than
+inventing a figure.
+
+To turn it on, find the GPIO carrying the divided pack voltage (board
+schematic or the Waveshare wiki) and set two constants:
+
+```cpp
+static const int   BATTERY_ADC_PIN = <gpio>;   // was -1
+static const float BATTERY_DIVIDER = 2.0f;     // pack volts / pin volts
+```
+
+Nothing else changes: the ADC is read through `analogReadMilliVolts()` so the
+per-chip eFuse calibration applies, samples are median-filtered and smoothed,
+and sampling is skipped while the panel is refreshing (a refresh sags the pack
+by enough to read as flat). Sanity check after wiring: a full pack should
+report ~4.15–4.20 V, i.e. 100%; if it reports half of that, the divider ratio
+is wrong, not the pin.
+
 ## What is real, and what is not
 
 **Real:** the whole UI and navigation, the button HAL, the e-paper refresh

@@ -10,7 +10,9 @@
 // ============================================================================
 #include "ui/screens.h"
 
+#include <ctype.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "ui/widgets.h"
 
@@ -22,9 +24,6 @@ namespace jota {
 const char *const MENU_ITEMS[] = {"NOTES", "TAGS", "SYNC", "PAIR", "GUIDE"};
 const uint8_t     MENU_COUNT   = 5;
 
-const char *const TAG_ITEMS[] = {"WORK", "HOME", "IDEA", "BUY", "LATER"};
-const uint8_t     TAG_COUNT   = 5;
-
 // ---- Local helpers -----------------------------------------------------
 
 static void fmtDuration(char *out, size_t n, uint16_t secs) {
@@ -35,9 +34,25 @@ static void fmtCount(char *out, size_t n, uint16_t v) {
   snprintf(out, n, "%03u", (unsigned)v);
 }
 
+// The last four characters of the device id, uppercased — "91C4". The app
+// prints the same four as JOTA-91C4, so the two can be matched by eye.
+static void fmtShortId(char *out, size_t n, const char *deviceId) {
+  if (!deviceId || !*deviceId) {
+    snprintf(out, n, "----");
+    return;
+  }
+  const size_t len = strlen(deviceId);
+  const char  *tail = (len > 4) ? deviceId + len - 4 : deviceId;
+  size_t       w    = 0;
+  for (const char *p = tail; *p && w + 1 < n; ++p) {
+    out[w++] = (char)toupper((unsigned char)*p);
+  }
+  out[w] = '\0';
+}
+
 // ---- Screens -----------------------------------------------------------
 
-void screenSplash(Adafruit_GFX &g) {
+void screenSplash(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
   // No chrome — the wordmark centres on the canvas, not the content area.
   g.setTextColor(INK);
@@ -46,8 +61,16 @@ void screenSplash(Adafruit_GFX &g) {
 
   rule(g, MARGIN, 109, CONTENT_W);
 
+  // Version and identity together: this is the one screen every boot shows, so
+  // it is where "which unit is this" costs nothing to answer.
+  char id[8];
+  fmtShortId(id, sizeof(id), m.deviceId);
+
+  char line[24];
+  snprintf(line, sizeof(line), "V0.1.0  %s", id);
+
   g.setFont(font::reading());
-  textCentered(g, "V0.1.0", CENTER_X, 131);
+  textCentered(g, line, CENTER_X, 131);
 }
 
 void screenGuide(Adafruit_GFX &g) {
@@ -66,14 +89,31 @@ void screenGuide(Adafruit_GFX &g) {
 void screenReady(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
 
+  // WAITING, not the lifetime count. The old figure only ever went up, so a
+  // note that had just been handed to the phone still showed on the panel and
+  // the device could never answer the one question it exists to answer: is my
+  // thought safe? Pending falling to zero IS that answer.
   char count[8];
-  fmtCount(count, sizeof(count), m.noteCount);
+  fmtCount(count, sizeof(count), m.pending);
   statusBar(g, "READY", count);
+  linkDot(g, "READY", m.paired, m.authed);
 
   // Idle is the ring and a dot. No figure, no word — stillness reads as
   // ready on its own, and the GUIDE card teaches the buttons once.
   ring(g, CENTER_X, CIRCLE_CY, CIRCLE_R, CIRCLE_STROKE);
   g.fillCircle(CENTER_X, CIRCLE_CY, DOT_R, INK);
+
+  // An armed tag has to be visible HERE, on the screen you are looking at when
+  // you press record. Armed silently on another screen, it would file notes
+  // under a heading chosen minutes ago and forgotten.
+  const char *armed = tagAt(m.tags, m.tagArmed);
+  if (armed) {
+    g.setTextColor(INK);
+    g.setFont(font::label());
+    textCenteredAt(g, armed, CENTER_X, CIRCLE_CY);
+  }
+
+  batteryGauge(g, CENTER_X, m.batteryPct, m.batteryKnown);
 }
 
 void screenRecording(Adafruit_GFX &g, const AppModel &m) {
@@ -90,6 +130,10 @@ void screenRecording(Adafruit_GFX &g, const AppModel &m) {
   g.setTextColor(INK);
   g.setFont(font::figure());
   textCentered(g, t, CENTER_X, CIRCLE_CY + CAP_FIGURE / 2);
+
+  // Same gauge, same pixels as READY — see the note in theme.h. Without it the
+  // idle screen's gauge would ghost through this one.
+  batteryGauge(g, CENTER_X, m.batteryPct, m.batteryKnown);
 }
 
 void screenSaved(Adafruit_GFX &g, const AppModel &m) {
@@ -104,6 +148,14 @@ void screenSaved(Adafruit_GFX &g, const AppModel &m) {
   char t[12];
   fmtDuration(t, sizeof(t), m.note.secs);
   bigFigure(g, font::display(), CAP_DISPLAY, id, t);
+
+  // If it was filed under a tag, say so on the confirmation — the only moment
+  // the person can still tell that the tag was wrong.
+  if (m.note.tag) {
+    g.setTextColor(INK);
+    g.setFont(font::label());
+    textCenteredAt(g, m.note.tag, CENTER_X, CONTENT_BOTTOM - 14);
+  }
 }
 
 void screenMenu(Adafruit_GFX &g, const AppModel &m) {
@@ -119,11 +171,51 @@ void screenMenu(Adafruit_GFX &g, const AppModel &m) {
 void screenChooseTag(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
 
-  char count[8];
-  fmtCount(count, sizeof(count), m.noteCount);
-  statusBar(g, "TAGS", count);
+  // The defining figure here is the position in the list, not the note count:
+  // the list can be eight long and the panel shows five, so the status slot is
+  // the only thing that says where in it you are.
+  char pos[16];
+  snprintf(pos, sizeof(pos), "%03u/%03u",
+           (unsigned)(m.tags.count ? m.tagSel + 1 : 0),
+           (unsigned)m.tags.count);
+  statusBar(g, "TAGS", pos);
 
-  list(g, TAG_ITEMS, TAG_COUNT, m.tagSel);
+  if (m.tags.count == 0) {
+    // The phone may legitimately write an empty list. Say so — a blank content
+    // area reads as a failed refresh, which is the one thing e-paper must
+    // never look like.
+    g.setTextColor(INK);
+    // Two lines: the mono face fits about fourteen characters across the
+    // content column, and textCenteredAt does not wrap — one long line runs
+    // off the panel and the overflow reappears at the left margin.
+    g.setFont(font::label());
+    textCenteredAt(g, "NO TAGS", CENTER_X, CONTENT_MID - 16);
+    g.setFont(font::reading());
+    textCenteredAt(g, "ADD THEM", CENTER_X, CONTENT_MID + 10);
+    textCenteredAt(g, "IN THE APP", CENTER_X, CONTENT_MID + 28);
+    return;
+  }
+
+  // Eight tags, five rows. Scroll the window rather than truncate, or the last
+  // three would be selectable but invisible.
+  uint8_t first = 0, selInWindow = 0;
+  const uint8_t rows = tagsWindow(m.tags, m.tagSel, ROWS_MAX, &first,
+                                  &selInWindow);
+
+  // The armed tag is marked with a leading asterisk, so the cursor (inversion)
+  // and the choice (the mark) are two different things you can see at once.
+  // ASCII only: the bundled GFX fonts carry 32..126 and nothing else, so a
+  // prettier bullet glyph renders as blank space on the panel.
+  char        marked[ROWS_MAX][TAG_LEN_MAX + 3];
+  const char *window[ROWS_MAX];
+  for (uint8_t i = 0; i < rows; ++i) {
+    const uint8_t idx = (uint8_t)(first + i);
+    snprintf(marked[i], sizeof(marked[i]), "%s%s",
+             (idx == m.tagArmed) ? "* " : "", m.tags.items[idx]);
+    window[i] = marked[i];
+  }
+
+  list(g, window, rows, selInWindow);
 }
 
 void screenSyncing(Adafruit_GFX &g, const AppModel &m) {
@@ -177,21 +269,38 @@ void screenNoteView(Adafruit_GFX &g, const AppModel &m) {
 
 void screenPair(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
-  statusBar(g, "PAIR", "BLE");
-  // Same big-figure pattern as SAVED — a code is a figure, so it gets the
-  // display face and the same rhythm.
-  bigFigure(g, font::display(), CAP_DISPLAY,
-            m.pairCode ? m.pairCode : "------", "ENTER ON PHONE");
+
+  // The right slot carries this device's own four characters — the same ones
+  // the app shows beside it in a list. That is the whole answer to "which of
+  // these two Jotas am I holding", and it has to be readable while pairing,
+  // which is exactly when the question gets asked.
+  char id[8];
+  fmtShortId(id, sizeof(id), m.deviceId);
+  statusBar(g, "PAIR", id);
+
+  if (!m.pairCode) {
+    // The phone answered. Same big-figure rhythm as SAVED, so a pair confirms
+    // the way a saved note does.
+    bigFigure(g, font::display(), CAP_DISPLAY, "PAIRED", "PHONE CONNECTED");
+    return;
+  }
+
+  // A code is a figure, so it gets the display face.
+  bigFigure(g, font::display(), CAP_DISPLAY, m.pairCode, "ENTER ON PHONE");
 }
 
-void screenOff(Adafruit_GFX &g) {
+void screenOff(Adafruit_GFX &g, const AppModel &m) {
   // E-paper retains its last image forever. Without this the device would sit
   // in a drawer showing whatever menu it happened to be on, with a frozen
   // clock. This is the object at rest.
   clear(g);
   g.setTextColor(INK);
   g.setFont(font::wordmark());
-  textCenteredAt(g, "JOTA", CENTER_X, SCREEN_H / 2);
+  textCenteredAt(g, "JOTA", CENTER_X, SCREEN_H / 2 - 12);
+
+  // The charge it went to sleep with. A device found in a drawer answering
+  // "can I take this out with me" without being switched on is worth the ink.
+  batteryGauge(g, CENTER_X, m.batteryPct, m.batteryKnown);
 }
 
 }  // namespace jota

@@ -66,6 +66,25 @@ static const int16_t DOT_R                = 4;
 static const int16_t PROGRESS_H = 10;
 static const int16_t PROGRESS_Y = CONTENT_MID - PROGRESS_H / 2;
 
+// ---- Battery -----------------------------------------------------------
+// A stadium with a proportional fill — the same shape as a row and the same
+// primitive as the progress bar, so the gauge introduces no new vocabulary.
+// It sits below the ring (whose bottom edge is CIRCLE_CY + CIRCLE_R = 160)
+// with the figure beneath it, and the last baseline lands at 185, inside
+// CONTENT_BOTTOM.
+//
+// It is drawn identically on READY and RECORDING. That is not decoration: the
+// Ready -> Recording transition is the one partial refresh in the product, and
+// it is only safe because it is purely ADDITIVE ink. A gauge on one screen and
+// not the other would leave the old one as residue.
+// Gauge and figure sit on ONE line, not stacked: stacked, the pair had to
+// start 4px under the ring to fit, which read as touching it.
+static const int16_t GAUGE_W        = 30;
+static const int16_t GAUGE_H        = 8;
+static const int16_t GAUGE_GAP      = 7;
+static const int16_t GAUGE_BASELINE = 178;         // 8px clear of the ring
+static const int16_t GAUGE_Y        = GAUGE_BASELINE - 10;  // centred on the cap
+
 // ---- Live regions ------------------------------------------------------
 // Areas that change on their own while a screen is displayed. Refreshing
 // only these keeps the panel quiet: a region update is both faster and

@@ -89,6 +89,7 @@ class Nav {
 
  private:
   Screen   s_          = Screen::Splash;
+  bool     wasAuthed_  = false;  // edge-detects a phone connecting
   bool     dirty_      = true;
   bool     needsFull_  = true;
   bool     hasRegion_  = false;

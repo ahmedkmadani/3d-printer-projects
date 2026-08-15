@@ -25,12 +25,25 @@ recording or after `SYNC` is pressed, then back to slow).
 |---|---|
 | Local name | `JOTA` |
 | Service UUID | `4a6f7461-1e5f-4b2a-9c33-000000000000` |
-| Manufacturer data | 4 bytes: `FF FF <pending> <flags>` |
+| Manufacturer data | 7 bytes: `FF FF <pending> <flags> <id-hi> <id-lo> <battery>` |
 
-`FF FF` is the "no company" prefix BLE requires; the two bytes after it are
-ours. `flags` bit 0 = paired. The phone can therefore see **how many notes are
-waiting without connecting** — if it is zero, the app never wakes and neither
-side spends battery.
+`FF FF` is the "no company" prefix BLE requires; the five bytes after it are
+ours. `flags` bit 0 = paired, bit 1 = owned (some phone holds the bond).
+
+`battery` is charge 0..100, or **`0xFF` for unknown** — a board with no
+battery-sense pin wired, which is not the same as a flat one and must never be
+shown as 0%. It rides in the advertisement so the app can show charge WITHOUT
+connecting, which is the whole point of this field: the common questions should
+be answerable for free.
+
+`id-hi`/`id-lo` are the low 16 bits of the device id — enough to tell two
+Jotas apart **in a scan list, before connecting to either**. The app shows it
+as `JOTA-7F3A` beside the device, and the same four characters are printed on
+the device's own PAIR screen, so "which one is mine" is answerable by looking
+at both.
+
+The phone can therefore see **how many notes are waiting without connecting**
+— if it is zero, the app never wakes and neither side spends battery.
 
 ## Characteristics
 
@@ -38,7 +51,7 @@ All share the service base; only the last field changes.
 
 | Name | UUID suffix | Access | Payload |
 |---|---|---|---|
-| `auth` | `...0001` | write | 6 digits, e.g. `428913` |
+| `auth` | `...0001` | write | JSON `{"app":"<uuid>","code":"428913"}` |
 | `status` | `...0002` | read, notify | JSON, see below |
 | `index` | `...0003` | read | JSON array of pending notes |
 | `fetch` | `...0004` | write | JSON `{"id":12,"offset":0}` |
@@ -49,26 +62,62 @@ All share the service base; only the last field changes.
 
 ### auth
 
-Nothing else responds until this matches the 6 digits on the e-paper. Wrong
-code three times → Jota drops the connection and stops advertising for 30 s.
+Nothing else responds until this passes. `status` is the one exception — it is
+readable unauthenticated, precisely so the app can find out that it is *not*
+authenticated. **Read `authed` from `status` rather than assuming a successful
+read means anything**; the app used to infer the bond from the read succeeding,
+so it never sent a code, and every sync then read an empty `index` and reported
+"all caught up" while notes sat on the device.
 
-This is the whole security model: **possession of the device**. Pair once; the
-bond is remembered, so `auth` is only needed the first time.
+Two ways in:
+
+```json
+{"app":"9f2c…"}                    // the owner reconnecting: silent, no code
+{"app":"9f2c…","code":"428913"}    // a new phone: the digits on the e-paper
+```
+
+`app` is a UUID the phone generates once, on first run, and never changes. The
+first phone to present a correct code becomes the **owner**, and Jota persists
+that UUID: from then on that phone reconnects with no code and no prompt. That
+is what "pair once" means, and it is what makes forgetting-and-rejoining cheap.
+
+A **different** `app` uuid is refused with `{"error":"owner"}` — unless it
+presents the code currently on the e-paper, which transfers ownership. Physical
+possession of the device outranks the stored bond, deliberately: the security
+model is possession, and a device that could lock out the person holding it
+would be worse, not better.
+
+Wrong code three times → Jota drops the connection and stops advertising for
+30 s.
 
 ### status
 
 ```json
-{"pending":3,"paired":true,"battery":84,"clock":1786045054}
+{"pending":3,"paired":true,"authed":false,"owned":true,
+ "device":"7f3a91c4","battery":84,"clock":1786045054}
 ```
+
+`battery` is 0..100, or **-1** when this board cannot measure it.
+
+`authed` is this connection's state, not a stored fact — it is false on every
+fresh connection until `auth` passes. `owned` says a phone holds the bond;
+`device` is the device id whose last four characters the app shows as
+`JOTA-7F3A`.
 
 ### index
 
 ```json
-[{"id":12,"secs":47,"bytes":389120,"crc":"a1b2c3d4","time":1786045054}]
+[{"id":12,"secs":47,"bytes":389120,"crc":"a1b2c3d4","time":1786045054,
+  "tag":"PERSONAL"}]
 ```
 
 `bytes` and `crc` are for the ADPCM copy the phone will receive, not the raw
 WAV kept on the SD card.
+
+`tag` is whatever was armed on the device's TAGS screen when the note was
+recorded, or `""`. It is a plain string, not an index: the phone can edit its
+tag list between a recording and a sync, and an index would then point at
+something else entirely.
 
 ### fetch / data / ack — with resume
 
@@ -106,6 +155,13 @@ Read to populate the app's editor, write to replace the whole list. Jota
 stores it and the `TAGS` screen shows it. Max 8 tags, 12 characters each — the
 list widget fits 5 rows at a time.
 
+Selecting one on the device ARMS it for the next recording, and the note
+carries it up in `index`. Pre-selection is the only tagging gesture that fits
+two buttons: asking after the fact would put a third decision inside
+press-speak-press, which is the whole speed of the product. The armed tag is
+spent when the note is committed, so it never silently files every later note
+under a heading chosen once.
+
 ### clock
 
 Jota has no network, so it cannot learn the time by itself. The app writes
@@ -119,7 +175,9 @@ you record                 Jota: note saved to SD, pending = 1
                                  advertise "JOTA, 1 waiting"
                      ──▶    OS wakes the app
 app connects         ──▶
-auth (first time)    ──▶
+status               ◀──    {"authed":false,"owned":true,"device":"7f3a91c4"}
+auth {"app":"9f2c…"} ──▶    uuid matches the stored owner
+status               ◀──    {"authed":true,…}   ← the app CHECKS this
 clock                ──▶    RTC set
 index                ◀──    [{"id":12,...}]
 fetch id 12          ──▶
@@ -139,3 +197,13 @@ ack id 12            ──▶    pending = 0
   trust only the CRC.
 - Keep the connection alive until `ack` is sent; disconnecting early is
   handled, but it wastes the transfer.
+- Authenticate on **every** connection, including tag reads and writes and the
+  clock. `authed` is per-connection state on the device; a `tags` or `clock`
+  write on an unauthenticated link is discarded, and — because the
+  characteristic still acks the bytes — a discarded write looks exactly like a
+  stored one from the phone's side. `status` now reports `{"error":"auth"}` for
+  such a write, but the fix is to authenticate, not to watch for the error.
+- One connection at a time. The plugin hands out a single device handle per
+  remote id, so a second `open` while a sync is running re-discovers services
+  underneath it and the matching `close` disconnects the link the transfer is
+  still using.

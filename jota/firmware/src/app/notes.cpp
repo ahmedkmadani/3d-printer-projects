@@ -98,10 +98,10 @@ size_t NoteStore::indexJson(char *out, size_t n) const {
     if (r.synced) continue;
     w += (size_t)snprintf(out + w, n - w,
                           "%s{\"id\":%u,\"secs\":%u,\"bytes\":%lu,"
-                          "\"crc\":\"%08lx\",\"time\":%lu}",
+                          "\"crc\":\"%08lx\",\"time\":%lu,\"tag\":\"%s\"}",
                           first ? "" : ",", (unsigned)r.id, (unsigned)r.secs,
                           (unsigned long)r.bytes, (unsigned long)r.crc,
-                          (unsigned long)r.time);
+                          (unsigned long)r.time, r.tag);
     first = false;
   }
   if (w < n) w += (size_t)snprintf(out + w, n - w, "]");

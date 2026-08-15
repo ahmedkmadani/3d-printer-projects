@@ -46,6 +46,12 @@ void rule(Adafruit_GFX &g, int16_t x, int16_t y, int16_t w);
 // slot always holds the screen's one defining figure.
 void statusBar(Adafruit_GFX &g, const char *left, const char *right);
 
+// The phone link, as a dot immediately after the label: FILLED when a phone is
+// connected and authenticated, HOLLOW when one is bonded but away, absent when
+// no phone has ever paired. Same vocabulary as the app's own status line, so
+// the two objects read as one product.
+void linkDot(Adafruit_GFX &g, const char *afterLabel, bool paired, bool authed);
+
 // The big-figure pattern shared by splash and saved: display type, rule,
 // caption — one helper so the two cannot drift apart.
 void bigFigure(Adafruit_GFX &g, const GFXfont *bigFont, int16_t bigCap,
@@ -68,6 +74,11 @@ void ring(Adafruit_GFX &g, int16_t cx, int16_t cy, int16_t r, int16_t stroke);
 // Rounded outline with an inset fill; frac in 0..1.
 void progressBar(Adafruit_GFX &g, int16_t x, int16_t y, int16_t w, int16_t h,
                  float frac);
+
+// Charge as a stadium with a proportional fill, and the figure beneath it.
+// Draws NOTHING when [known] is false: a board with no sense pin must not show
+// an empty battery, which reads as "flat" rather than "not measured".
+void batteryGauge(Adafruit_GFX &g, int16_t cx, uint8_t pct, bool known);
 
 // `n` dots centred on cx; the first `active` are filled, the rest outlined.
 void dots(Adafruit_GFX &g, int16_t cx, int16_t cy, uint8_t n, uint8_t active);

@@ -15,6 +15,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "app/tags.h"
+
 namespace jota {
 
 struct NoteRec {
@@ -24,6 +26,12 @@ struct NoteRec {
   uint32_t crc;    // CRC32 over those bytes
   uint32_t time;   // unix seconds, 0 until the phone has set the clock
   bool     synced;
+
+  // The tag armed on the TAGS screen when this note was recorded, or "" for
+  // none. Travels to the phone in `index`, which is what makes tagging on the
+  // device worth anything at all — before this, a tag chosen on the panel went
+  // nowhere and was attached to nothing.
+  char tag[TAG_LEN_MAX + 1];
 };
 
 class NoteStore {

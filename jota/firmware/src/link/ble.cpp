@@ -5,9 +5,13 @@
 #include "link/ble.h"
 
 #include <NimBLEDevice.h>
+#include <Preferences.h>
 
 #include <stdio.h>
 #include <string.h>
+
+#include "app/identity.h"
+#include "app/tags.h"
 
 namespace jota {
 
@@ -48,10 +52,26 @@ static uint8_t  g_authFails  = 0;
 static uint32_t g_lockUntil  = 0;
 static uint32_t g_fastUntil  = 0;
 static uint8_t  g_advPending = 0xFF;   // forces the first advert update
+static uint8_t  g_advFlags   = 0xFF;
+static uint8_t  g_advBattery = 0xFE;  // never a real value; forces the first
 static char     g_pairCode[8] = {0};
+static uint8_t  g_battery    = 0xFF;  // 0xFF = no sense pin, unknown
 
-static char g_tags[160] =
-    "[\"WORK\",\"HOME\",\"IDEA\",\"BUY\",\"LATER\"]";
+// ---- tags ----------------------------------------------------------------
+// The phone owns the list and writes it whole; Jota stores it and the TAGS
+// screen shows it. A write lands in this staging buffer and is applied from
+// loop(), never from the callback: parsing plus an NVS commit is far more than
+// a BLE callback may do on the host stack's task.
+//
+// The list itself lives in AppModel::tags. It used to live here, in a buffer
+// nothing ever drew, which is why a tag written from the app never appeared on
+// the panel.
+static const size_t TAGS_JSON_MAX = 192;  // 8 * (12 + 3) + 2, with headroom
+
+static char        g_tagsPending[TAGS_JSON_MAX] = {0};
+static bool        g_tagsDirty   = false;  // a write is waiting to be applied
+static bool        g_tagsChanged = false;  // the model changed; repaint
+static Preferences g_prefs;
 
 struct Xfer {
   bool     active = false;
@@ -69,12 +89,36 @@ static void digitsOnly(const char *in, char *out, size_t n) {
   out[w] = '\0';
 }
 
+// Reads a string field out of a flat JSON object. Same spirit as the integer
+// readers further down: two fields do not justify a parser.
+static bool jsonStr(const char *s, const char *key, char *out, size_t n) {
+  out[0] = '\0';
+  const char *p = strstr(s, key);
+  if (!p) return false;
+  p = strchr(p + strlen(key), ':');
+  if (!p) return false;
+  p = strchr(p, '"');
+  if (!p) return false;
+  ++p;
+
+  size_t w = 0;
+  while (*p && *p != '"' && w + 1 < n) out[w++] = *p++;
+  out[w] = '\0';
+  return w > 0;
+}
+
 static void buildStatus(char *out, size_t n) {
+  // `authed` is what the app reads to find out whether it still has to
+  // present itself. It used to infer that from the read SUCCEEDING, which it
+  // always does — this characteristic is deliberately ungated so that an
+  // unauthenticated phone can learn it is unauthenticated.
   snprintf(out, n,
-           "{\"pending\":%u,\"paired\":%s,\"authed\":%s,\"clock\":%lu}",
+           "{\"pending\":%u,\"paired\":%s,\"authed\":%s,\"owned\":%s,"
+           "\"device\":\"%s\",\"battery\":%d,\"clock\":%lu}",
            (unsigned)(g_store ? g_store->pending() : 0),
            (g_model && g_model->paired) ? "true" : "false",
-           g_authed ? "true" : "false", 0UL);
+           g_authed ? "true" : "false", hasOwner() ? "true" : "false",
+           deviceId(), (g_battery == 0xFF) ? -1 : (int)g_battery, 0UL);
 }
 
 static void pushStatus() {
@@ -96,15 +140,27 @@ static void statusError(const char *code) {
 // Advertise the pending count so the phone can decide whether to wake at all.
 static void refreshAdvert(bool force = false) {
   const uint8_t pending = g_store ? g_store->pending() : 0;
-  if (!force && pending == g_advPending) return;
+  const uint8_t flags   = (uint8_t)(((g_model && g_model->paired) ? 0x01 : 0)
+                                  | (hasOwner() ? 0x02 : 0));
+  if (!force && pending == g_advPending && flags == g_advFlags &&
+      g_battery == g_advBattery) {
+    return;
+  }
   g_advPending = pending;
+  g_advFlags   = flags;
+  g_advBattery = g_battery;
 
   NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
   adv->stop();
 
-  // 0xFFFF is the "no company" identifier, then our two bytes.
-  uint8_t md[4] = {0xFF, 0xFF, pending,
-                   (uint8_t)((g_model && g_model->paired) ? 0x01 : 0x00)};
+  // 0xFFFF is the "no company" identifier, then our four bytes. The id goes
+  // out unconnected so the app can name each Jota in a scan list — "which of
+  // these two is mine" has to be answerable before you connect to one.
+  const uint16_t id    = deviceIdShort();
+  uint8_t        md[7] = {0xFF,          0xFF,
+                          pending,       flags,
+                          (uint8_t)(id >> 8), (uint8_t)(id & 0xFF),
+                          g_battery};
   adv->setManufacturerData(std::string((char *)md, sizeof(md)));
   adv->start();
 }
@@ -122,6 +178,7 @@ class ServerCB : public NimBLEServerCallbacks {
   void onDisconnect(NimBLEServer *s) override {
     g_connected   = false;
     g_authed      = false;
+    if (g_model) g_model->authed = false;
     // An interrupted transfer is simply abandoned. The note was never acked,
     // so it stays pending and the advert keeps calling the phone back; it
     // will resume with a byte offset rather than starting over.
@@ -133,19 +190,58 @@ class ServerCB : public NimBLEServerCallbacks {
   }
 };
 
+static void grantAuth() {
+  g_authed    = true;
+  g_authFails = 0;
+  if (g_model) {
+    g_model->paired = true;
+    g_model->authed = true;
+  }
+  pushStatus();
+  refreshAdvert();
+}
+
 class AuthCB : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic *c) override {
-    char given[8], want[8];
-    digitsOnly(c->getValue().c_str(), given, sizeof(given));
-    digitsOnly(g_pairCode, want, sizeof(want));
+    const std::string v = c->getValue();
 
-    if (want[0] && strcmp(given, want) == 0) {
-      g_authed    = true;
-      g_authFails = 0;
-      if (g_model) g_model->paired = true;
-      pushStatus();
+    char appId[APP_ID_MAX];
+    jsonStr(v.c_str(), "\"app\"", appId, sizeof(appId));
+
+    // The owner reconnecting. No code, no prompt, no e-paper — this is the
+    // whole point of the bond, and what stops every single sync from
+    // demanding six digits off a device that may be in another room.
+    if (isOwner(appId)) {
+      grantAuth();
       return;
     }
+
+    char code[16];
+    jsonStr(v.c_str(), "\"code\"", code, sizeof(code));
+
+    char given[8], want[8];
+    digitsOnly(code, given, sizeof(given));
+    digitsOnly(g_pairCode, want, sizeof(want));
+
+    // A correct code takes ownership, even from an existing owner. Possession
+    // of the device outranks the stored bond by design: possession IS the
+    // security model, so a Jota that could lock out the person holding it
+    // would be worse, not better.
+    if (want[0] && strcmp(given, want) == 0) {
+      if (appId[0]) setOwner(appId);
+      grantAuth();
+      return;
+    }
+
+    // No code offered at all. That is a phone introducing itself, not a wrong
+    // guess, so it must not burn one of the three attempts — otherwise an app
+    // that simply is not the owner would lock the device out of the air in
+    // three reconnects.
+    if (!given[0]) {
+      statusError(hasOwner() ? "owner" : "auth");
+      return;
+    }
+
     if (++g_authFails >= MAX_AUTH_FAIL) {
       g_lockUntil = millis() + LOCKOUT_MS;
       NimBLEDevice::getAdvertising()->stop();
@@ -237,16 +333,54 @@ class AckCB : public NimBLECharacteristicCallbacks {
   }
 };
 
+// Persisted so the list survives a power cycle — "Jota stores it". Without
+// this every reboot silently reverted to the factory five, and the app, which
+// believes the device already has its list, had no reason to write again.
+static void tagsSave(const TagList &t) {
+  char         buf[TAGS_JSON_MAX];
+  const size_t n = tagsToJson(t, buf, sizeof(buf));
+  g_prefs.begin("jota", /*readOnly=*/false);
+  g_prefs.putBytes("tags", buf, n);
+  g_prefs.end();
+}
+
+static bool tagsLoad(TagList &t) {
+  g_prefs.begin("jota", /*readOnly=*/true);
+  char         buf[TAGS_JSON_MAX] = {0};
+  const size_t n = g_prefs.getBytes("tags", buf, sizeof(buf) - 1);
+  g_prefs.end();
+  if (n == 0) return false;
+  buf[n] = '\0';
+  return tagsParseJson(buf, t);
+}
+
 class TagsCB : public NimBLECharacteristicCallbacks {
   void onRead(NimBLECharacteristic *c) override {
-    c->setValue((uint8_t *)g_tags, strlen(g_tags));
+    // Serialised from the model, so what the phone reads back is exactly what
+    // the panel is showing — one source of truth, not two.
+    char buf[TAGS_JSON_MAX];
+    if (g_model && tagsToJson(g_model->tags, buf, sizeof(buf)) > 0) {
+      c->setValue((uint8_t *)buf, strlen(buf));
+    } else {
+      c->setValue("[]");
+    }
   }
   void onWrite(NimBLECharacteristic *c) override {
-    if (!g_authed) return;
+    // A dropped write used to be indistinguishable from a stored one: the
+    // characteristic still acks, so the phone reported success either way.
+    // Say what happened instead.
+    if (!g_authed) {
+      statusError("auth");
+      return;
+    }
     const std::string v = c->getValue();
-    if (v.size() >= sizeof(g_tags)) return;
-    memcpy(g_tags, v.data(), v.size());
-    g_tags[v.size()] = '\0';
+    if (v.size() >= sizeof(g_tagsPending)) {
+      statusError("tags");
+      return;
+    }
+    memcpy(g_tagsPending, v.data(), v.size());
+    g_tagsPending[v.size()] = '\0';
+    g_tagsDirty             = true;
   }
 };
 
@@ -264,6 +398,14 @@ class ClockCB : public NimBLECharacteristicCallbacks {
 void Link::begin(NoteStore &store, AppModel &model) {
   g_store = &store;
   g_model = &model;
+
+  // This board's id, and the phone that owns it if there is one.
+  identityBegin();
+  g_model->deviceId = deviceId();
+  g_model->paired   = hasOwner();
+
+  // Whatever the phone last wrote, or the factory list if it never has.
+  if (!tagsLoad(g_model->tags)) tagsSetDefaults(g_model->tags);
 
   NimBLEDevice::init("JOTA");
   NimBLEDevice::setMTU(247);
@@ -308,6 +450,10 @@ void Link::begin(NoteStore &store, AppModel &model) {
   refreshAdvert(/*force=*/true);
 }
 
+void Link::setBattery(uint8_t pct) {
+  g_battery = (pct > 100 && pct != 0xFF) ? 100 : pct;
+}
+
 void Link::setPairCode(const char *code) {
   if (!code) {
     g_pairCode[0] = '\0';
@@ -318,6 +464,12 @@ void Link::setPairCode(const char *code) {
 
 bool Link::connected() const { return g_connected; }
 bool Link::authed() const { return g_authed; }
+
+bool Link::takeTagsChanged() {
+  const bool v  = g_tagsChanged;
+  g_tagsChanged = false;
+  return v;
+}
 
 void Link::nudge(uint32_t nowMs) {
   g_fastUntil = nowMs + ADV_FAST_MS;
@@ -345,6 +497,24 @@ void Link::loop(uint32_t nowMs) {
   }
 
   refreshAdvert();
+
+  // Apply a pending tag write. Deferred out of the callback because both the
+  // parse and the NVS commit are slow enough to stall the host stack's task.
+  if (g_tagsDirty) {
+    g_tagsDirty = false;
+    if (g_model && tagsParseJson(g_tagsPending, g_model->tags)) {
+      // A shorter list must not leave the cursor pointing off the end.
+      if (g_model->tagSel >= g_model->tags.count) {
+        g_model->tagSel =
+            g_model->tags.count ? (uint8_t)(g_model->tags.count - 1) : 0;
+      }
+      tagsSave(g_model->tags);
+      g_tagsChanged = true;
+      pushStatus();
+    } else {
+      statusError("tags");
+    }
+  }
 
   // Pump the transfer here, never from a callback: callbacks run on the host
   // stack's task and must return promptly.

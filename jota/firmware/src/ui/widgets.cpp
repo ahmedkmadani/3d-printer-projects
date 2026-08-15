@@ -150,6 +150,23 @@ void statusBar(Adafruit_GFX &g, const char *left, const char *right) {
   rule(g, MARGIN, STATUS_RULE_Y, CONTENT_W);
 }
 
+void linkDot(Adafruit_GFX &g, const char *afterLabel, bool paired,
+             bool authed) {
+  // Nothing at all until a phone has been paired: an empty circle on a device
+  // that has never met a phone would read as a fault rather than as "away".
+  if (!paired) return;
+
+  g.setFont(font::label());
+  const int16_t x  = (int16_t)(MARGIN + textWidth(g, afterLabel) + GAP_S + 3);
+  const int16_t cy = (int16_t)(STATUS_BASELINE - CAP_LABEL / 2);
+
+  if (authed) {
+    g.fillCircle(x, cy, 3, INK);
+  } else {
+    g.drawCircle(x, cy, 3, INK);
+  }
+}
+
 void bigFigure(Adafruit_GFX &g, const GFXfont *bigFont, int16_t bigCap,
                const char *big, const char *caption) {
   // Block = big cap + GAP_M + rule + GAP_M + caption cap, centred on
@@ -217,6 +234,29 @@ void progressBar(Adafruit_GFX &g, int16_t x, int16_t y, int16_t w, int16_t h,
     if (iw < ih) iw = ih;
     g.fillRoundRect(x + 2, y + 2, iw, ih, ih / 2, INK);
   }
+}
+
+void batteryGauge(Adafruit_GFX &g, int16_t cx, uint8_t pct, bool known) {
+  // Nothing at all rather than an empty stadium: an unmeasured battery and a
+  // flat one must never look the same.
+  if (!known) return;
+  if (pct > 100) pct = 100;
+
+  // Zero-padded, like every other figure in the product, so it does not change
+  // width as the charge falls and shuffle the layout under a partial refresh.
+  char label[8];
+  snprintf(label, sizeof(label), "%03u%%", (unsigned)pct);
+
+  g.setTextColor(INK);
+  g.setFont(font::reading());
+
+  // Centre the PAIR, not each half, or the gauge would sit off-axis.
+  const int16_t tw    = textWidth(g, label);
+  const int16_t total = (int16_t)(GAUGE_W + GAUGE_GAP + tw);
+  const int16_t x0    = (int16_t)(cx - total / 2);
+
+  progressBar(g, x0, GAUGE_Y, GAUGE_W, GAUGE_H, (float)pct / 100.0f);
+  textLeft(g, label, (int16_t)(x0 + GAUGE_W + GAUGE_GAP), GAUGE_BASELINE);
 }
 
 void dots(Adafruit_GFX &g, int16_t cx, int16_t cy, uint8_t n, uint8_t active) {

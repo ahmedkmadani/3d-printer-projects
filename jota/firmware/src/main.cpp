@@ -17,6 +17,7 @@
 #include "app/model.h"
 #include "app/nav.h"
 #include "app/notes.h"
+#include "hal/battery.h"
 #include "hal/buttons.h"
 #include "link/ble.h"
 #include "ui/screens.h"
@@ -42,6 +43,7 @@ using namespace jota;
 
 static Nav       nav;
 static Buttons   buttons;
+static Battery   battery;
 static AppModel  model;
 static NoteStore notes;
 static Link      bleLink;   // not `link`: collides with POSIX link()
@@ -135,7 +137,11 @@ void setup() {
   model.noteCount = 0;
   model.noteIndex = 0;
   model.syncTotal = 5;
-  model.note      = {0, "--:--", nullptr, 0};
+  model.note      = {0, "--:--", nullptr, 0, nullptr};
+  model.tagArmed  = TAG_NONE;
+  // The factory list. Link::begin() replaces it with whatever the phone last
+  // wrote, if this device has ever been paired.
+  tagsSetDefaults(model.tags);
   updateClock(millis());
   model.clock = clockBuf;
 
@@ -143,6 +149,12 @@ void setup() {
   // the phone app can be built against a real protocol today.
   notes.begin();
   model.pending = notes.pending();
+
+  // Before the first paint, so the idle screen shows a real figure rather than
+  // filling one in half a minute later.
+  battery.begin();
+  model.batteryKnown = battery.known();
+  model.batteryPct   = battery.percent();
 
   bleLink.begin(notes, model);
   Serial.printf("[jota] BLE up, %u notes pending\n", (unsigned)notes.pending());
@@ -179,7 +191,28 @@ void loop() {
   lastPending = model.pending;
   lastScreen  = nav.screen();
 
+  // `nav.dirty()` means a refresh is imminent; sampling into one reads the
+  // pack under load and reports a healthy battery as nearly flat.
+  battery.loop(now, /*busy=*/nav.dirty());
+  if (battery.known() &&
+      (battery.percent() != model.batteryPct || !model.batteryKnown)) {
+    model.batteryKnown = true;
+    model.batteryPct   = battery.percent();
+    // Only the idle screen carries the gauge as a live figure; anywhere else
+    // it will be right the next time that screen is drawn.
+    if (nav.screen() == Screen::Ready) nav.markDirty();
+  }
+  bleLink.setBattery(battery.advByte());
+
   bleLink.loop(now);
+
+  // A tag write from the phone changes what TAGS draws. Repaint it while the
+  // user is looking at it — otherwise the panel would keep showing the old
+  // list until something else happened to redraw, which on e-paper is
+  // indistinguishable from the write having failed.
+  if (bleLink.takeTagsChanged() && nav.screen() == Screen::ChooseTag) {
+    nav.markDirty(/*full=*/true);
+  }
 
   if (nav.powerOff()) {
     Serial.println("[jota] powering off");
@@ -189,7 +222,7 @@ void loop() {
     display.setFullWindow();
     display.firstPage();
     do {
-      screenOff(display);
+      screenOff(display, model);
     } while (display.nextPage());
 
     display.hibernate();
