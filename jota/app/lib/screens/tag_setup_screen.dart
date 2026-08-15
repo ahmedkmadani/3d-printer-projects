@@ -233,7 +233,12 @@ class _TagChip extends StatelessWidget {
         : enabled
             ? c.ink
             : c.inkMuted;
-    final Color border = selected ? c.signal : c.rule;
+    // INK, not the accent. Selection is shown by inversion everywhere else in
+    // this product — on the panel and in the app — and the accent means live
+    // or dangerous and nothing else (docs/brand.md). A row of terracotta pills
+    // read as eight warnings on the one screen that is meant to feel like
+    // picking favourites.
+    final Color border = selected ? c.ink : c.rule;
 
     return Semantics(
       button: true,
@@ -251,7 +256,7 @@ class _TagChip extends StatelessWidget {
             curve: JotaMotion.curve,
             height: JotaRows.heightCompact,
             decoration: BoxDecoration(
-              color: selected ? c.signal : Colors.transparent,
+              color: selected ? c.ink : Colors.transparent,
               borderRadius: JotaRows.borderRadiusOf(JotaRows.heightCompact),
               border: Border.all(color: border, width: JotaGrid.hairline),
             ),

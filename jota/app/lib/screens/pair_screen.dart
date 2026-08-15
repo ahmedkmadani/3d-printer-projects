@@ -81,7 +81,10 @@ class _PairScreenState extends State<PairScreen> {
           Text(
             // The device only accepts a code while its PAIR screen is up, and
             // nothing else in the app says how to get there.
-            'Press PAIR on Jota to see the code.',
+            // The device has no PAIR menu item any more — it shows its code
+            // by itself whenever no phone owns it. Telling someone to press a
+            // button that no longer exists is worse than saying nothing.
+            'Jota shows its code whenever no phone owns it.',
             style: t.prose.copyWith(color: c.inkMuted),
           ),
           const SizedBox(height: JotaGrid.gapL),
