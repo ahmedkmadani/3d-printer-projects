@@ -24,6 +24,7 @@ import 'package:provider/provider.dart';
 
 import '../data/note.dart';
 import '../design/format.dart';
+import '../design/mark.dart';
 import '../design/script.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
@@ -54,7 +55,12 @@ class HomeScreen extends StatelessWidget {
       // 48pt in the body, so repeating it up here as `012` would be the same
       // datum twice at two sizes — the exact failure theme.h was written to
       // prevent.
-      label: 'Jota',
+      // The MARK, not the word. This is the app's own header and the one place
+      // it says whose app this is — and the product's name is a circle with the
+      // word inside it, not the word on its own. The device wears the same mark
+      // as its idle screen, so the two objects greet you identically.
+      label: '',
+      trailing: const JotaMark(size: 30),
       // The heading and its hairline are in the BODY, so the status line does
       // not get one too. Two rules within forty pixels is two pieces of chrome
       // where the rule says there is one, and it fenced off a strip holding
