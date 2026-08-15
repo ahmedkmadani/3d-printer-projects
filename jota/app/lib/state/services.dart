@@ -36,7 +36,7 @@ import '../security/authenticator.dart';
 import '../security/local_authenticator.dart';
 import '../transcribe/transcriber.dart';
 import '../transcribe/transcription_queue.dart';
-import '../transcribe/whisper_transcriber.dart';
+import '../transcribe/google_stt_transcriber.dart';
 
 class Services {
   Services({
@@ -95,10 +95,15 @@ class Services {
     // The transcriber is rebuilt per use so a key or model changed in settings
     // takes effect on the very next note, with no restart and no stale client.
     Transcriber buildTranscriber() {
-      if (settings.backend != 'whisper') return const UnconfiguredTranscriber();
-      return WhisperTranscriber(
+      if (settings.backend != 'google') return const UnconfiguredTranscriber();
+      return GoogleSttTranscriber(
         apiKey: settings.apiKey,
         model: settings.model,
+        // Sudanese Arabic has no code of its own at Google; Egyptian is the
+        // closest supported neighbour, and English rides alongside because
+        // that is how these notes are actually spoken. Both are settings, so
+        // trying a different pair is not a rebuild.
+        language: settings.language ?? 'ar-EG',
       );
     }
 

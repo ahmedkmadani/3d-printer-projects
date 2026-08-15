@@ -3,7 +3,7 @@
 //
 //  Two stores, split by sensitivity:
 //
-//    flutter_secure_storage  the OpenAI API key. Keychain on iOS,
+//    flutter_secure_storage  the Google Cloud API key. Keychain on iOS,
 //                            EncryptedSharedPreferences on Android. Never
 //                            anywhere else, never logged, never in a crash
 //                            report.
@@ -22,7 +22,11 @@ class PrefsSettingsStore implements SettingsStore {
   final FlutterSecureStorage _secure;
 
   static const String _kAppId = 'app_id';
-  static const String _kApiKey = 'openai_api_key';
+  // Renamed from 'openai_api_key' when the backend changed (decisions.md #9).
+  // A new name rather than a reused one ON PURPOSE: an OpenAI key left in the
+  // old slot would be sent to Google, fail with a 403, and read as "your key
+  // is wrong" rather than "that is the wrong kind of key".
+  static const String _kApiKey = 'google_stt_api_key';
   static const String _kDeviceId = 'device_id';
   static const String _kDeviceName = 'device_name';
   static const String _kBackgroundSync = 'background_sync';
@@ -30,8 +34,8 @@ class PrefsSettingsStore implements SettingsStore {
   static const String _kSeenOnboarding = 'seen_onboarding';
   static const String _kTags = 'tags';
   static const String _kAppLock = 'app_lock';
-  static const String _kModel = 'whisper_model';
-  static const String _kLanguage = 'whisper_language';
+  static const String _kModel = 'stt_model';
+  static const String _kLanguage = 'stt_language';
   static const String _kBackend = 'transcribe_backend';
 
   static Future<PrefsSettingsStore> open() async {
@@ -138,7 +142,7 @@ class PrefsSettingsStore implements SettingsStore {
   Future<void> setAppLockEnabled(bool v) => _prefs.setBool(_kAppLock, v);
 
   @override
-  String get model => _prefs.getString(_kModel) ?? 'whisper-1';
+  String get model => _prefs.getString(_kModel) ?? 'latest_long';
 
   @override
   Future<void> setModel(String v) => _prefs.setString(_kModel, v);
@@ -159,7 +163,7 @@ class PrefsSettingsStore implements SettingsStore {
   }
 
   @override
-  String get backend => _prefs.getString(_kBackend) ?? 'whisper';
+  String get backend => _prefs.getString(_kBackend) ?? 'google';
 
   @override
   Future<void> setBackend(String v) => _prefs.setString(_kBackend, v);

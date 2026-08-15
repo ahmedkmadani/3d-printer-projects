@@ -3,7 +3,7 @@
 //
 //  Your device, transcription, background sync, storage, and a couple of
 //  "about" actions. No account and no telemetry — but transcription DOES need
-//  an OpenAI key, and this is where it goes.
+//  a Google Cloud key, and this is where it goes.
 //
 //  That section was missing entirely until now, which made the product's one
 //  promise unreachable: notes arrived, played back, and sat untranscribed
@@ -101,11 +101,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Text('OpenAI API key', style: context.type.label),
+            Text('Google Cloud API key', style: context.type.label),
             const SizedBox(height: JotaGrid.gapS),
             Text(
-              'Starts with sk-. Stored in your phone\'s secure keychain, and '
-              'sent only to OpenAI.',
+              'A Speech-to-Text key from Google Cloud. Stored in your phone\'s '
+              'secure keychain, and sent only to Google.',
               style: context.type.prose.copyWith(color: context.ink.inkMuted),
             ),
             const SizedBox(height: JotaGrid.gapM),
@@ -115,7 +115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               obscureText: true,
               autocorrect: false,
               enableSuggestions: false,
-              decoration: const InputDecoration(hintText: 'sk-…'),
+              decoration: const InputDecoration(hintText: 'AIza…'),
               onSubmitted: (String v) =>
                   Navigator.of(sheetContext).pop(v.trim()),
             ),

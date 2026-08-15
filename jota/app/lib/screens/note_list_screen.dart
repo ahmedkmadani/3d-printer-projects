@@ -385,8 +385,8 @@ class _NoKeyBanner extends StatelessWidget {
             Text(
               // Lead with the reassurance. The notes ARE safe; only the text is
               // missing, and that distinction is the whole anxiety here.
-              'Your notes are saved and playable. Add an OpenAI key to turn '
-              'them into text.',
+              'Your notes are saved and playable. Add a Google Cloud key in '
+              'Settings to turn them into text.',
               style: t.prose.copyWith(color: c.inkMuted),
             ),
           ],

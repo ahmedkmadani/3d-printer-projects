@@ -7,37 +7,104 @@
 //  espresso line, a soft clay wash for the thoughts, cream underneath. Soft and
 //  human, never a spec drawing.
 //
-//    stage 0  a crowded mind — a tangle packed inside
+//    stage 0  a crowded mind — a tangle packed inside, never quite still
 //    stage 1  letting it out — one line streams out and settles below
 //    stage 2  lighter — a clear head but for a calm curve; thoughts drift off
+//
+//  They MOVE, slowly. A full head is restless, a thought leaving travels, and
+//  a clear one breathes — none of which a frozen drawing can say. The loops run
+//  6-9 seconds so the page reads as alive rather than animated, and they stop
+//  dead under prefers-reduced-motion.
 // ============================================================================
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../design/theme.dart';
 
-class MindIllustration extends StatelessWidget {
+class MindIllustration extends StatefulWidget {
   const MindIllustration({super.key, required this.stage});
 
   /// 0 = full, 1 = releasing, 2 = light.
   final int stage;
 
   @override
+  State<MindIllustration> createState() => _MindIllustrationState();
+}
+
+class _MindIllustrationState extends State<MindIllustration>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    // Long enough that no single element ever looks like it is being animated
+    // AT you. The stages differ so three pages side by side never pulse
+    // together.
+    duration: Duration(milliseconds: 6000 + widget.stage * 1500),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _c.repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final JotaColors c = context.ink;
-    return CustomPaint(
-      painter: _MindPainter(line: c.ink, accent: c.signal, stage: stage),
+    // Someone who has asked the OS for less motion has asked for less motion.
+    final bool still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (still) {
+      return CustomPaint(
+        painter: _MindPainter(
+          line: c.ink,
+          accent: c.signal,
+          stage: widget.stage,
+          t: 0,
+        ),
+        child: const SizedBox.expand(),
+      );
+    }
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (BuildContext context, Widget? child) => CustomPaint(
+        painter: _MindPainter(
+          line: c.ink,
+          accent: c.signal,
+          stage: widget.stage,
+          t: _c.value,
+        ),
+        child: child,
+      ),
+      child: const SizedBox.expand(),
     );
   }
 }
 
 class _MindPainter extends CustomPainter {
-  _MindPainter({required this.line, required this.accent, required this.stage});
+  _MindPainter({
+    required this.line,
+    required this.accent,
+    required this.stage,
+    required this.t,
+  });
 
   final Color line;
   final Color accent;
   final int stage;
+
+  /// 0..1, wrapping. Every motion below is a function of this and nothing
+  /// else, so the drawing is still pure and still testable at any frame.
+  final double t;
+
+  /// One turn of the loop, in radians.
+  double get _phase => t * 2 * math.pi;
 
   late final Paint _ink;
   late final Paint _clay;
@@ -106,12 +173,23 @@ class _MindPainter extends CustomPainter {
     canvas.save();
     _clip(canvas, ctr, r);
     for (int i = 0; i < 6; i++) {
-      final double y = ctr.dy - r * 0.7 + (r * 1.4) * (i / 5);
+      // Each line drifts on its own phase, so the tangle jostles instead of
+      // sliding about as one piece — a full head is many things at once.
+      final double drift = math.sin(_phase + i * 1.1) * r * 0.045;
+      final double y = ctr.dy - r * 0.7 + (r * 1.4) * (i / 5) + drift;
       canvas.drawPath(_wave(ctr, r, y, 3.0 + i, 0.13), i.isEven ? _ink : _clay);
     }
     canvas.restore();
-    canvas.drawCircle(ctr.translate(-r * 0.35, -r * 0.35), r * 0.08, _clayDot);
-    canvas.drawCircle(ctr.translate(r * 0.4, r * 0.25), r * 0.06, _clayDot);
+    canvas.drawCircle(
+      ctr.translate(-r * 0.35, -r * 0.35 + math.sin(_phase) * r * 0.05),
+      r * 0.08,
+      _clayDot,
+    );
+    canvas.drawCircle(
+      ctr.translate(r * 0.4, r * 0.25 + math.cos(_phase * 0.8) * r * 0.05),
+      r * 0.06,
+      _clayDot,
+    );
   }
 
   /// Letting it out: the head quiets, one line streams out and pools below.
@@ -133,6 +211,25 @@ class _MindPainter extends CustomPainter {
       pooled.dy,
     );
     canvas.drawPath(stream, _clay);
+
+    // A thought travelling the path, rather than a line that merely points
+    // along it. It fades as it arrives, and the pool is always there waiting.
+    final ui.PathMetric metric = stream.computeMetrics().first;
+    final double travel = (t * 1.35) % 1.0;  // pauses at the pool
+    if (travel <= 1.0) {
+      final ui.Tangent? at = metric.getTangentForOffset(
+        metric.length * travel.clamp(0.0, 1.0),
+      );
+      if (at != null) {
+        canvas.drawCircle(
+          at.position,
+          r * 0.085,
+          Paint()
+            ..style = PaintingStyle.fill
+            ..color = accent.withValues(alpha: 0.75 * (1 - travel * 0.6)),
+        );
+      }
+    }
     canvas.drawCircle(pooled, r * 0.10, _clayDot);
   }
 
@@ -148,16 +245,20 @@ class _MindPainter extends CustomPainter {
     canvas.drawPath(calm, _ink);
 
     for (int i = 0; i < 3; i++) {
-      final double up = r * (1.25 + i * 0.55);
-      final double rad = r * (0.10 - i * 0.02);
+      // Each mark rises, thins and fades, then begins again lower down — the
+      // head keeps clearing rather than having cleared once.
+      final double p = ((t + i / 3.0) % 1.0);
+      final double up = r * (1.05 + p * 1.5);
+      final double rad = r * (0.11 * (1 - p * 0.7));
       final Paint fade = Paint()
         ..style = PaintingStyle.fill
-        ..color = accent.withValues(alpha: 0.5 - i * 0.15);
+        ..color = accent.withValues(alpha: 0.55 * (1 - p));
       canvas.drawCircle(ctr.translate(r * 0.35 * (i - 1), -up), rad, fade);
     }
   }
 
   @override
   bool shouldRepaint(_MindPainter old) =>
-      old.stage != stage || old.line != line || old.accent != accent;
+      old.stage != stage || old.line != line || old.accent != accent ||
+      old.t != t;
 }

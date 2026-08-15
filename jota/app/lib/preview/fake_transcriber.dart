@@ -1,7 +1,7 @@
 // ============================================================================
 //  Jota — a simulated transcription backend
 //
-//  Implements the same Transcriber interface as WhisperTranscriber, so the queue,
+//  Implements the same Transcriber interface as GoogleSttTranscriber, so the queue,
 //  the running/failed/done states and the detail screen's TRANSCRIBE button are
 //  all driven by the real code. It just answers from a script instead of from a
 //  network.
@@ -23,7 +23,7 @@ class FakeTranscriber implements Transcriber {
   String get id => 'preview';
 
   @override
-  String get displayName => 'Simulated Whisper (preview)';
+  String get displayName => 'Simulated speech-to-text (preview)';
 
   @override
   Future<bool> get isReady => _settings.hasApiKey();

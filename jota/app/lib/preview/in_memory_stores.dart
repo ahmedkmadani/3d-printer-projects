@@ -348,9 +348,9 @@ class InMemorySettingsStore implements SettingsStore {
   bool _hasSeenOnboarding;
   List<String> _tags;
   bool _appLockEnabled;
-  String _model = 'whisper-1';
+  String _model = 'latest_long';
   String? _language;
-  String _backend = 'whisper';
+  String _backend = 'google';
 
   @override
   Future<String?> apiKey() async => _apiKey;
