@@ -62,13 +62,13 @@ static void sheetRings(Adafruit_GFX &g) {
   clear(g);
   statusBar(g, "RINGS", "OK");
 
+  // Idle beside recording: same outer edge, a second ring inside. The pair
+  // has to be checked together, because the whole partial-refresh trick
+  // depends on the right one being the left one plus ink.
   ring(g, 58, CONTENT_MID, 34, CIRCLE_STROKE);
-  g.fillCircle(58, CONTENT_MID, DOT_R, INK);
 
-  ring(g, 142, CONTENT_MID, 34, CIRCLE_STROKE_ACTIVE);
-  g.setTextColor(INK);
-  g.setFont(font::figure());
-  textCentered(g, "0:07", 140, CONTENT_MID + CAP_FIGURE / 2);
+  ring(g, 142, CONTENT_MID, 34, CIRCLE_STROKE);
+  ring(g, 142, CONTENT_MID, 24, CIRCLE_STROKE);
 }
 
 int main(int argc, char **argv) {
@@ -76,14 +76,9 @@ int main(int argc, char **argv) {
 
   AppModel m{};
   m.noteCount = 12;
-  m.noteIndex = 4;
   m.clock     = "14:32";
   m.recSecs   = 7;
-  m.syncDone  = 4;
-  m.syncTotal = 5;
-  m.menuSel   = 1;
   m.tagSel    = 1;   // legal for a 3-tag list
-  m.tagArmed  = 1;   // PERSONAL armed for the next recording
   // Tags come from the phone now, so the preview seeds them the same way the
   // device does before it has ever been written to.
   tagsSetDefaults(m.tags);
@@ -112,18 +107,16 @@ int main(int argc, char **argv) {
   writePGM(canvas, out + "/00_widgets.pgm");
   sheetRings(canvas);
   writePGM(canvas, out + "/00b_rings.pgm");
-  screenSplash(canvas, m);
-  writePGM(canvas, out + "/01_splash.pgm");
-  screenGuide(canvas);
-  writePGM(canvas, out + "/02_guide.pgm");
   screenOff(canvas, m);
-  writePGM(canvas, out + "/10_off.pgm");
+  writePGM(canvas, out + "/09_off.pgm");
 
+  // The whole product, in five frames.
   const Item items[] = {
-      {"03_ready", screenReady},          {"04_recording", screenRecording},
-      {"05_saved", screenSaved},          {"06_menu", screenMenu},
-      {"07_choose_tag", screenChooseTag}, {"08_syncing", screenSyncing},
-      {"09_note_view", screenNoteView},   {"11_pair", screenPair},
+      {"01_ready", screenReady},
+      {"02_recording", screenRecording},
+      {"03_saved", screenSaved},
+      {"04_pair", screenPair},
+      {"05_erase", screenErase},
   };
 
   for (const Item &it : items) {
@@ -131,7 +124,14 @@ int main(int argc, char **argv) {
     writePGM(canvas, out + "/" + it.name + ".pgm");
   }
 
-  printf("rendered %zu screens to %s\n", sizeof(items) / sizeof(items[0]) + 5,
+  // A saved note with no tags at all: the phone may legitimately have written
+  // an empty list, and that path draws a completely different SAVED.
+  AppModel bare = m;
+  bare.tags.count = 0;
+  screenSaved(canvas, bare);
+  writePGM(canvas, out + "/03b_saved_no_tags.pgm");
+
+  printf("rendered %zu screens to %s\n", sizeof(items) / sizeof(items[0]) + 4,
          out.c_str());
   return 0;
 }

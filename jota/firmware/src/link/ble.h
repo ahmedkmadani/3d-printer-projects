@@ -43,6 +43,10 @@ class Link {
   // Advertise fast for a while (after a recording, or when SYNC is pressed)
   // so the phone notices quickly, then fall back to the slow interval.
   void nudge(uint32_t nowMs);
+
+  // Drop the stored owner and the current connection's authentication, so the
+  // device is a stranger to every phone again. ERASE only.
+  void forgetOwner();
 };
 
 }  // namespace jota

@@ -25,7 +25,6 @@ struct NoteMeta {
 struct AppModel {
   // Library
   uint16_t noteCount;
-  uint16_t noteIndex;  // 1-based position of the note being viewed
 
   // "HH:MM" shown in the status strip. Phase 1 drives this from millis();
   // phase 2 sources it from the PCF85063 RTC (I2C 47/48), set over NTP.
@@ -33,10 +32,6 @@ struct AppModel {
 
   // Recording
   uint16_t recSecs;
-
-  // Sync
-  uint8_t syncDone;
-  uint8_t syncTotal;
 
   // Phone link. Jota has no WiFi: the phone pulls notes over BLE and does the
   // transcription, so there are no credentials and no API key on the device.
@@ -55,15 +50,13 @@ struct AppModel {
   bool    batteryKnown;
   uint8_t batteryPct;
 
-  // Selection indices
-  uint8_t menuSel;
-  uint8_t tagSel;   // where the cursor is on the TAGS screen
-
-  // The tag ARMED for the next recording, as an index into `tags`, or
-  // TAG_NONE. Pre-selection is the only tagging interaction that fits two
-  // buttons: choosing after the fact would put a third decision in the middle
-  // of press-speak-press, which is the whole speed of the product.
-  uint8_t tagArmed;
+  // Where the cursor sits in the tag offer on SAVED.
+  //
+  // Tags are chosen AFTER a recording now, not armed before it. Arming was the
+  // only gesture that fit two buttons while the list lived behind a menu — but
+  // it meant deciding what a note was about before saying it, and a tag armed
+  // and forgotten silently filed every later note under a heading chosen once.
+  uint8_t tagSel;
 
   // The phone's tag list, as last written over BLE. Lives in the model so the
   // TAGS screen and the `tags` characteristic are reading the same bytes.
@@ -72,11 +65,6 @@ struct AppModel {
   // Currently viewed note
   NoteMeta note;
 };
-
-// Fixed label tables. `extern` so the firmware and the preview tool draw from
-// the same list.
-extern const char *const MENU_ITEMS[];
-extern const uint8_t     MENU_COUNT;
 
 // Tags are NOT a fixed table — they are whatever the phone last wrote. See
 // AppModel::tags and app/tags.h.

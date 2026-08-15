@@ -2,13 +2,17 @@
 //  Jota — screen navigator (implementation)
 //
 //  Interaction contract, held to on EVERY screen:
-//    BOOT short = select / confirm / record      BOOT long = back
-//    PWR  short = next item                      PWR  long = power off
+//    BOOT short = record / stop / confirm     BOOT long = same as short
+//    PWR  short = next tag (SAVED only)       PWR  long = power off
+//    BOTH long  = erase everything (asks first)
 //
-//  NOTE (phase 1): recording and syncing are SIMULATED. The timer counts and
-//  the sync bar advances so the whole flow can be walked on real hardware —
-//  but no audio is captured and nothing is uploaded. Phase 2 replaces the
-//  tick() bodies with real work.
+//  BOOT long doing exactly what BOOT short does is deliberate. There is
+//  nowhere left to go "back" to now that the menu is gone, and a long press
+//  that silently did nothing on a panel this slow reads as a crash.
+//
+//  NOTE (phase 1): recording is SIMULATED. The timer counts so the whole flow
+//  can be walked on real hardware — but no audio is captured. Phase 2 replaces
+//  the tick() bodies with real work.
 // ============================================================================
 #include "app/nav.h"
 
@@ -17,10 +21,16 @@
 
 namespace jota {
 
-static const uint32_t SPLASH_MS    = 3000;
-static const uint32_t GUIDE_MS     = 4000;
-static const uint32_t SAVED_MS     = 1800;
-static const uint32_t SYNC_STEP_MS = 900;
+static const uint32_t SAVED_MS = 1600;
+
+// How long the tag offer stands after a recording is saved.
+//
+// Ten seconds, and it TIMES OUT rather than waiting: the moment you have to
+// deal with it is often the moment you are driving, and a device that holds a
+// decision open until you answer has put itself in the middle of
+// press-speak-press. Say nothing and the note is simply untagged; the phone
+// will suggest one later.
+static const uint32_t TAG_WINDOW_MS = 10000;
 
 // How long the pairing offer stands. The code must live exactly as long as the
 // offer does: this used to be a 6-second animation left over from the simulated
@@ -29,42 +39,38 @@ static const uint32_t SYNC_STEP_MS = 900;
 // failed. Two minutes is a walk-to-the-other-room's worth of patience.
 static const uint32_t PAIR_WINDOW_MS = 120000;
 
-// How long "PAIRED" stays up before falling back to the menu.
-static const uint32_t PAIR_OK_MS    = 1800;
-static const char    *SIM_PAIR_CODE = "428 913";
+// How long "PAIRED" stays up before falling back.
+static const uint32_t PAIR_OK_MS = 1800;
+
+// How long the ERASE question stands before it answers itself with "no".
+static const uint32_t ERASE_WINDOW_MS = 10000;
+
+static const char *SIM_PAIR_CODE = "428 913";
 
 // Element regions, so a tick pushes only the pixels that actually change.
 static const Rect kTimerRect = {TIMER_X, TIMER_Y, TIMER_W, TIMER_H};
 static const Rect kListRect  = {MARGIN, CONTENT_TOP, CONTENT_W, CONTENT_H};
-static const Rect kSyncRect  = {MARGIN, STATUS_BASELINE - CAP_LABEL - 2,
-                                CONTENT_W,
-                                (PROGRESS_Y + PROGRESS_H + 4) -
-                                    (STATUS_BASELINE - CAP_LABEL - 2)};
 
 void renderScreen(Adafruit_GFX &g, Screen s, const AppModel &m) {
   switch (s) {
-    case Screen::Splash:    screenSplash(g, m); break;
-    case Screen::Guide:     screenGuide(g); break;
     case Screen::Ready:     screenReady(g, m); break;
     case Screen::Recording: screenRecording(g, m); break;
     case Screen::Saved:     screenSaved(g, m); break;
-    case Screen::Menu:      screenMenu(g, m); break;
-    case Screen::ChooseTag: screenChooseTag(g, m); break;
-    case Screen::Syncing:   screenSyncing(g, m); break;
-    case Screen::NoteView:  screenNoteView(g, m); break;
     case Screen::Pair:      screenPair(g, m); break;
+    case Screen::Erase:     screenErase(g, m); break;
   }
 }
 
 void Nav::begin(uint32_t nowMs) {
-  s_           = Screen::Splash;
-  enteredMs_   = nowMs;
-  lastTickMs_  = nowMs;
-  dirty_       = true;
-  needsFull_   = true;
-  hasRegion_   = false;
-  justEntered_ = true;
-  powerOff_    = false;
+  s_            = Screen::Ready;
+  enteredMs_    = nowMs;
+  lastTickMs_   = nowMs;
+  dirty_        = true;
+  needsFull_    = true;
+  hasRegion_    = false;
+  justEntered_  = true;
+  powerOff_     = false;
+  wipeRequested_ = false;
 }
 
 void Nav::go(Screen s, uint32_t nowMs, bool full) {
@@ -77,18 +83,15 @@ void Nav::go(Screen s, uint32_t nowMs, bool full) {
   justEntered_ = true;   // dwell is measured from paintDone(), not from here
 }
 
-// Commit the in-progress recording as a note.
+// Commit the in-progress recording as a note. The tag is NOT set here: it is
+// chosen on the SAVED screen in the seconds afterwards, or not at all.
 static void commitNote(AppModel &m) {
   m.note.id   = ++m.noteCount;
   m.note.secs = m.recSecs;
-  m.note.text = nullptr;  // untranscribed until phase 2
-  m.noteIndex = m.noteCount;
-
-  // The armed tag belongs to THIS note, and is then spent. Leaving it armed
-  // would silently file every later note under a heading chosen once, which is
-  // worse than not tagging at all.
-  m.note.tag  = tagAt(m.tags, m.tagArmed);
-  m.tagArmed  = TAG_NONE;
+  m.note.text = nullptr;  // the device never holds a transcript, by design
+  m.note.tag  = nullptr;
+  if (m.pending < 255) m.pending++;
+  m.tagSel = 0;
 }
 
 void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
@@ -103,30 +106,43 @@ void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
     return;
   }
 
+  if (e == BtnEvent::BothLong) {
+    // Nothing preempts a recording, not even this. The gesture is destructive
+    // and the recording is the one thing on the device that cannot be got
+    // back — asking "erase everything?" over a live microphone would be the
+    // worst possible moment to be wrong about what the user meant.
+    if (s_ == Screen::Recording) return;
+
+    if (s_ == Screen::Erase) {
+      // Second hold: this is the answer. The wipe itself belongs to main.cpp;
+      // nav owns no storage and no radio, which is what keeps it renderable
+      // on the host preview.
+      wipeRequested_ = true;
+      return;
+    }
+    go(Screen::Erase, nowMs);
+    return;
+  }
+
+  const bool select = (e == BtnEvent::BootShort || e == BtnEvent::BootLong);
+
   switch (s_) {
-    case Screen::Splash:
-      go(Screen::Guide, nowMs);
-      break;
-
-    case Screen::Guide:
-      go(Screen::Ready, nowMs);
-      break;
-
     case Screen::Ready:
-      // BootLong starts too. Press-and-hold-to-talk is the first instinct on
-      // any one-button recorder, and it used to do NOTHING here — no ink, no
-      // sound, on a panel that takes two seconds to repaint. The instinct
-      // cannot be allowed to fail silently.
-      if (e == BtnEvent::BootShort || e == BtnEvent::BootLong) {
+      // Press-and-hold-to-talk is the first instinct on any one-button
+      // recorder, and it used to do NOTHING here — no ink, no sound, on a
+      // panel that takes two seconds to repaint. The instinct cannot be
+      // allowed to fail silently.
+      if (select) {
         m.recSecs = 0;
         // The ONE transition that stays partial: the ring's outer edge does
-        // not move and the annulus only thickens inward, so this is purely
+        // not move and the state mark appears inside it, so this is purely
         // additive ink with nothing to erase. Record lands instantly.
         go(Screen::Recording, nowMs, /*full=*/false);
-      } else if (e == BtnEvent::PwrShort) {
-        m.menuSel = 0;
-        go(Screen::Menu, nowMs);
       }
+      // PWR short deliberately does nothing here. Every destination it used to
+      // reach is gone: notes and sync live on the phone, tags are chosen on
+      // SAVED, and pairing shows itself. A button that opens a menu of one
+      // thing is worse than a button that waits.
       break;
 
     case Screen::Recording:
@@ -136,113 +152,74 @@ void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
       // destructive one unguarded, is a trap; whoever holds the button to
       // stop is not asking to throw the recording away.
       //
-      // Nothing on this device destroys a recording. Deleting a note is the
-      // phone's job, where there is a screen big enough to confirm it.
-      if (e == BtnEvent::BootShort || e == BtnEvent::BootLong) {
+      // Nothing on this device destroys a recording except ERASE. Deleting one
+      // note is the phone's job, where there is a screen big enough to confirm
+      // it.
+      if (select) {
         commitNote(m);
         go(Screen::Saved, nowMs);
       }
       break;
 
     case Screen::Saved:
-      if (e == BtnEvent::BootShort || e == BtnEvent::BootLong) {
-        go(Screen::Ready, nowMs);
-      }
-      break;
-
-    case Screen::Menu:
       if (e == BtnEvent::PwrShort) {
-        m.menuSel = (uint8_t)((m.menuSel + 1) % MENU_COUNT);
-        markDirtyRegion(kListRect);  // only the inverted row moves
-      } else if (e == BtnEvent::BootShort) {
-        switch (m.menuSel) {
-          case 0: go(Screen::NoteView, nowMs); break;
-          case 1: go(Screen::ChooseTag, nowMs); break;
-          case 2: m.syncDone = 0; go(Screen::Syncing, nowMs); break;
-          case 3: m.pairCode = SIM_PAIR_CODE; go(Screen::Pair, nowMs); break;
-          default: go(Screen::Guide, nowMs); break;
-        }
-      } else if (e == BtnEvent::BootLong) {
-        go(Screen::Ready, nowMs);
-      }
-      break;
-
-    case Screen::ChooseTag:
-      if (e == BtnEvent::BootShort) {
-        // Select ARMS the tag for the next recording. This branch used to be
-        // identical to cancel: pressing select on this screen did nothing at
-        // all, which taught that select is sometimes meaningless.
-        if (m.tags.count) {
-          // Choosing the armed tag again disarms it — the only way back to
-          // "no tag" without a sixth screen.
-          m.tagArmed = (m.tagArmed == m.tagSel) ? TAG_NONE : m.tagSel;
-        }
-        go(Screen::Menu, nowMs);
-      } else if (e == BtnEvent::PwrShort) {
         // The list is whatever the phone last wrote, so it can be empty — and
         // `% 0` is an integer-divide exception, which on the ESP32 is a panic
         // and a reboot, not a wrong pixel.
         if (m.tags.count == 0) break;
         m.tagSel = (uint8_t)((m.tagSel + 1) % m.tags.count);
-        // Not just the list: the status slot carries the position, and a long
-        // list scrolls every row under the cursor.
-        markDirty();
-      } else if (e == BtnEvent::BootLong) {
-        // Cancel: leave whatever was already armed alone.
-        go(Screen::Menu, nowMs);
-      }
-      break;
-
-    case Screen::Syncing:
-      if (e == BtnEvent::BootLong) go(Screen::Menu, nowMs);
-      break;
-
-    case Screen::NoteView:
-      if (e == BtnEvent::BootShort || e == BtnEvent::BootLong) {
-        go(Screen::Menu, nowMs);
+        markDirtyRegion(kListRect);
+      } else if (select) {
+        // Confirm. Choosing the tag already on the note again clears it —
+        // the only way back to "no tag" without inventing a sixth screen.
+        const char *chosen = tagAt(m.tags, m.tagSel);
+        m.note.tag = (m.note.tag == chosen) ? nullptr : chosen;
+        go(Screen::Ready, nowMs);
       }
       break;
 
     case Screen::Pair:
-      if (e == BtnEvent::BootLong) {   // cancel pairing
-        m.pairCode = nullptr;
-        go(Screen::Menu, nowMs);
-      }
+      // No way to dismiss it by hand. The device is unowned: there is nothing
+      // else for it to show, and a cancel would only hide the one number the
+      // phone is asking for.
+      break;
+
+    case Screen::Erase:
+      // A single press is not an answer to a destructive question. Only the
+      // deliberate second both-button hold above counts, or the timeout below
+      // declines for you.
       break;
   }
 }
 
 void Nav::tick(uint32_t nowMs, AppModel &m) {
-  // A phone authenticating is worth showing. Jump to MENU so the device is
-  // sitting on the thing you can now drive from it, rather than leaving the
-  // person to guess whether the connection landed.
+  // An unowned device has exactly one useful thing to say, so it says it
+  // without being asked. This replaces hunting MENU -> PAIR on a two-button
+  // device at the single highest-friction moment in the product.
+  if (!m.paired && s_ != Screen::Pair && s_ != Screen::Recording &&
+      s_ != Screen::Saved && s_ != Screen::Erase) {
+    m.pairCode = SIM_PAIR_CODE;
+    go(Screen::Pair, nowMs);
+    return;
+  }
+
+  // A phone authenticating is worth showing. Land on READY — the thing you
+  // can actually do — rather than leaving the person to guess.
   //
   // Three screens are never interrupted:
-  //   PAIR      — it has its own "PAIRED" confirmation and gets to MENU itself
+  //   PAIR      — it has its own "PAIRED" confirmation and gets there itself
   //   RECORDING — nothing preempts a recording, ever
-  //   SAVED     — a 1.8s confirmation that a note exists; cutting it short
-  //               would make the note look like it had not been kept
+  //   SAVED     — the tag window is the user's, not ours
   if (m.authed && !wasAuthed_) {
     wasAuthed_ = true;
     if (s_ != Screen::Pair && s_ != Screen::Recording && s_ != Screen::Saved) {
-      m.menuSel = 0;
-      go(Screen::Menu, nowMs);
+      go(Screen::Ready, nowMs);
     }
   } else if (!m.authed) {
     wasAuthed_ = false;
   }
 
   switch (s_) {
-    case Screen::Splash:
-      // TODO(phase 2): gate GUIDE behind an NVS first-run flag so it appears
-      // once rather than on every boot.
-      if (nowMs - enteredMs_ >= SPLASH_MS) go(Screen::Guide, nowMs);
-      break;
-
-    case Screen::Guide:
-      if (nowMs - enteredMs_ >= GUIDE_MS) go(Screen::Ready, nowMs);
-      break;
-
     case Screen::Recording:
       if (nowMs - lastTickMs_ >= 1000) {
         lastTickMs_ += 1000;
@@ -252,19 +229,11 @@ void Nav::tick(uint32_t nowMs, AppModel &m) {
       break;
 
     case Screen::Saved:
-      if (nowMs - enteredMs_ >= SAVED_MS) go(Screen::Ready, nowMs);
-      break;
-
-    case Screen::Syncing:
-      if (nowMs - lastTickMs_ >= SYNC_STEP_MS) {
-        lastTickMs_ = nowMs;
-        if (m.syncDone < m.syncTotal) {
-          m.syncDone++;
-          // Spans the status ratio as well as the bar — both change together.
-          markDirtyRegion(kSyncRect);
-        } else {
-          go(Screen::Menu, nowMs);
-        }
+      // With no tags to offer there is nothing to wait for, so the
+      // confirmation is short. With tags, the window is the person's to spend.
+      if (nowMs - enteredMs_ >=
+          (m.tags.count == 0 ? SAVED_MS : TAG_WINDOW_MS)) {
+        go(Screen::Ready, nowMs);
       }
       break;
 
@@ -274,14 +243,23 @@ void Nav::tick(uint32_t nowMs, AppModel &m) {
         // sit on an unattended panel — and hold the confirmation.
         m.pairCode = nullptr;
         m.paired   = true;
-        enteredMs_ = nowMs;   // the hold starts now, not when PAIR opened
+        enteredMs_ = nowMs;  // the hold starts now, not when PAIR opened
         markDirty(/*full=*/true);
       } else if (!m.pairCode) {
-        if (nowMs - enteredMs_ >= PAIR_OK_MS) go(Screen::Menu, nowMs);
+        if (nowMs - enteredMs_ >= PAIR_OK_MS) go(Screen::Ready, nowMs);
       } else if (nowMs - enteredMs_ >= PAIR_WINDOW_MS) {
-        m.pairCode = nullptr;  // the offer expired; nothing is left showing
-        go(Screen::Menu, nowMs);
+        // The offer expired. Nothing is left showing, and the next tick puts
+        // it straight back up if the device is still unowned — which is
+        // correct: the code rotates, the offer does not end.
+        m.pairCode = nullptr;
+        go(Screen::Ready, nowMs);
       }
+      break;
+
+    case Screen::Erase:
+      // Silence declines. A destructive question that waited forever would
+      // eventually be answered by a pocket.
+      if (nowMs - enteredMs_ >= ERASE_WINDOW_MS) go(Screen::Ready, nowMs);
       break;
 
     default:

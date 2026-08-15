@@ -480,6 +480,24 @@ void Link::nudge(uint32_t nowMs) {
   adv->start();
 }
 
+void Link::forgetOwner() {
+  clearOwner();
+  // Also drop THIS connection's authentication. Leaving it standing would let
+  // the phone that just asked for an erase keep reading the device it no
+  // longer owns, until it happened to disconnect.
+  g_authed = false;
+  if (g_model) {
+    g_model->paired = false;
+    g_model->authed = false;
+  }
+  // Re-advertise so the "owned" flag in the advertisement stops claiming a
+  // bond that no longer exists — otherwise a scanning phone would keep being
+  // told to expect a silent reconnect.
+  NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
+  adv->stop();
+  adv->start();
+}
+
 void Link::loop(uint32_t nowMs) {
   if (g_lockUntil && nowMs > g_lockUntil) {
     g_lockUntil = 0;

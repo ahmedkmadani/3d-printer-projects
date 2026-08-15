@@ -149,4 +149,13 @@ void NoteStore::setClock(uint32_t unixSeconds) {
     if (notes_[i].time == 0) notes_[i].time = unixSeconds;
 }
 
+void NoteStore::eraseAll() {
+  // Phase 1 synthesises its notes in flash, so dropping the count IS the
+  // erase. Phase 2 must also unlink the WAV and ADPCM files from the SD card
+  // here — a note that is only forgotten by the index is still readable by
+  // anyone who takes the card out, which is exactly what ERASE promises it
+  // is not.
+  count_ = 0;
+}
+
 }  // namespace jota

@@ -13,10 +13,11 @@ namespace jota {
 
 enum class BtnEvent : uint8_t {
   None,
-  BootShort,  // select / confirm / record
-  BootLong,   // back
-  PwrShort,   // next item
+  BootShort,  // record / stop / confirm
+  BootLong,   // same as BootShort everywhere — see nav.cpp
+  PwrShort,   // next tag
   PwrLong,    // power off
+  BothLong,   // erase everything (asks first)
 };
 
 class Buttons {
@@ -38,8 +39,9 @@ class Buttons {
     bool     longFired;
   };
 
-  Btn boot_{};
-  Btn pwr_{};
+  Btn  boot_{};
+  Btn  pwr_{};
+  bool bothFired_ = false;  // one BothLong per pair of presses
 
   // Returns 0 = nothing, 1 = short release, 2 = long threshold crossed.
   uint8_t update(Btn &b, uint32_t nowMs);

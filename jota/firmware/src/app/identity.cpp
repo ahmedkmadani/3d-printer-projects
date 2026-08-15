@@ -58,4 +58,15 @@ void setOwner(const char *appId) {
   prefs.end();
 }
 
+void clearOwner() {
+  g_ownerAppId[0] = '\0';
+
+  Preferences prefs;
+  prefs.begin("jota", /*readOnly=*/false);
+  // remove(), not an empty putBytes: a zero-length value still leaves the key
+  // present, and hasOwner() would keep answering yes on the next boot.
+  prefs.remove("owner");
+  prefs.end();
+}
+
 }  // namespace jota

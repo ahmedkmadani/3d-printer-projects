@@ -14,15 +14,16 @@
 
 namespace jota {
 
-void screenSplash(Adafruit_GFX &g, const AppModel &m);
-void screenGuide(Adafruit_GFX &g);
+// FIVE screens. See app/nav.h for what went and why.
 void screenReady(Adafruit_GFX &g, const AppModel &m);
 void screenRecording(Adafruit_GFX &g, const AppModel &m);
+
+// Confirmation, and — while the phone has given it tags — the ten-second
+// offer to file the note you have just made.
 void screenSaved(Adafruit_GFX &g, const AppModel &m);
-void screenMenu(Adafruit_GFX &g, const AppModel &m);
-void screenChooseTag(Adafruit_GFX &g, const AppModel &m);
-void screenSyncing(Adafruit_GFX &g, const AppModel &m);
-void screenNoteView(Adafruit_GFX &g, const AppModel &m);
+
+// The destructive question, reached only by holding both buttons.
+void screenErase(Adafruit_GFX &g, const AppModel &m);
 
 // Pairing. The code lives on the PANEL, not in the phone app — holding the
 // device is what authorises pairing.

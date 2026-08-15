@@ -21,8 +21,6 @@ namespace jota {
 // ---- Label tables ------------------------------------------------------
 
 // Five rows is the list's exact capacity: 5*22 + 4*5 = 130 <= CONTENT_H 156.
-const char *const MENU_ITEMS[] = {"NOTES", "TAGS", "SYNC", "PAIR", "GUIDE"};
-const uint8_t     MENU_COUNT   = 5;
 
 // ---- Local helpers -----------------------------------------------------
 
@@ -52,42 +50,13 @@ static void fmtShortId(char *out, size_t n, const char *deviceId) {
 
 // ---- Screens -----------------------------------------------------------
 
-void screenSplash(Adafruit_GFX &g, const AppModel &m) {
-  clear(g);
-  // No chrome — the wordmark centres on the canvas, not the content area.
-  g.setTextColor(INK);
-  g.setFont(font::wordmark());
-  textCentered(g, "JOTA", CENTER_X, 96);
-
-  rule(g, MARGIN, 109, CONTENT_W);
-
-  // Version and identity together: this is the one screen every boot shows, so
-  // it is where "which unit is this" costs nothing to answer.
-  char id[8];
-  fmtShortId(id, sizeof(id), m.deviceId);
-
-  char line[24];
-  snprintf(line, sizeof(line), "V0.1.0  %s", id);
-
-  g.setFont(font::reading());
-  textCentered(g, line, CENTER_X, 131);
-}
-
-void screenGuide(Adafruit_GFX &g) {
-  clear(g);
-  statusBar(g, "GUIDE", nullptr);
-
-  // Monospace keeps the two columns aligned without a layout pass. This card
-  // is what buys the idle screen the right to stay wordless.
-  g.setTextColor(INK);
-  g.setFont(font::reading());
-  textLeft(g, "BOOT  RECORD", MARGIN, 94);
-  textLeft(g, "PWR   MENU", MARGIN, 112);
-  textLeft(g, "HOLD  BACK", MARGIN, 130);
-}
-
 void screenReady(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
+
+  // Left slot is this device's own four characters — the same ones the app
+  // shows beside it in a list, and the answer to "which of these is mine".
+  char id[8];
+  fmtShortId(id, sizeof(id), m.deviceId);
 
   // WAITING, not the lifetime count. The old figure only ever went up, so a
   // note that had just been handed to the phone still showed on the panel and
@@ -95,176 +64,91 @@ void screenReady(Adafruit_GFX &g, const AppModel &m) {
   // thought safe? Pending falling to zero IS that answer.
   char count[8];
   fmtCount(count, sizeof(count), m.pending);
-  statusBar(g, "READY", count);
-  linkDot(g, "READY", m.paired, m.authed);
+  statusBar(g, id, count);
+  linkDot(g, id, m.paired, m.authed);
 
-  // Idle is the ring and a dot. No figure, no word — stillness reads as
-  // ready on its own, and the GUIDE card teaches the buttons once.
+  // The mark is the whole screen. No "READY" label: there is nothing else this
+  // device does while sitting still, and a word saying so is a word to read.
   ring(g, CENTER_X, CIRCLE_CY, CIRCLE_R, CIRCLE_STROKE);
-  g.fillCircle(CENTER_X, CIRCLE_CY, DOT_R, INK);
-
-  // An armed tag has to be visible HERE, on the screen you are looking at when
-  // you press record. Armed silently on another screen, it would file notes
-  // under a heading chosen minutes ago and forgotten.
-  const char *armed = tagAt(m.tags, m.tagArmed);
-  if (armed) {
-    g.setTextColor(INK);
-    g.setFont(font::label());
-    textCenteredAt(g, armed, CENTER_X, CIRCLE_CY);
-  }
+  g.setTextColor(INK);
+  g.setFont(font::figure());
+  textCenteredAt(g, "Jota", CENTER_X, CIRCLE_CY);
 
   batteryGauge(g, CENTER_X, m.batteryPct, m.batteryKnown);
 }
 
 void screenRecording(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
-  statusBar(g, "REC", m.clock);
 
-  // Same centre, same outer edge as idle — only the annulus thickens inward
-  // and the timer appears. Purely additive ink, so the transition is safe as
-  // a partial refresh and reads instantly as a different state.
-  ring(g, CENTER_X, CIRCLE_CY, CIRCLE_R, CIRCLE_STROKE_ACTIVE);
+  // EVERY pixel of READY is redrawn identically — status line, wordmark, ring,
+  // gauge. Only the inner ring and the timer are new. That is what makes this
+  // transition safe as a partial refresh: partial updates can lay ink down
+  // cleanly but leave residue where ink is removed, so the rule is that
+  // RECORDING may only ADD to READY, never take away.
+  char id[8];
+  fmtShortId(id, sizeof(id), m.deviceId);
+  char count[8];
+  fmtCount(count, sizeof(count), m.pending);
+  statusBar(g, id, count);
+  linkDot(g, id, m.paired, m.authed);
+
+  ring(g, CENTER_X, CIRCLE_CY, CIRCLE_R, CIRCLE_STROKE);
+  ring(g, CENTER_X, CIRCLE_CY, CIRCLE_INNER_R, CIRCLE_STROKE);
+  g.setTextColor(INK);
+  g.setFont(font::figure());
+  textCenteredAt(g, "Jota", CENTER_X, CIRCLE_CY);
 
   char t[12];
   fmtDuration(t, sizeof(t), m.recSecs);
-  g.setTextColor(INK);
   g.setFont(font::figure());
-  textCentered(g, t, CENTER_X, CIRCLE_CY + CAP_FIGURE / 2);
+  textCentered(g, t, CENTER_X, TIMER_BASELINE);
 
-  // Same gauge, same pixels as READY — see the note in theme.h. Without it the
-  // idle screen's gauge would ghost through this one.
   batteryGauge(g, CENTER_X, m.batteryPct, m.batteryKnown);
 }
 
 void screenSaved(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
-  statusBar(g, "SAVED", m.clock);
 
   char id[16];
   snprintf(id, sizeof(id), "N-%03u", (unsigned)m.note.id);
-
-  // The duration is set in `figure()` — the same face the user was watching
-  // inside the ring one second ago. Continuity across the transition.
   char t[12];
   fmtDuration(t, sizeof(t), m.note.secs);
-  bigFigure(g, font::display(), CAP_DISPLAY, id, t);
-
-  // If it was filed under a tag, say so on the confirmation — the only moment
-  // the person can still tell that the tag was wrong.
-  if (m.note.tag) {
-    g.setTextColor(INK);
-    g.setFont(font::label());
-    textCenteredAt(g, m.note.tag, CENTER_X, CONTENT_BOTTOM - 14);
-  }
-}
-
-void screenMenu(Adafruit_GFX &g, const AppModel &m) {
-  clear(g);
-
-  char count[8];
-  fmtCount(count, sizeof(count), m.noteCount);
-  statusBar(g, "MENU", count);
-
-  list(g, MENU_ITEMS, MENU_COUNT, m.menuSel);
-}
-
-void screenChooseTag(Adafruit_GFX &g, const AppModel &m) {
-  clear(g);
-
-  // The defining figure here is the position in the list, not the note count:
-  // the list can be eight long and the panel shows five, so the status slot is
-  // the only thing that says where in it you are.
-  char pos[16];
-  snprintf(pos, sizeof(pos), "%03u/%03u",
-           (unsigned)(m.tags.count ? m.tagSel + 1 : 0),
-           (unsigned)m.tags.count);
-  statusBar(g, "TAGS", pos);
+  statusBar(g, id, t);
 
   if (m.tags.count == 0) {
-    // The phone may legitimately write an empty list. Say so — a blank content
-    // area reads as a failed refresh, which is the one thing e-paper must
-    // never look like.
-    g.setTextColor(INK);
-    // Two lines: the mono face fits about fourteen characters across the
-    // content column, and textCenteredAt does not wrap — one long line runs
-    // off the panel and the overflow reappears at the left margin.
-    g.setFont(font::label());
-    textCenteredAt(g, "NO TAGS", CENTER_X, CONTENT_MID - 16);
-    g.setFont(font::reading());
-    textCenteredAt(g, "ADD THEM", CENTER_X, CONTENT_MID + 10);
-    textCenteredAt(g, "IN THE APP", CENTER_X, CONTENT_MID + 28);
+    // Nothing to offer, so this is purely a confirmation. The duration is set
+    // in the same face the user was watching under the ring a second ago.
+    bigFigure(g, font::display(), CAP_DISPLAY, "SAVED", t);
     return;
   }
 
+  g.setTextColor(INK);
+  g.setFont(font::label());
+  textCenteredAt(g, "SAVED", CENTER_X, CONTENT_TOP + 10);
+
+  // Tagging happens HERE, after the fact, because this is the only moment you
+  // know what you just said. It is optional and it times out: see nav.cpp.
+  //
   // Eight tags, five rows. Scroll the window rather than truncate, or the last
   // three would be selectable but invisible.
   uint8_t first = 0, selInWindow = 0;
-  const uint8_t rows = tagsWindow(m.tags, m.tagSel, ROWS_MAX, &first,
-                                  &selInWindow);
+  const uint8_t rows =
+      tagsWindow(m.tags, m.tagSel, ROWS_MAX, &first, &selInWindow);
 
-  // The armed tag is marked with a leading asterisk, so the cursor (inversion)
-  // and the choice (the mark) are two different things you can see at once.
-  // ASCII only: the bundled GFX fonts carry 32..126 and nothing else, so a
-  // prettier bullet glyph renders as blank space on the panel.
+  // The tag already on this note is marked with a leading asterisk, so the
+  // cursor (inversion) and the choice (the mark) are two different things you
+  // can see at once. ASCII only: the bundled GFX fonts carry 32..126 and
+  // nothing else, so a prettier bullet renders as blank space on the panel.
   char        marked[ROWS_MAX][TAG_LEN_MAX + 3];
   const char *window[ROWS_MAX];
   for (uint8_t i = 0; i < rows; ++i) {
     const uint8_t idx = (uint8_t)(first + i);
+    const char   *nm  = m.tags.items[idx];
     snprintf(marked[i], sizeof(marked[i]), "%s%s",
-             (idx == m.tagArmed) ? "* " : "", m.tags.items[idx]);
+             (m.note.tag && nm == m.note.tag) ? "* " : "", nm);
     window[i] = marked[i];
   }
-
   list(g, window, rows, selInWindow);
-}
-
-void screenSyncing(Adafruit_GFX &g, const AppModel &m) {
-  clear(g);
-
-  char ratio[16];
-  snprintf(ratio, sizeof(ratio), "%03u/%03u", (unsigned)m.syncDone,
-           (unsigned)m.syncTotal);
-  statusBar(g, "SYNC", ratio);
-
-  // SYNC means handing notes to the paired phone over BLE — there is no
-  // upload from the device. The bar alone: the ratio already lives in the
-  // status slot.
-  const float frac =
-      m.syncTotal ? (float)m.syncDone / (float)m.syncTotal : 0.0f;
-  progressBar(g, MARGIN, CONTENT_MID - PROGRESS_H / 2, CONTENT_W, PROGRESS_H,
-              frac);
-}
-
-void screenNoteView(Adafruit_GFX &g, const AppModel &m) {
-  clear(g);
-
-  char pos[16];
-  snprintf(pos, sizeof(pos), "%03u/%03u", (unsigned)m.noteIndex,
-           (unsigned)m.noteCount);
-
-  char id[16];
-  snprintf(id, sizeof(id), "N-%03u", (unsigned)m.note.id);
-  statusBar(g, id, pos);
-
-  // The note's own timestamp and duration belong in the body, not in the
-  // status slot where they would masquerade as the live clock.
-  char t[12];
-  fmtDuration(t, sizeof(t), m.note.secs);
-  g.setTextColor(INK);
-  g.setFont(font::reading());
-  textLeft(g, m.note.time ? m.note.time : "--:--", MARGIN, META_BASELINE);
-  textRight(g, t, SCREEN_W - MARGIN, META_BASELINE);
-
-  if (m.note.text) {
-    // Prose is the one place sans beats mono: at 172 px the monospace face
-    // fits only ~15 characters per line, which shreds a transcript.
-    g.setFont(font::prose());
-    textWrapped(g, m.note.text, MARGIN, PROSE_TOP, CONTENT_W, PROSE_LEADING,
-                PROSE_MAX_LINES);
-  } else {
-    g.setFont(font::reading());
-    textCenteredAt(g, "NO TRANSCRIPT", CENTER_X, CONTENT_MID + 12);
-  }
 }
 
 void screenPair(Adafruit_GFX &g, const AppModel &m) {
@@ -287,6 +171,29 @@ void screenPair(Adafruit_GFX &g, const AppModel &m) {
 
   // A code is a figure, so it gets the display face.
   bigFigure(g, font::display(), CAP_DISPLAY, m.pairCode, "ENTER ON PHONE");
+}
+
+void screenErase(Adafruit_GFX &g, const AppModel &m) {
+  clear(g);
+  statusBar(g, "ERASE", "");
+
+  g.setTextColor(INK);
+  g.setFont(font::label());
+  textCenteredAt(g, "ERASE ALL?", CENTER_X, CONTENT_TOP + 26);
+
+  // Say the size of it in figures. "Erase everything" is abstract; "13 notes"
+  // is the thing you are about to lose, and it is the only number that could
+  // change someone's mind at this point.
+  char line[32];
+  snprintf(line, sizeof(line), "%u NOTES", (unsigned)m.noteCount);
+  g.setFont(font::reading());
+  textCenteredAt(g, line, CENTER_X, CONTENT_MID - 6);
+  textCenteredAt(g, "AND YOUR PHONE", CENTER_X, CONTENT_MID + 16);
+
+  // The way out is stated, because there is no cancel button to find and
+  // doing nothing is the safe answer.
+  textCenteredAt(g, "HOLD BOTH AGAIN", CENTER_X, CONTENT_BOTTOM - 30);
+  textCenteredAt(g, "OR WAIT", CENTER_X, CONTENT_BOTTOM - 12);
 }
 
 void screenOff(Adafruit_GFX &g, const AppModel &m) {

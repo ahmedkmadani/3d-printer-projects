@@ -46,6 +46,11 @@ bool isOwner(const char *appId);
 // every morning.
 void setOwner(const char *appId);
 
+// Forget the owner, so the next phone to present a correct code takes the
+// device. Used only by ERASE — the whole point of the bond is that it survives
+// everything short of that.
+void clearOwner();
+
 // Load the ids at boot. Generates and stores nothing the first time except
 // what it derives from the MAC.
 void identityBegin();

@@ -114,8 +114,8 @@ fresh connection until `auth` passes. `owned` says a phone holds the bond;
 `bytes` and `crc` are for the ADPCM copy the phone will receive, not the raw
 WAV kept on the SD card.
 
-`tag` is whatever was armed on the device's TAGS screen when the note was
-recorded, or `""`. It is a plain string, not an index: the phone can edit its
+`tag` is whatever was chosen on the device in the seconds after the recording
+stopped, or `""`. It is a plain string, not an index: the phone can edit its
 tag list between a recording and a sync, and an index would then point at
 something else entirely.
 
@@ -152,15 +152,19 @@ dropped link costs only the bytes still outstanding.
 ### tags
 
 Read to populate the app's editor, write to replace the whole list. Jota
-stores it and the `TAGS` screen shows it. Max 8 tags, 12 characters each — the
-list widget fits 5 rows at a time.
+stores it and offers it on the SAVED screen. Max 8 tags, 12 characters each —
+the list widget fits 5 rows at a time, and the app sends only the first 5.
 
-Selecting one on the device ARMS it for the next recording, and the note
-carries it up in `index`. Pre-selection is the only tagging gesture that fits
-two buttons: asking after the fact would put a third decision inside
-press-speak-press, which is the whole speed of the product. The armed tag is
-spent when the note is committed, so it never silently files every later note
-under a heading chosen once.
+**Tags are chosen AFTER a recording, not armed before it.** The device offers
+the list for ten seconds on SAVED; press to choose, or say nothing and the note
+arrives untagged for the phone to label.
+
+This replaces pre-arming, which was the only gesture that fit two buttons while
+the list lived behind a menu. Arming meant deciding what a note was about
+before saying it, and a tag armed and then forgotten silently filed every later
+note under a heading chosen once. Choosing afterwards costs nothing, because by
+then you know what you said — and it times out, so it never gets in the way of
+press-speak-press.
 
 ### clock
 

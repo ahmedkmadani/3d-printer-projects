@@ -164,5 +164,6 @@ wakes.
 
 1. Microphone: ES8311 over I2C, I2S capture, ADPCM straight into the note store.
 2. microSD: keep the raw WAV as the archive; only the compressed copy is sent.
-3. Real pairing code per session, and an NVS first-run flag so `GUIDE` shows once.
+3. Real pairing code per session. (GUIDE is gone — the device no longer
+   teaches itself on every boot.)
 4. Deep sleep between notes, waking on BOOT (`ext_wakeup` is already GPIO0).

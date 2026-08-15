@@ -149,8 +149,10 @@ The app must warn clearly: *this deletes all recordings on the device.*
 - Nothing on the device ever deletes a recording except Erase.
 - Recording is never interrupted. Not by sync, not by a phone connecting.
 - A note only leaves the pending list after the phone confirms it.
-- Tagging never blocks. Press record during the tag window and a new
-  recording starts.
+- Tagging never blocks — but it is not interruptible either. During the ten
+  seconds, BOOT confirms the tag rather than starting a recording, because one
+  button cannot mean two things at once. Saying nothing is always an answer:
+  the window closes on its own and the note goes up untagged.
 - The device never shows note text. It has none.
 - Bluetooth being off is a notice, not a wall — synced notes still read.
 
@@ -175,8 +177,14 @@ The app must warn clearly: *this deletes all recordings on the device.*
 Lock, Onboarding, Connect, Bluetooth off. Arabic notes read right to left.
 Three tabs. 44 tests, analyze clean.
 
-**Not built:** everything on the device side of this doc — it still has ten
-screens, not five. Recording, tagging and the erase gesture are unchanged.
+**Also built:** the device is down to five screens. Tagging happens after a
+recording, pairing shows itself when nobody owns the device, and holding both
+buttons twice erases everything. Compiles clean; all five render in
+`renders/ui/contact_sheet.png`.
+
+**Not built:** the microphone. Recording is still simulated — the timer counts
+and a note is committed, but no audio is captured. `eraseAll()` drops the note
+index; phase 2 must also unlink the files from the SD card.
 
 **Standing in for Gemma:** "what keeps coming back" counts words that return
 across separate notes (`lib/insights/insights.dart`). It is honest and local,

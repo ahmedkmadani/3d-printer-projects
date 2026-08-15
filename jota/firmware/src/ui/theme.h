@@ -56,10 +56,23 @@ static const uint8_t ROWS_MAX    = 5;
 // solid at any weight rather than a stack of aliased outlines. The outer
 // edge NEVER moves between idle and recording — only the annulus thickens
 // inward, which keeps the transition additive and safe for partial refresh.
-static const int16_t CIRCLE_CY            = CONTENT_MID;
-static const int16_t CIRCLE_R             = 52;
+// The ring sits ABOVE centre now, because the recording timer moved out from
+// inside it to underneath it — and between the ring's old bottom edge (160)
+// and the battery gauge (168) there was no room for a figure.
+static const int16_t CIRCLE_CY            = 94;
+static const int16_t CIRCLE_R             = 46;
 static const int16_t CIRCLE_STROKE        = 3;
-static const int16_t CIRCLE_STROKE_ACTIVE = 8;
+
+// Recording is the SAME ring with a second one drawn inside it. Not a thicker
+// annulus, and not a filled dot: two concentric circles keep the whole device
+// on one motif, and — critically — adding a ring inside the first is purely
+// ADDITIVE ink. The wordmark, the status line and the gauge all stay exactly
+// where they were, which is what lets Ready -> Recording be a partial refresh
+// and appear instantly instead of after a two-second full repaint.
+// Sized so the wordmark clears it: FreeMonoBold12 puts "Jota" at ~56px, and
+// the inner ring's clear width at r=34 is 62. The word does not shrink to fit
+// the ring; the ring was drawn around the word.
+static const int16_t CIRCLE_INNER_R       = 34;
 static const int16_t DOT_R                = 4;
 
 // ---- Indicators --------------------------------------------------------
@@ -89,7 +102,10 @@ static const int16_t GAUGE_Y        = GAUGE_BASELINE - 10;  // centred on the ca
 // Areas that change on their own while a screen is displayed. Refreshing
 // only these keeps the panel quiet: a region update is both faster and
 // visibly cleaner than pushing all 200x200 pixels for five digits.
-static const int16_t TIMER_X = 48, TIMER_Y = 92, TIMER_W = 104, TIMER_H = 28;
+// The recording timer, below the ring. Baseline 162 clears the ring's bottom
+// edge (138) and stays clear of the gauge line (168).
+static const int16_t TIMER_BASELINE = 162;
+static const int16_t TIMER_X = 40, TIMER_Y = 138, TIMER_W = 120, TIMER_H = 26;
 
 // ---- Prose -------------------------------------------------------------
 static const int16_t META_BASELINE   = 46;  // note time / duration line

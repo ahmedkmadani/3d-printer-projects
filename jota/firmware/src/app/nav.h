@@ -16,17 +16,22 @@
 
 namespace jota {
 
+// FIVE screens. There were ten.
+//
+// The six that went were all the device trying to be a small, bad phone:
+// MENU existed only to reach them; NOTES/NOTE VIEW showed a transcript the
+// device by design never has; SYNCING was a destination for something that
+// happens by itself and cannot be started from here anyway; CHOOSE TAG became
+// a step on SAVED, where you already know what you just said; SPLASH and GUIDE
+// were shown on every single boot to a person who owns one of these.
+//
+// What is left is a capture instrument. The phone is the library.
 enum class Screen : uint8_t {
-  Splash,
-  Guide,
   Ready,
   Recording,
-  Saved,
-  Menu,
-  ChooseTag,
-  Syncing,
-  NoteView,
-  Pair,
+  Saved,  // and, for ten seconds, the tag picker
+  Pair,   // shows itself when no phone owns this device
+  Erase,  // both buttons, twice
 };
 
 // Dispatch to the matching screen function.
@@ -48,6 +53,12 @@ class Nav {
   bool   dirty() const { return dirty_; }
   bool   needsFull() const { return needsFull_; }
   bool   powerOff() const { return powerOff_; }
+
+  // Set when the user answered the ERASE question with a second both-button
+  // hold. Nav owns no storage and no radio — main.cpp does the wiping — which
+  // is what keeps every screen renderable on the host preview.
+  bool   wipeRequested() const { return wipeRequested_; }
+  void   clearWipeRequest() { wipeRequested_ = false; }
   void   clearDirty() { dirty_ = false; }
 
   // When set, only this rectangle needs pushing to the panel.
@@ -88,7 +99,7 @@ class Nav {
   }
 
  private:
-  Screen   s_          = Screen::Splash;
+  Screen   s_          = Screen::Ready;
   bool     wasAuthed_  = false;  // edge-detects a phone connecting
   bool     dirty_      = true;
   bool     needsFull_  = true;
@@ -96,6 +107,7 @@ class Nav {
   bool     justEntered_ = true;
   Rect     region_     = {0, 0, 0, 0};
   bool     powerOff_   = false;
+  bool     wipeRequested_ = false;
   uint32_t enteredMs_  = 0;
   uint32_t lastTickMs_ = 0;
 };

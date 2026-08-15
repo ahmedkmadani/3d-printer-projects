@@ -59,8 +59,11 @@ static const uint16_t FULL_EVERY        = 4;
 // The de-ghosting flash is deferred to one of these, so it is only ever seen
 // while idle — never interrupting a recording, a sync, or a confirmation.
 static bool quietScreen(Screen s) {
-  return s == Screen::Ready || s == Screen::Menu || s == Screen::ChooseTag ||
-         s == Screen::Guide || s == Screen::NoteView;
+  // READY and PAIR are the only screens where nothing is running and the user
+  // is not mid-act. SAVED is excluded on purpose: its ten-second tag offer is
+  // the user's, and a de-ghosting flash across it would look like the note had
+  // been lost.
+  return s == Screen::Ready || s == Screen::Pair;
 }
 
 // PHASE 1 CLOCK: counts from 00:00 at boot. There is no real time source yet
@@ -135,10 +138,7 @@ void setup() {
 
   model           = AppModel{};
   model.noteCount = 0;
-  model.noteIndex = 0;
-  model.syncTotal = 5;
   model.note      = {0, "--:--", nullptr, 0, nullptr};
-  model.tagArmed  = TAG_NONE;
   // The factory list. Link::begin() replaces it with whatever the phone last
   // wrote, if this device has ever been paired.
   tagsSetDefaults(model.tags);
@@ -179,13 +179,17 @@ void loop() {
   // `pending` is what the advertisement broadcasts, so it must reflect the
   // real note store rather than the recording simulation.
   static uint8_t lastPending = 0xFF;
-  static Screen  lastScreen  = Screen::Splash;
+  static Screen  lastScreen  = Screen::Ready;
   model.pending = notes.pending();
 
   // Advertise fast for a minute whenever there is a fresh reason for the
   // phone to notice: a note appeared, or the user asked for a sync.
   if (model.pending != lastPending && model.pending > 0) bleLink.nudge(now);
-  if (nav.screen() == Screen::Syncing && lastScreen != Screen::Syncing) {
+  // Landing on READY after saving is the moment a phone should be looking:
+  // there is a fresh note and the user has stopped touching the device. The
+  // old trigger was opening the SYNC screen, which no longer exists — syncing
+  // is not something you ask this device to do.
+  if (nav.screen() == Screen::Ready && lastScreen == Screen::Saved) {
     bleLink.nudge(now);
   }
   lastPending = model.pending;
@@ -210,7 +214,26 @@ void loop() {
   // user is looking at it — otherwise the panel would keep showing the old
   // list until something else happened to redraw, which on e-paper is
   // indistinguishable from the write having failed.
-  if (bleLink.takeTagsChanged() && nav.screen() == Screen::ChooseTag) {
+  if (bleLink.takeTagsChanged() && nav.screen() == Screen::Saved) {
+    nav.markDirty(/*full=*/true);
+  }
+
+  // The user held both buttons twice: erase everything and start over. Nav
+  // asks; main does it, because nav owns no storage and no radio.
+  if (nav.wipeRequested()) {
+    Serial.println("[jota] ERASE: wiping notes, owner and tags");
+    nav.clearWipeRequest();
+    notes.eraseAll();
+    bleLink.forgetOwner();
+    tagsSetDefaults(model.tags);
+    model.noteCount = 0;
+    model.pending   = notes.pending();
+    model.paired    = false;
+    model.authed    = false;
+    model.note      = {0, "--:--", nullptr, 0, nullptr};
+    model.tagSel    = 0;
+    // Straight back to the unowned state, which puts PAIR up by itself.
+    nav.go(Screen::Ready, now);
     nav.markDirty(/*full=*/true);
   }
 

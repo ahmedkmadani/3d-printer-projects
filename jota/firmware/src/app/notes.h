@@ -58,6 +58,11 @@ class NoteStore {
   // first connected.
   void setClock(uint32_t unixSeconds);
 
+  // Destroy every note. ERASE is the only caller: nothing else on this device
+  // may delete a recording, because there is no undo and no second copy until
+  // the phone has taken one.
+  void eraseAll();
+
  private:
   static const uint8_t MAX_NOTES = 8;
   NoteRec              notes_[MAX_NOTES];
