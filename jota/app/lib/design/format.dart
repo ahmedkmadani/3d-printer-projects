@@ -35,6 +35,25 @@ String fmtClock(DateTime t) {
   return '$hh:$mm';
 }
 
+/// `TUE 12 AUG · 14:32`. The note-row stamp.
+///
+/// A weekday rather than a bare date, because that is how anyone actually
+/// reaches for a note — "the one after Tuesday's session", never "the one from
+/// 2026-08-12". Upper case and mono so it sits in the same figure vocabulary
+/// as every other measurement.
+String fmtNoteStamp(DateTime t) {
+  const List<String> days = <String>[
+    'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN',
+  ];
+  const List<String> months = <String>[
+    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+  ];
+  final String d = days[(t.weekday - 1) % 7];
+  final String m = months[(t.month - 1) % 12];
+  return '$d ${t.day} $m · ${fmtClock(t)}';
+}
+
 /// `2026-08-06`. Used as a list section heading.
 String fmtDate(DateTime t) {
   final String y = t.year.toString().padLeft(4, '0');

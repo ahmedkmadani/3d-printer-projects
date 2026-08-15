@@ -12,6 +12,7 @@
 // ============================================================================
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jota/app.dart';
+import 'package:jota/design/widgets.dart';
 import 'package:jota/preview/preview_services.dart';
 import 'package:jota/screens/note_detail_screen.dart';
 import 'package:jota/screens/sync_screen.dart';
@@ -74,9 +75,11 @@ void main() {
     // active nav pill, so there's more than one.)
     expect(find.text('Notes'), findsWidgets);
 
-    // Ids are monospaced and zero-padded everywhere in the product.
-    expect(find.text('N-012'), findsOneWidget);
-    expect(find.text('N-011'), findsOneWidget);
+    // The row leads with WHEN, not with an id: you reach for a note by the
+    // afternoon it came from, never by its number. The id and duration still
+    // exist on the note itself.
+    expect(find.textContaining(' AUG · '), findsWidgets);
+    expect(find.byType(JotaTagPill), findsWidgets);
 
     // A transcript, rendered as prose in the row preview.
     expect(

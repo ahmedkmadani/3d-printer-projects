@@ -154,18 +154,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 JotaGrid.margin,
                 JotaGrid.gapM,
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   JotaDots(count: _pages.length, active: _index),
-                  const Spacer(),
-                  SizedBox(
-                    width: 160,
-                    child: JotaButton(
-                      label: _isLast ? 'Get started' : 'Next',
-                      primary: true,
-                      upcase: false,
-                      onTap: _next,
-                    ),
+                  const SizedBox(height: JotaGrid.gapM),
+                  JotaButton(
+                    label: _isLast ? 'Connect my Jota' : 'Next',
+                    primary: true,
+                    upcase: false,
+                    onTap: _next,
                   ),
                 ],
               ),
@@ -187,30 +185,39 @@ class _OnboardingPage extends StatelessWidget {
     final JotaColors c = context.ink;
     final JotaType t = context.type;
 
+    // Centred, and no card. The drawing used to sit in a JotaHeroCard, which
+    // put a second surface and a second corner radius on the one screen that
+    // should be nothing but a picture and a sentence — and the card's edge read
+    // as a boundary you were meant to do something with.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: JotaGrid.margin),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
-          Expanded(
-            child: Center(
-              child: JotaHeroCard(
-                child: SizedBox(
-                  width: 240,
-                  height: 240,
-                  child: MindIllustration(stage: page.stage),
-                ),
-              ),
-            ),
+          const Spacer(),
+          SizedBox(
+            width: 180,
+            height: 150,
+            child: MindIllustration(stage: page.stage),
           ),
           const SizedBox(height: JotaGrid.gapXL),
-          Text(page.headline, style: t.headline),
-          const SizedBox(height: JotaGrid.gapS),
           Text(
-            page.body,
-            style: t.prose.copyWith(color: c.inkMuted),
+            page.headline,
+            style: t.headline.copyWith(fontSize: 24, height: 1.2),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: JotaGrid.gapL),
+          const SizedBox(height: JotaGrid.gapM),
+          // ~26 characters a line: the body is one sentence and it should look
+          // like one, not like a paragraph that ran to the margins.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 300),
+            child: Text(
+              page.body,
+              style: t.prose.copyWith(color: c.inkMuted, height: 1.55),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const Spacer(),
         ],
       ),
     );

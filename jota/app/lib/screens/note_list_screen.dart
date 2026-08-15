@@ -275,25 +275,27 @@ class _NoteRow extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // Figure line: everything here is a measurement, so all of it is
-            // mono and all of it is zero-padded.
+            // Meta line: WHEN it was said, and what it was filed under. The
+            // note's id and its duration used to lead here — but neither is
+            // how anyone finds a note. You remember the afternoon, not that it
+            // was N-012 and ran 47 seconds. Both still exist, on the note
+            // itself, where they are facts rather than the headline.
+            //
+            // The tag is a pill, and it inverts when set — the same selection
+            // vocabulary as every other surface on both objects.
             Row(
               children: <Widget>[
-                Text(note.displayId, style: t.label),
-                const SizedBox(width: JotaGrid.gapM),
                 Text(
-                  fmtClock(note.recordedAt),
-                  style: t.reading.copyWith(color: c.inkMuted),
+                  fmtNoteStamp(note.recordedAt),
+                  style: t.reading.copyWith(color: c.inkMuted, fontSize: 11),
                 ),
+                const SizedBox(width: JotaGrid.gapS),
+                if (note.tag != null) JotaTagPill(label: note.tag!),
                 const Spacer(),
-                if (note.tag != null) ...<Widget>[
-                  Text(
-                    note.tag!,
-                    style: t.reading.copyWith(color: c.inkMuted),
-                  ),
-                  const SizedBox(width: JotaGrid.gapM),
-                ],
-                Text(note.displayDuration, style: t.reading),
+                Text(
+                  note.displayDuration,
+                  style: t.reading.copyWith(color: c.inkMuted, fontSize: 11),
+                ),
               ],
             ),
             const SizedBox(height: JotaGrid.gapS),

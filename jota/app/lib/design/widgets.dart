@@ -889,3 +889,38 @@ class JotaEmpty extends StatelessWidget {
     );
   }
 }
+
+/// A tag, as a stadium. Outlined when it is simply a label, filled with ink and
+/// knocked out when it is selected — the one selection signal this product has,
+/// on the phone exactly as on the panel.
+class JotaTagPill extends StatelessWidget {
+  const JotaTagPill({super.key, required this.label, this.selected = false});
+
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    final JotaType t = context.type;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+      decoration: BoxDecoration(
+        color: selected ? c.ink : Colors.transparent,
+        border: Border.all(
+          color: selected ? c.ink : c.rule,
+          width: JotaGrid.hairline,
+        ),
+        borderRadius: const BorderRadius.all(Radius.circular(999)),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: t.reading.copyWith(
+          fontSize: 10,
+          letterSpacing: 0.8,
+          color: selected ? c.onInk : c.inkMuted,
+        ),
+      ),
+    );
+  }
+}
