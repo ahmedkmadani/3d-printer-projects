@@ -14,6 +14,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../data/note.dart';
+import '../design/format.dart';
 import '../design/script.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
@@ -58,19 +59,32 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       child: ListView(
         padding: const EdgeInsets.only(top: JotaGrid.gapM),
         children: <Widget>[
-          // The note's time and duration live in the BODY, not in the status
-          // slot — up there they would masquerade as the live clock.
-          // A Plex Serif headline, like every other screen's — the note's own
-          // date is its title. The time and length sit under it in quiet mono.
+          // Meta ABOVE the title, as drawn: the stamp and the tag are how you
+          // confirm you opened the right note, so they come first and small.
+          // The id and duration sit on the right, where they are available
+          // without competing.
+          Row(
+            children: <Widget>[
+              Text(
+                fmtNoteStamp(_note.recordedAt),
+                style: t.reading.copyWith(color: c.inkMuted, fontSize: 11),
+              ),
+              const SizedBox(width: JotaGrid.gapS),
+              if (_note.tag != null)
+                JotaTagPill(label: _note.tag!, selected: true),
+              const Spacer(),
+              Text(
+                '${_note.displayId} · ${_note.displayDuration}',
+                style: t.reading.copyWith(color: c.inkMuted, fontSize: 11),
+              ),
+            ],
+          ),
+          const SizedBox(height: JotaGrid.gapM),
+          // The note's own date is its title. A Plex Serif headline, like every
+          // other screen's.
           Text(
             DateFormat('MMMM d').format(_note.recordedAt),
             style: t.headline,
-          ),
-          const SizedBox(height: JotaGrid.gapS),
-          Text(
-            '${DateFormat('HH:mm').format(_note.recordedAt)} · '
-            '${_note.displayDuration}',
-            style: t.reading.copyWith(color: c.inkMuted),
           ),
           const SizedBox(height: JotaGrid.gapL),
 

@@ -292,9 +292,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: JotaGrid.gapS),
                 Text(
-                  'Ask for Face ID or your passcode each time you open Jota. '
-                  'Your notes stay on this phone — this keeps them yours.',
+                  'Ask for your face, fingerprint or passcode each time you '
+                  'open Jota. Your notes stay on this phone — this keeps them '
+                  'yours.',
                   style: t.prose.copyWith(color: c.inkMuted),
+                ),
+
+                const SizedBox(height: JotaGrid.gapL),
+                // Story T2, and the reason problem.md calls privacy a
+                // FUNCTIONAL requirement: if you are not sure where a recording
+                // goes, you speak differently, and a thought you softened while
+                // saying it is not the thought.
+                //
+                // So this says the awkward part out loud. The audio does leave,
+                // today, to become text. Anything vaguer would be the product
+                // quietly buying itself room, which is exactly what would make
+                // someone hesitate before speaking.
+                _LeavesCard(
+                  hasKey: (_apiKey ?? '').isNotEmpty,
                 ),
 
                 const SizedBox(height: JotaGrid.gapXL),
@@ -347,6 +362,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: JotaGrid.gapXL),
               ],
             ),
+    );
+  }
+}
+
+/// What actually leaves this phone, in plain words.
+class _LeavesCard extends StatelessWidget {
+  const _LeavesCard({required this.hasKey});
+
+  /// Without a key nothing is transcribed, so nothing leaves at all — and
+  /// saying so is more reassuring than a caveat about what would happen.
+  final bool hasKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    final JotaType t = context.type;
+    return Container(
+      padding: const EdgeInsets.all(JotaGrid.gapM),
+      decoration: BoxDecoration(
+        color: c.field,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'WHAT LEAVES YOUR PHONE',
+            style: t.label.copyWith(color: c.inkMuted, fontSize: 11),
+          ),
+          const SizedBox(height: JotaGrid.gapS),
+          Text(
+            hasKey
+                ? 'Audio is sent to Google to be turned into words. Nothing '
+                    'else leaves: no account, nothing posted, and the sorting '
+                    'runs here on this phone.'
+                : 'Nothing. Without a key nothing is transcribed, so no audio '
+                    'is sent anywhere. Your notes are recorded, stored and '
+                    'played back entirely on this phone.',
+            style: t.prose.copyWith(color: c.ink, height: 1.5),
+          ),
+        ],
+      ),
     );
   }
 }

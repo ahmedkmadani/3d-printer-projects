@@ -924,3 +924,66 @@ class JotaTagPill extends StatelessWidget {
     );
   }
 }
+
+/// The pairing code as one box per digit, filled left to right.
+///
+/// Boxes rather than a run of dashes because the count is the instruction: six
+/// slots say "six digits" without a word of copy, and the outlined box you are
+/// about to fill says where you are in it. The digits are mono, like every
+/// other figure in the product.
+///
+/// It draws only — the caller owns the controller and the keyboard, so the
+/// same boxes serve first-run pairing and re-pairing from Settings without
+/// either screen inheriting the other's plumbing.
+class JotaCodeBoxes extends StatelessWidget {
+  const JotaCodeBoxes({
+    super.key,
+    required this.digits,
+    required this.length,
+    this.focused = true,
+  });
+
+  final String digits;
+  final int length;
+
+  /// Marks the next empty box, so there is a cursor even though the real
+  /// TextField behind this is invisible.
+  final bool focused;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    final JotaType t = context.type;
+    final int cursor = digits.length.clamp(0, length - 1);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        for (int i = 0; i < length; i++) ...<Widget>[
+          if (i > 0) const SizedBox(width: 7),
+          Container(
+            width: 34,
+            height: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: c.field,
+              borderRadius: const BorderRadius.all(Radius.circular(10)),
+              border: Border.all(
+                color: (focused && i == cursor && digits.length < length)
+                    ? c.ink
+                    : c.rule,
+                width: (focused && i == cursor && digits.length < length)
+                    ? 1.6
+                    : JotaGrid.hairline,
+              ),
+            ),
+            child: Text(
+              i < digits.length ? digits[i] : '',
+              style: t.figure.copyWith(fontSize: 20),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
