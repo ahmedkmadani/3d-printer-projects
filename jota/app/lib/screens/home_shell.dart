@@ -1,12 +1,19 @@
 // ============================================================================
 //  Jota — home shell
 //
-//  The app's persistent tab frame. The three destinations live in an IndexedStack
-//  so switching tabs swaps the body IN PLACE — no page push — while the floating
-//  nav stays put. Tabs are built lazily (only once first visited) so an unopened
-//  Sync tab never starts a scan or a pair prompt behind your back. Tags aren't a
-//  destination of their own — they're a short list you set once and tweak rarely,
-//  so they live under Settings, not in the nav.
+//  The app's persistent tab frame: HOME, NOTES, SETTINGS. They live in an
+//  IndexedStack so switching swaps the body IN PLACE — no page push — while the
+//  floating nav stays put, and each is built lazily so an unvisited tab never
+//  starts work behind your back.
+//
+//  Sync is NOT a destination. A tab dedicated to a mechanism says the mechanism
+//  does not work by itself; syncing happens on its own, pull-to-refresh covers
+//  the times the OS blocks it, and the device chip above the nav answers "is it
+//  there" from everywhere. The full sync screen is still reachable — by tapping
+//  that chip — it just is not a place you live.
+//
+//  Patterns are reached from Home, and Tags from Settings, for the same reason:
+//  both are occasional, and the bottom bar has three slots, not five.
 //
 //  Opening a note's detail still pushes a full page over the whole shell — a
 //  focused view earns the whole screen. That is deliberate; we did not give each
@@ -16,8 +23,11 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
+import '../ble/device_scanner.dart';
 import '../design/theme.dart';
 import '../state/device_controller.dart';
+import 'bluetooth_off_screen.dart';
+import 'home_screen.dart';
 import 'note_list_screen.dart';
 import 'settings_screen.dart';
 import 'sync_screen.dart';
@@ -40,6 +50,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkRadio());
   }
 
   @override
@@ -54,6 +65,41 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     // to just be there. Un-park the automatic path and look again.
     final DeviceController device = context.read<DeviceController>();
     device.resumeAutoSync(foreground: state == AppLifecycleState.resumed);
+    if (state == AppLifecycleState.resumed) {
+      // Radios get switched off while an app is in the background more often
+      // than while it is in front of you — usually in the same swipe down that
+      // turned on something else.
+      _radioNoticeShown = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _checkRadio());
+    }
+  }
+
+  /// True while the notice is up, or while it has been dismissed for this
+  /// visit. Without it, "Keep reading offline" would be answered by the same
+  /// screen being pushed again on the very next rebuild.
+  bool _radioNoticeShown = false;
+
+  /// Bluetooth is the only way a note reaches this phone, so a radio that is
+  /// off is worth saying out loud once — and then getting out of the way.
+  Future<void> _checkRadio() async {
+    if (!mounted || _radioNoticeShown) return;
+    final DeviceController device = context.read<DeviceController>();
+
+    // Nothing to warn about before there is a device to talk to: a first-run
+    // phone has no notes waiting and no pairing to lose.
+    if (!device.hasPairedDevice) return;
+    if (device.bluetoothReady) return;
+    if (device.adapter == AdapterStatus.unavailable) return; // no radio at all
+
+    _radioNoticeShown = true;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => BluetoothOffScreen(
+          unauthorized: device.adapter == AdapterStatus.unauthorized,
+        ),
+      ),
+    );
   }
 
   void _select(int i) {
@@ -67,12 +113,21 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   Widget _tab(int i) {
     switch (i) {
       case 1:
-        return const SyncScreen(embedded: true);
+        return const NoteListScreen();
       case 2:
         return const SettingsScreen(embedded: true);
       default:
-        return const NoteListScreen();
+        return HomeScreen(onSeeNotes: () => _select(1));
     }
+  }
+
+  /// The chip is the way to the sync screen now that it is not a tab. Pushed
+  /// over the shell rather than swapped in, because it is a thing you go and
+  /// look at and then come back from.
+  void _openSync() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const SyncScreen()),
+    );
   }
 
   @override
@@ -94,7 +149,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         children: <Widget>[
           // Above the nav, under every tab: the answer to "is it there" without
           // having to open Sync and ask.
-          DeviceChip(onTap: () => _select(1)),
+          DeviceChip(onTap: _openSync),
           HomeNavBar(current: _index, onSelect: _select),
         ],
       ),
@@ -144,14 +199,14 @@ class HomeNavBar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: <Widget>[
                 _NavItem(
-                  icon: LucideIcons.notebook,
-                  label: 'Notes',
+                  icon: LucideIcons.house,
+                  label: 'Home',
                   active: current == 0,
                   onTap: () => onSelect(0),
                 ),
                 _NavItem(
-                  icon: LucideIcons.refreshCw,
-                  label: 'Sync',
+                  icon: LucideIcons.notebook,
+                  label: 'Notes',
                   active: current == 1,
                   onTap: () => onSelect(1),
                 ),

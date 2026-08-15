@@ -15,6 +15,7 @@ import 'package:jota/app.dart';
 import 'package:jota/preview/preview_services.dart';
 import 'package:jota/screens/note_detail_screen.dart';
 import 'package:jota/screens/sync_screen.dart';
+import 'package:jota/screens/widgets/device_chip.dart';
 import 'package:jota/state/services.dart';
 
 /// Boots the preview graph and guarantees its timers are cancelled, so a test
@@ -63,6 +64,11 @@ void main() {
     final Services services = await bootPreview(tester);
     await tester.pumpWidget(JotaApp(services: services));
     await pumpAwake(tester);
+
+    // Home is the landing tab now, so the archive is one tap away. The nav
+    // labels only the ACTIVE pill, so 'Notes' is not on screen until then.
+    await tester.tap(find.bySemanticsLabel('Notes'));
+    await tester.pumpAndSettle();
 
     // The status label — Title case now, not all-caps. (Also appears on the
     // active nav pill, so there's more than one.)
@@ -129,7 +135,7 @@ void main() {
     await quiesce(tester, services);
   });
 
-  testWidgets('sync tab shows the connect flow and finds a nearby Jota', (
+  testWidgets('the device chip opens the sync screen and finds a Jota', (
     WidgetTester tester,
   ) async {
     final Services services = await bootPreview(tester);
@@ -137,8 +143,9 @@ void main() {
     await pumpAwake(tester);
 
     // The nav is a floating pill of icon buttons now, not a footer SYNC button;
-    // the Sync destination carries a semantics label so it stays tappable.
-    await tester.tap(find.bySemanticsLabel('Sync'));
+    // Sync is no longer a tab: the device chip above the nav is the way in,
+    // and it pushes the screen rather than swapping a destination.
+    await tester.tap(find.byType(DeviceChip));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
