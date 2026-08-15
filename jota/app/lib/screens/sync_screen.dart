@@ -355,9 +355,39 @@ class _Connect extends StatelessWidget {
           )
         else
           for (final JotaAdvertisement ad in found) ...<Widget>[
-            // The id-bearing name: every Jota advertises as plain "JOTA".
-            JotaRow(label: ad.shortName, onTap: () => device.pairWith(ad)),
-            const SizedBox(height: JotaRows.gap),
+            // A flat ruled line, the same as Connect's list and Settings' rows.
+            // It was a stadium here — and a stadium is this product's SELECTED
+            // shape. A list of devices you have not chosen between yet should
+            // not be drawn as a column of selections, and the app's two
+            // first-run device lists should not look like two different
+            // products.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => device.pairWith(ad),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: JotaGrid.gapM),
+                child: Row(
+                  children: <Widget>[
+                    // The id-bearing name: every Jota advertises as plain
+                    // "JOTA", so the bare local name cannot tell two apart.
+                    Expanded(
+                      child: Text(
+                        ad.shortName,
+                        style: t.reading.copyWith(color: c.ink),
+                      ),
+                    ),
+                    Text(
+                      'NEARBY',
+                      style: t.reading.copyWith(
+                        color: c.inkMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const JotaRule(),
           ],
         const SizedBox(height: JotaGrid.gapXL),
         Text(

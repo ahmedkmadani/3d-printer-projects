@@ -205,17 +205,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 JotaGrid.margin,
                 0,
               ),
-              child: SizedBox(
+              // Embedded in the shell there is no chevron and no label, so the
+              // row is 34pt of nothing above the title. Take no room instead.
+              child: widget.embedded
+                  ? const SizedBox.shrink()
+                  : SizedBox(
                 height: JotaGrid.statusHeight,
-                child: widget.embedded
-                    ? null
-                    : Align(
+                child: Align(
                         alignment: Alignment.centerLeft,
                         child: _BackChevron(
                           onTap: () => Navigator.of(context).pop(),
                         ),
                       ),
-              ),
+                    ),
             ),
             Expanded(
               child: _loading

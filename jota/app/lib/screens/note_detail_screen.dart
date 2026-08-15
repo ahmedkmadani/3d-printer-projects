@@ -356,7 +356,8 @@ class _SummaryCard extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: c.field,
-        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        borderRadius:
+            const BorderRadius.all(Radius.circular(JotaCards.radius)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,6 +393,54 @@ class _SummaryCard extends StatelessWidget {
 /// 132pt PLAY button over a 12pt outlined progress bar — three stacked shapes
 /// where the design has one, and the loudest thing on a screen whose point is
 /// that the audio is optional.
+/// Play as a triangle, pause as two bars — the two shapes everyone already
+/// reads, drawn in the app's own ink rather than borrowed from an icon set.
+class _TransportMark extends CustomPainter {
+  const _TransportMark({required this.playing, required this.color});
+
+  final bool playing;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint p = Paint()..color = color;
+    final double w = size.width;
+    final double h = size.height;
+    if (playing) {
+      final double bar = w * 0.3;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(w * 0.08, 0, bar, h),
+          const Radius.circular(1),
+        ),
+        p,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(w - bar - w * 0.08, 0, bar, h),
+          const Radius.circular(1),
+        ),
+        p,
+      );
+      return;
+    }
+    // Nudged right by a hair: a triangle centred on its bounding box reads as
+    // sitting left of centre inside a circle.
+    canvas.drawPath(
+      Path()
+        ..moveTo(w * 0.15, 0)
+        ..lineTo(w, h / 2)
+        ..lineTo(w * 0.15, h)
+        ..close(),
+      p,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_TransportMark old) =>
+      old.playing != playing || old.color != color;
+}
+
 class _PlayerPill extends StatefulWidget {
   const _PlayerPill({
     super.key,
@@ -541,12 +590,16 @@ class _PlayerPillState extends State<_PlayerPill> {
                                   AlwaysStoppedAnimation<Color>(c.onInk),
                             ),
                           )
-                        : Icon(
-                            _player.playing
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            size: 17,
-                            color: c.onInk,
+                        // Drawn, not an icon: these were the only Material
+                        // glyphs left in the app, and a set whose weight and
+                        // corner treatment are not ours has no business inside
+                        // the one circle the design draws bare.
+                        : CustomPaint(
+                            size: const Size(14, 14),
+                            painter: _TransportMark(
+                              playing: _player.playing,
+                              color: c.onInk,
+                            ),
                           ),
                   ),
                 ),

@@ -80,10 +80,11 @@ class _NoteListScreenState extends State<NoteListScreen>
       // something" in the words — `2 NEW` — and the accent dot lives on the
       // device chip above the nav, where it is about the device rather than
       // about this list.
-      trailing: _PendingSlot(
-        pending: device.pendingOnDevice,
-        syncing: device.isSyncing,
-      ),
+      // A STRING, not a widget: a trailing widget that renders nothing still
+      // counts as "this strip has content", and the strip then holds 40pt of
+      // blank paper open above the heading on the common case where nothing is
+      // pending.
+      value: _pendingLabel(device),
       // The title and its hairline are in the body, below. A second rule under
       // the status line made two hairlines of chrome where the design has one.
       rule: false,
@@ -171,29 +172,14 @@ class _NoteListScreenState extends State<NoteListScreen>
 /// number that never changes is not news, and the design's slot only ever holds
 /// something worth acting on. The count is not zero-padded here because it is
 /// read as words — "two new" — not as a measurement.
-class _PendingSlot extends StatelessWidget {
-  const _PendingSlot({required this.pending, required this.syncing});
-
-  final int? pending;
-  final bool syncing;
-
-  @override
-  Widget build(BuildContext context) {
-    final JotaType t = context.type;
-    final JotaColors c = context.ink;
-    // 9px mono at the design's phone width; the app's grid is ~1.28x that.
-    final TextStyle style = t.reading.copyWith(
-      color: c.inkMuted,
-      fontSize: 11,
-      letterSpacing: 0.8,
-    );
-
-    if (syncing) return Text('SYNC', style: style);
-    if (pending != null && pending! > 0) {
-      return Text('$pending NEW', style: style);
-    }
-    return const SizedBox.shrink();
-  }
+/// SYNC while it is running, `2 NEW` when the device is holding notes, and
+/// nothing at all otherwise — the status slot carries only something worth
+/// acting on.
+String? _pendingLabel(DeviceController device) {
+  if (device.isSyncing) return 'SYNC';
+  final int? pending = device.pendingOnDevice;
+  if (pending != null && pending > 0) return '$pending NEW';
+  return null;
 }
 
 class _NoteRow extends StatelessWidget {

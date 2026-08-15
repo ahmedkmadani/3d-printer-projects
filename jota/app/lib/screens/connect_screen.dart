@@ -106,7 +106,17 @@ class _ConnectScreenState extends State<ConnectScreen> {
       footer: wantsCode
           ? null
           : JotaButton(label: 'Set up later', upcase: false, onTap: _onwards),
-      child: Column(
+      child: SingleChildScrollView(
+        // Scrollable, because on this screen the keyboard is up by definition.
+        // A fixed Column under a Scaffold that resizes for the keyboard has
+        // only its Spacer to give, and a Spacer bottoms out at zero — past
+        // that it overflows. Small phone + a found device + the keyboard is
+        // exactly that case.
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.sizeOf(context).height * 0.60,
+          ),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           const SizedBox(height: JotaGrid.gapM),
@@ -205,6 +215,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
             const SizedBox(height: JotaGrid.gapM),
           ],
         ],
+      ),
+        ),
       ),
     );
   }

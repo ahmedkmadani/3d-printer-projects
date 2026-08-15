@@ -106,6 +106,19 @@ class JotaStatusBar extends StatelessWidget {
     final JotaColors c = context.ink;
     final JotaType t = context.type;
 
+    // Nothing to say and no line to draw: take no room at all. On the mock the
+    // strip is never truly empty because the phone's own clock is drawn inside
+    // it; on a real phone that clock lives above the safe area, so an empty
+    // strip is 40pt of blank paper fenced off above the actual heading.
+    if (label.isEmpty &&
+        value == null &&
+        trailing == null &&
+        onBack == null &&
+        !showSignalDot &&
+        !rule) {
+      return const SizedBox.shrink();
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
@@ -132,7 +145,17 @@ class JotaStatusBar extends StatelessWidget {
                       Flexible(
                         child: Text(
                           upcase ? label.toUpperCase() : label,
-                          style: t.label,
+                          // Mono and muted, like every other word in this
+                          // strip. Right-aligning the group put these labels
+                          // in the slot the design fills with 9px mono muted,
+                          // beside figures like `4 WEEKS` and `N-012` — in
+                          // sans ink they read as a different system's
+                          // heading. `JOTA` is an identifier besides, and
+                          // brand.md puts every identifier in mono.
+                          style: t.reading.copyWith(
+                            color: c.inkMuted,
+                            letterSpacing: 0.8,
+                          ),
                           textAlign: TextAlign.right,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
