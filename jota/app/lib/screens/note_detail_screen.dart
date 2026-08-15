@@ -59,7 +59,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         children: <Widget>[
           // The note's time and duration live in the BODY, not in the status
           // slot — up there they would masquerade as the live clock.
-          // A Fraunces headline, like every other screen's — the note's own
+          // A Plex Serif headline, like every other screen's — the note's own
           // date is its title. The time and length sit under it in quiet mono.
           Text(
             DateFormat('MMMM d').format(_note.recordedAt),

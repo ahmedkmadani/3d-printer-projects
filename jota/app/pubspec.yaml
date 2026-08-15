@@ -25,7 +25,10 @@ dependencies:
   sqflite: 2.4.1
   # 1.9.1, not 1.9.0: the Flutter SDK's flutter_test pins path to 1.9.1, so the
   # exact 1.9.0 pin no longer resolves. A patch bump, SDK-required.
-  path: 1.9.1
+  # Ranged, not pinned, unlike its neighbours: flutter_test pins `path` exactly,
+  # and which version it pins moves with the Flutter SDK. An exact pin here
+  # therefore builds on whichever machine matches and fails on the other.
+  path: ^1.9.0
   path_provider: 2.1.5
   # API key only. Never in SharedPreferences.
   flutter_secure_storage: 9.2.4
@@ -69,33 +72,38 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # The type system is three bundled faces: Fraunces (an elegant display serif,
-  # the warm voice) for headlines + wordmark; Inter (clean humanist sans) for
-  # labels, buttons and prose; and the PLATFORM monospace for every figure, so
-  # codes and columns stay aligned. All are STATIC instances baked from the
-  # variable originals with fonttools — iOS/CoreText did not load the variable
-  # files — and each family name matches the font's internal name.
-  fonts:
-    - family: Fraunces
-      fonts:
-        - asset: assets/fonts/Fraunces-Display.ttf
-    - family: Inter
-      fonts:
-        - asset: assets/fonts/Inter-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Inter-SemiBold.ttf
-          weight: 600
-
-  # The design leans hard on a monospace face. Flutter falls back to the
-  # platform monospace (Roboto Mono on Android, Menlo/SF Mono on iOS), which is
-  # good enough to ship. To lock the two platforms to one face, drop the .ttf
-  # files in assets/fonts/ and uncomment. lib/design/theme.dart already reads
-  # the family name from a single constant.
+  # ONE family, four scripts: IBM Plex. Serif for headlines and the wordmark,
+  # Sans for labels and prose, Mono for every figure, and Sans Arabic for
+  # Arabic note text.
   #
-  # fonts:
-  #   - family: JotaMono
-  #     fonts:
-  #       - asset: assets/fonts/JetBrainsMono-Regular.ttf
-  #         weight: 400
-  #       - asset: assets/fonts/JetBrainsMono-Bold.ttf
-  #         weight: 700
+  # Arabic is why Plex won rather than a nicer-looking pairing. Fraunces and
+  # Inter carry NO Arabic glyphs at all, so roughly half the notes were falling
+  # back to whatever face the phone happened to have — a different design on
+  # every handset, inside the one screen that matters most. Plex Arabic is
+  # drawn by the same team on the same skeleton, so the two languages finally
+  # read as one product.
+  #
+  # All STATIC instances (Sans baked from the variable original with
+  # fonttools) — iOS/CoreText did not load the variable files — and each
+  # family name matches the font's internal name, which is what iOS resolves.
+  fonts:
+    - family: IBM Plex Serif
+      fonts:
+        - asset: assets/fonts/IBMPlexSerif-Regular.ttf
+          weight: 400
+    - family: IBM Plex Sans
+      fonts:
+        - asset: assets/fonts/IBMPlexSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSans-SemiBold.ttf
+          weight: 600
+    - family: IBM Plex Mono
+      fonts:
+        - asset: assets/fonts/IBMPlexMono-Regular.ttf
+          weight: 400
+    - family: IBM Plex Sans Arabic
+      fonts:
+        - asset: assets/fonts/IBMPlexSansArabic-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSansArabic-SemiBold.ttf
+          weight: 600

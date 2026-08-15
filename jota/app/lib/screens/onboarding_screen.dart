@@ -18,9 +18,9 @@ import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/services.dart';
 import 'onboarding_illustration.dart';
-import 'pair_screen.dart';
+import 'connect_screen.dart';
 
-/// One onboarding page: an illustration, a Fraunces headline, and one line of
+/// One onboarding page: an illustration, a Plex Serif headline, and one line of
 /// prose. The body is a single sentence — the headline carries the feeling, the
 /// line underneath just lands it.
 class _Page {
@@ -93,7 +93,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     unawaited(
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => const PairScreen(firstRun: true),
+          builder: (_) => const ConnectScreen(),
         ),
       ),
     );

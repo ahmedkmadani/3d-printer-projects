@@ -65,7 +65,7 @@ class JotaColors extends ThemeExtension<JotaColors> {
   /// Text-selection wash. A literal rather than a computed alpha so the token
   /// survives Flutter's ongoing churn around Color.withOpacity/withValues.
   Color get selection =>
-      brightnessIsDark ? const Color(0x33EFE7DB) : const Color(0x33241E1A);
+      brightnessIsDark ? const Color(0x33EDE6DA) : const Color(0x3323201C);
 
   bool get brightnessIsDark => bg.computeLuminance() < 0.5;
 
@@ -75,21 +75,21 @@ class JotaColors extends ThemeExtension<JotaColors> {
   // actually has in the hand. The greys and the one terracotta accent warm to
   // match. Nothing structural changed: everything still resolves to ink or bg.
   static const JotaColors light = JotaColors(
-    ink: Color(0xFF241E1A), // espresso
-    bg: Color(0xFFFAF6EF), // cream paper
-    inkMuted: Color(0xFF8A7F73), // warm taupe
-    rule: Color(0xFFE6DED2),
-    field: Color(0xFFF1EADE),
-    signal: Color(0xFFB33A22), // terracotta, unchanged
+    ink: Color(0xFF23201C), // espresso
+    bg: Color(0xFFF6F1E8), // paper
+    inkMuted: Color(0xFF8B8177), // warm taupe
+    rule: Color(0xFFE4DCD0),
+    field: Color(0xFFEFE8DC),
+    signal: Color(0xFFA8452C), // clay
   );
 
   static const JotaColors dark = JotaColors(
-    ink: Color(0xFFEFE7DB), // warm paper-white
-    bg: Color(0xFF14110D), // warm charcoal
-    inkMuted: Color(0xFF948A7C),
-    rule: Color(0xFF2E2820),
-    field: Color(0xFF1C1813),
-    signal: Color(0xFFE0674A),
+    ink: Color(0xFFEDE6DA), // warm paper-white
+    bg: Color(0xFF16130F), // warm charcoal
+    inkMuted: Color(0xFF968C7E),
+    rule: Color(0xFF302A22),
+    field: Color(0xFF1E1A15),
+    signal: Color(0xFFDD6D4C),
   );
 
   @override
@@ -228,32 +228,57 @@ abstract final class JotaFonts {
   /// Three bundled faces, one per job. The family strings MATCH each font's
   /// internal name — on iOS the bundled font is resolved by that, not by an
   /// arbitrary pubspec alias.
-  static const String serif = 'Fraunces'; // headlines + wordmark — the warm voice
-  static const String sans = 'Inter'; //     labels, buttons, prose — clean chrome
+  static const String serif = 'IBM Plex Serif'; // headlines + wordmark
+  static const String sans = 'IBM Plex Sans'; //   labels, buttons, prose
 
-  /// Figures stay on the PLATFORM monospace so codes and columns align without a
-  /// layout pass. Null family → Flutter walks the fallback list below.
-  static const String? mono = null;
+  /// Figures are monospace so codes and columns align without a layout pass.
+  /// BUNDLED rather than left to the platform: the fallback resolved to Roboto
+  /// Mono on Android and SF Mono on iOS, so the same timer rendered at two
+  /// different widths and the zero-padded figures the design depends on did not
+  /// line up across devices.
+  static const String mono = 'IBM Plex Mono';
 
+  /// Arabic note text. Roughly half of what gets recorded is Arabic, and
+  /// neither of the previous faces carried a single Arabic glyph — so those
+  /// notes rendered in whatever the phone happened to fall back to, which is a
+  /// different design on every handset. Plex Arabic shares the skeleton with
+  /// the Latin faces, so a mixed list reads as one product.
+  ///
+  /// Only the note's WORDS use it. Dates, tags and chrome follow the app
+  /// language, not the note's — see docs/brand.md.
+  static const String arabic = 'IBM Plex Sans Arabic';
+
+  /// Every family here falls back to Plex first: a missing glyph should land on
+  /// a sibling of the same design before it lands on a system face.
   static const List<String> serifFallback = <String>[
+    'IBM Plex Sans',
     'Georgia',
     'Times New Roman',
     'serif',
   ];
 
   static const List<String> sansFallback = <String>[
+    'IBM Plex Sans Arabic',
     'Helvetica Neue',
     'Arial',
     'sans-serif',
   ];
 
   static const List<String> monoFallback = <String>[
+    'IBM Plex Sans',
     'Roboto Mono',
     'SF Mono',
     'Menlo',
     'DejaVu Sans Mono',
     'Courier New',
     'monospace',
+  ];
+
+  static const List<String> arabicFallback = <String>[
+    'IBM Plex Sans',
+    'Noto Sans Arabic',
+    'Geeza Pro',
+    'sans-serif',
   ];
 }
 
@@ -299,12 +324,12 @@ class JotaType extends ThemeExtension<JotaType> {
 
   static JotaType of(Color ink) {
     return JotaType(
-      // Three voices, by role:
-      //   serif (Fraunces)  headline, wordmark        — the warm, elegant note
-      //   sans  (Inter)     label, prose              — clean chrome + paragraphs
-      //   mono  (platform)  reading, figure, display  — every figure, aligned
-      // Fraunces is a single baked weight, so its fontWeight is nominal; the
-      // platform mono has a real bold, so figures lean on w700.
+      // Three voices, by role — all IBM Plex:
+      //   serif (Plex Serif)  headline, wordmark        — the warm, elegant note
+      //   sans  (Plex Sans)   label, prose              — chrome + paragraphs
+      //   mono  (Plex Mono)   reading, figure, display  — every figure, aligned
+      // Serif and mono ship one weight each, so their fontWeight is nominal;
+      // only Plex Sans has a real second weight (600).
       label: _sans.copyWith(
         color: ink,
         fontSize: 14,
