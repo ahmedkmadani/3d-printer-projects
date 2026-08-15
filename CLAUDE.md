@@ -31,7 +31,8 @@ internet (OpenAI Whisper).
 
 Consequences, all deliberate:
 
-- No WiFi credentials, no API key, and no server anywhere
+- No WiFi credentials and no server anywhere. The OpenAI key lives on the
+  PHONE, in its keychain, set in the app's Settings — never on the device
 - The device cannot learn the time by itself — **the phone sets the clock over BLE**
 - BLE is too slow for raw audio (1.9 MB/min), hence ADPCM at 4:1 → ~480 KB/min,
   ~16 s of transfer per minute of speech
@@ -68,7 +69,17 @@ flutter test && flutter analyze
 **Real:** the enclosure (validated, exported); the firmware UI, navigation,
 button HAL and e-paper refresh policy; the ADPCM encoder; the note store with
 byte-range serving, CRC and resume; the whole BLE service; the Flutter app
-(analyses clean, 7 tests pass).
+(analyses clean, 27 tests pass).
+
+**Built but switched off:** the battery gauge. `BATTERY_ADC_PIN` in
+`jota/firmware/src/hal/battery.h` is `-1` because the verified pin map has no
+battery-sense pin. Everything downstream — the e-paper gauge, the
+advertisement byte, `status.battery`, the app — reports *unknown* rather than a
+figure. Set the pin and the divider and it comes alive; see the firmware README.
+
+Tags are armed on the device (TAGS → select) and spent by the next recording,
+travelling to the phone as a string in `index`. Selecting the armed tag again
+disarms it.
 
 **Simulated:** the microphone. `jota/firmware/src/app/notes.cpp` synthesises
 three short notes in flash so the app can be built end to end with no SD card
@@ -77,7 +88,24 @@ and no mic. Recording and syncing on the device UI are also simulated.
 **Never run against real hardware:** the app's BLE path. It has only ever
 talked to fakes.
 
-The pairing code is the fixed `428 913`.
+The pairing code is the fixed `428 913`, and it is only live while the device
+is showing its PAIR screen (a two-minute window).
+
+**Identity and the bond.** Each Jota derives a device id from its efuse MAC and
+shows the last four characters (`91C4`) on its splash and PAIR screens; the app
+shows the same as `JOTA-91C4`, and the id also rides in the advertisement so two
+devices can be told apart *without connecting*. Each app install mints a uuid
+once and presents it on every connection; the first phone to give a correct code
+becomes the device's stored **owner** and reconnects silently forever after.
+Another phone is refused unless it enters the code currently on the e-paper,
+which transfers ownership — possession of the device deliberately outranks the
+stored bond.
+
+Beware the shape of the auth bug this replaced: `status` is readable
+unauthenticated *on purpose*, so "the read succeeded" proves nothing. Read
+`status.authed`. The old code inferred the bond from a successful read, never
+sent a code, and every sync then read an empty `index` and said "all caught up"
+while notes sat on the device.
 
 ## Hardware facts worth not rediscovering
 

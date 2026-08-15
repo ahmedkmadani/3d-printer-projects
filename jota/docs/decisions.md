@@ -29,8 +29,8 @@ Killed the `WIFI` screen; `SYNC` now means "hand notes to my phone".
 speech. IMA ADPCM at 4:1 gives ~480 KB/min and ~16 s. Opus would be four times
 better again but is a much heavier lift on the chip.
 
-ADPCM is lossy, but the loss is inaudible for speech and irrelevant to Whisper,
-which was trained on far worse. **The raw WAV stays on the SD card**, so the
+ADPCM is lossy, but the loss is inaudible for speech and irrelevant to
+speech-to-text, which is trained on far worse. **The raw WAV stays on the SD card**, so the
 archive is never compressed — only the copy in flight.
 
 Later: Opus is a drop-in upgrade that changes nothing else.
@@ -119,7 +119,32 @@ with them.
 
 ---
 
-## 9. The plunger goes in from inside, before the board
+## 9. Google Cloud for speech, Gemma on the phone for sorting
+
+Replaces the old choice of OpenAI Whisper.
+
+**Considered:** everything offline on the phone, so nothing ever leaves.
+
+**Chosen:** Google Cloud Speech-to-Text now. Gemma runs on the phone and does
+the sorting locally.
+
+**Why:** the speech is Sudanese Arabic mixed with English. Offline models are
+weak at Arabic dialect, and unreadable text fails the main goal (see
+[problem.md](problem.md) #4). Cloud is the only thing good enough today.
+
+**Cost:** the audio leaves the phone. That breaks the privacy promise in
+[problem.md](problem.md), so it is temporary and must be said openly.
+Going offline is v2.
+
+**Also:** Gemma, not Gemini Nano. Gemini Nano only exists on some phones
+(Pixel, Samsung). Gemma ships with the app and runs anywhere.
+
+**Untested:** whether Google STT can read Sudanese dialect at all. Test before
+building anything else.
+
+---
+
+## 10. The plunger goes in from inside, before the board
 
 It was first a dumbbell — cap and flange both wider than the bore — so it could
 not be fitted from either direction. "Fixing" it by deleting the flange gave
