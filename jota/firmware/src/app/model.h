@@ -40,6 +40,15 @@ struct AppModel {
   bool        authed;    // a phone is connected AND authenticated right now
   uint8_t     pending;   // notes recorded but not yet handed to the phone
 
+  // A phone has asked to authenticate and been refused because it is not the
+  // owner. Set by the link, cleared by the navigator when it puts PAIR up.
+  //
+  // This is what makes "possession outranks the bond" true rather than merely
+  // written down: the code only exists while the PAIR screen is showing, and
+  // once a device is owned it has no other reason to show it. Without this a
+  // second phone can never present a code, because there is no code to read.
+  bool pairAsked;
+
   // This device's own id, "7f3a91c4". Shown as JOTA-91C4 so two Jotas in the
   // same room are told apart by looking at them, not by guessing.
   const char *deviceId;

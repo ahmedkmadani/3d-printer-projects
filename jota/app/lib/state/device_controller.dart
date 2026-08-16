@@ -63,6 +63,10 @@ class DeviceController extends ChangeNotifier {
   final BackgroundSyncController _background;
   final NotesController _notes;
 
+  /// True from the instant a sync is asked for until the engine owns it.
+  /// See syncNow for why `_sync.isRunning` alone leaves a race open.
+  bool _syncStarting = false;
+
   StreamSubscription<SyncProgress>? _progressSub;
   StreamSubscription<AdapterStatus>? _adapterSub;
   StreamSubscription<List<JotaAdvertisement>>? _scanSub;
@@ -210,20 +214,38 @@ class DeviceController extends ChangeNotifier {
       notifyListeners();
       return null;
     }
-    if (_sync.isRunning) return null;
+    // `_sync.isRunning` is not enough on its own. Between this check and the
+    // `_sync.run()` below there is an `await` — stopping the scanner — and an
+    // advertisement arriving inside that window lets _maybeAutoSync pass the
+    // very same check and start a SECOND run. Two runs means two connects to
+    // one device, and flutter_blue_plus answers a second connection by tearing
+    // the whole link down ("unexpected connection, disconnecting now").
+    //
+    // On real hardware that looked like a device that read its index and then
+    // hung up without fetching anything — with nothing in either log saying
+    // why. A synchronous flag closes the window the await opens.
+    if (_sync.isRunning || _syncStarting) return null;
+    _syncStarting = true;
 
     _lastError = null;
     // Scanning while connecting is slow and pointless — but it has to come
     // BACK afterwards, or the screen that was watching for this device goes
     // dark the moment it succeeds and reports it as out of range.
     final bool wasScanning = _scanner.isScanning;
-    await _scanner.stop();
-    notifyListeners();
-
-    final SyncResult result = await _sync.run(
-      id,
-      onPairCodeNeeded: interactive ? _requestPairCode : _neverPrompt,
-    );
+    final SyncResult result;
+    try {
+      await _scanner.stop();
+      notifyListeners();
+      result = await _sync.run(
+        id,
+        onPairCodeNeeded: interactive ? _requestPairCode : _neverPrompt,
+      );
+    } finally {
+      // Held for the WHOLE attempt and released in a finally: cleared any
+      // earlier and the window reopens; not cleared on a throw and every
+      // later sync is blocked by a run that already died.
+      _syncStarting = false;
+    }
 
     // App-first tags: the phone owns the tag list, so push it to the device on
     // every successful sync (covers tags added while it was out of range).
@@ -257,7 +279,7 @@ class DeviceController extends ChangeNotifier {
   /// found, listed, counted — and then wait to be told to sync. Coming into
   /// range is the entire signal a person expects to be enough.
   Future<void> _maybeAutoSync() async {
-    if (_sync.isRunning) return;
+    if (_sync.isRunning || _syncStarting) return;
     final JotaAdvertisement? ad = pairedAdvertisement;
     if (ad == null || !ad.hasWork) return;
 

@@ -169,6 +169,7 @@ static void refreshAdvert(bool force = false) {
 
 class ServerCB : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer *s, ble_gap_conn_desc *desc) override {
+    Serial.println("[ble] connected");
     g_connected = true;
     g_conn      = desc->conn_handle;
     g_mtu       = s->getPeerMTU(g_conn);
@@ -176,6 +177,7 @@ class ServerCB : public NimBLEServerCallbacks {
     g_xfer.active = false;
   }
   void onDisconnect(NimBLEServer *s) override {
+    Serial.println("[ble] disconnected");
     g_connected   = false;
     g_authed      = false;
     if (g_model) g_model->authed = false;
@@ -227,6 +229,9 @@ class AuthCB : public NimBLECharacteristicCallbacks {
     // of the device outranks the stored bond by design: possession IS the
     // security model, so a Jota that could lock out the person holding it
     // would be worse, not better.
+    Serial.printf("[ble] auth: given='%s' want='%s' owner=%s\n",
+                  given, want, hasOwner() ? "yes" : "no");
+
     if (want[0] && strcmp(given, want) == 0) {
       if (appId[0]) setOwner(appId);
       grantAuth();
@@ -238,11 +243,23 @@ class AuthCB : public NimBLECharacteristicCallbacks {
     // that simply is not the owner would lock the device out of the air in
     // three reconnects.
     if (!given[0]) {
+      // A phone introducing itself and not recognised. Put the code up so the
+      // person holding the device can read it out — that IS the handshake.
+      if (g_model && hasOwner()) {
+        g_model->pairAsked = true;
+        Serial.println("[ble] stranger knocked — offering the code");
+      }
       statusError(hasOwner() ? "owner" : "auth");
       return;
     }
 
+    // A wrong code from a phone that cannot see the panel is the same
+    // situation: show it, so the next attempt can succeed.
+    if (g_model && !want[0]) g_model->pairAsked = true;
+    Serial.printf("[ble] auth REFUSED (%u/%u)\n",
+                  (unsigned)(g_authFails + 1), (unsigned)MAX_AUTH_FAIL);
     if (++g_authFails >= MAX_AUTH_FAIL) {
+      Serial.println("[ble] too many attempts — advertising off for 30s");
       g_lockUntil = millis() + LOCKOUT_MS;
       NimBLEDevice::getAdvertising()->stop();
       if (g_connected) NimBLEDevice::getServer()->disconnect(g_conn);
@@ -253,12 +270,21 @@ class AuthCB : public NimBLECharacteristicCallbacks {
 
 class IndexCB : public NimBLECharacteristicCallbacks {
   void onRead(NimBLECharacteristic *c) override {
+    // An empty index on an unauthenticated read is the defect the whole bond
+    // rewrite exists to prevent looking like success — so say which it was.
     if (!g_authed || !g_store) {
+      Serial.println("[ble] index read while NOT authed -> []");
       c->setValue("[]");
       return;
     }
+    Serial.printf("[ble] index read, %u pending\n",
+                  (unsigned)g_store->pending());
     char buf[512];
     const size_t n = g_store->indexJson(buf, sizeof(buf));
+    // The exact bytes the phone receives. A malformed or unexpected index is
+    // indistinguishable on the phone from "nothing to sync" — which is the
+    // shape of the original bug this whole contract was rewritten to kill.
+    Serial.printf("[ble] index (%u bytes): %.*s\n", (unsigned)n, (int)n, buf);
     c->setValue((uint8_t *)buf, n);
   }
 };
@@ -294,7 +320,10 @@ static bool jsonHex(const char *s, const char *key, uint32_t *out) {
 
 class FetchCB : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic *c) override {
-    if (!g_authed || !g_store) return;
+    if (!g_authed || !g_store) {
+      Serial.println("[ble] fetch while NOT authed — ignored");
+      return;
+    }
     const std::string v = c->getValue();
     uint32_t id = 0, off = 0;
     if (!jsonUint(v.c_str(), "\"id\"", &id)) return;
@@ -315,6 +344,7 @@ class FetchCB : public NimBLECharacteristicCallbacks {
 
 class AckCB : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic *c) override {
+    Serial.println("[ble] ack");
     if (!g_authed || !g_store) return;
     const std::string v = c->getValue();
     uint32_t id = 0, crc = 0;
@@ -499,7 +529,30 @@ void Link::forgetOwner() {
 }
 
 void Link::loop(uint32_t nowMs) {
+  // ADVERTISING WATCHDOG.
+  //
+  // The device stopped advertising after its first connection and never came
+  // back — invisible to the phone AND to a laptop scanner, until a reset. A
+  // peripheral that has gone quiet is, for this product, simply dead: the whole
+  // sync model is "the device calls the phone", so if the advert stops, notes
+  // sit on it forever and nothing on either screen says why.
+  //
+  // Rather than chase which of NimBLE's paths dropped it — restarting from
+  // inside the disconnect callback is a known way to lose the race, and the
+  // lockout path stops it deliberately — this asserts the invariant every
+  // loop: if nobody is connected and we are not deliberately locked out, we
+  // MUST be advertising. Cheap to check, and it cannot be defeated by whatever
+  // else goes wrong.
+  if (!g_connected && !g_lockUntil) {
+    NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
+    if (!adv->isAdvertising()) {
+      Serial.println("[ble] advert had stopped — restarting");
+      adv->start();
+    }
+  }
+
   if (g_lockUntil && nowMs > g_lockUntil) {
+    Serial.println("[ble] lockout over");
     g_lockUntil = 0;
     g_authFails = 0;
     refreshAdvert(/*force=*/true);

@@ -24,7 +24,6 @@ import 'package:provider/provider.dart';
 
 import '../data/note.dart';
 import '../design/format.dart';
-import '../design/mark.dart';
 import '../design/script.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
@@ -55,12 +54,14 @@ class HomeScreen extends StatelessWidget {
       // 48pt in the body, so repeating it up here as `012` would be the same
       // datum twice at two sizes — the exact failure theme.h was written to
       // prevent.
-      // The MARK, not the word. This is the app's own header and the one place
-      // it says whose app this is — and the product's name is a circle with the
-      // word inside it, not the word on its own. The device wears the same mark
-      // as its idle screen, so the two objects greet you identically.
+      // Nothing up here. The mark lived in this slot for a while and earned
+      // nothing: the status slot's rule, inherited from the panel, is ONE
+      // DEFINING FIGURE — a count, a ratio, an id — and a logo is not a figure.
+      // It was brand decoration in the one place the app reserves for
+      // information, on the screen you open every day. The device does the same
+      // thing: it wears the mark when idle and gets out of the way once you are
+      // using it.
       label: '',
-      trailing: const JotaMark(size: 30),
       // The heading and its hairline are in the BODY, so the status line does
       // not get one too. Two rules within forty pixels is two pieces of chrome
       // where the rule says there is one, and it fenced off a strip holding
@@ -193,13 +194,24 @@ class _Figure extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        // Larger than `display`'s 34, and with the tracking taken back out:
-        // display is sized for a pair code, and these two numbers are the
-        // loudest thing on the screen by design. Not zero-padded — the sheet
-        // shows `12`, and a padded `012` reads as an id rather than a count.
+        // SANS, not the mono figure face — the one deliberate exception to
+        // "every figure is mono" (docs/brand.md), and it is about this size
+        // only. Plex Mono's zero carries a dot, which at 48pt beside a second
+        // zero reads as a pair of eyes staring off the screen. Mono earns its
+        // place where figures must ALIGN — ids, timers, a column of counts —
+        // and these two stand alone.
+        //
+        // Regular weight, and tabular figures so 8 and 11 still occupy the
+        // same width as the week turns over.
         Text(
           value,
-          style: t.display.copyWith(fontSize: 48, letterSpacing: 0),
+          style: t.prose.copyWith(
+            fontSize: 44,
+            fontWeight: FontWeight.w400,
+            height: 1,
+            letterSpacing: -0.5,
+            fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+          ),
         ),
         const SizedBox(height: JotaGrid.gapS),
         Text(unit, style: _cardLabel(t, c)),

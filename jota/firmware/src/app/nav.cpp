@@ -193,6 +193,18 @@ void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
 }
 
 void Nav::tick(uint32_t nowMs, AppModel &m) {
+  // A phone has knocked and been turned away for not being the owner. Show the
+  // code so whoever is holding the device can hand it over — possession is the
+  // security model, and this is the moment it has to be exercisable.
+  if (m.pairAsked && s_ != Screen::Recording && s_ != Screen::Erase) {
+    m.pairAsked = false;
+    if (s_ != Screen::Pair) {
+      m.pairCode = SIM_PAIR_CODE;
+      go(Screen::Pair, nowMs);
+      return;
+    }
+  }
+
   // An unowned device has exactly one useful thing to say, so it says it
   // without being asked. This replaces hunting MENU -> PAIR on a two-button
   // device at the single highest-friction moment in the product.
@@ -212,7 +224,16 @@ void Nav::tick(uint32_t nowMs, AppModel &m) {
   //   SAVED     — the tag window is the user's, not ours
   if (m.authed && !wasAuthed_) {
     wasAuthed_ = true;
-    if (s_ != Screen::Pair && s_ != Screen::Recording && s_ != Screen::Saved) {
+    // ONLY if we are somewhere else. Calling go(Ready) while already on Ready
+    // still forces a FULL refresh — and a full refresh blocks this core for
+    // ~1.29 s, which is long enough to starve the BLE host and drop the link.
+    //
+    // That is exactly what happened on the first real sync: connect, index
+    // read, full repaint, disconnect — every time, before a single byte of
+    // audio moved. A cosmetic repaint of a screen that already looks right is
+    // not worth the one thing the device exists to do.
+    if (s_ != Screen::Pair && s_ != Screen::Recording &&
+        s_ != Screen::Saved && s_ != Screen::Ready) {
       go(Screen::Ready, nowMs);
     }
   } else if (!m.authed) {
