@@ -62,13 +62,17 @@ static void sheetRings(Adafruit_GFX &g) {
   clear(g);
   statusBar(g, "RINGS", "OK");
 
-  // Idle beside recording: same outer edge, a second ring inside. The pair
-  // has to be checked together, because the whole partial-refresh trick
-  // depends on the right one being the left one plus ink.
-  ring(g, 58, CONTENT_MID, 34, CIRCLE_STROKE);
+  // Idle beside recording. They have to be checked together, because the whole
+  // partial-refresh trick depends on the right one being the left one PLUS
+  // ink — the word does not move and nothing is taken away.
+  // Stacked, not side by side: the wordmark is ~112px wide and two of them
+  // across a 200px panel simply collide.
+  g.setTextColor(INK);
+  g.setFont(font::wordmark());
+  textCenteredAt(g, "Jota", CENTER_X, 74);
 
-  ring(g, 142, CONTENT_MID, 34, CIRCLE_STROKE);
-  ring(g, 142, CONTENT_MID, 24, CIRCLE_STROKE);
+  g.fillCircle(CENTER_X, 118, REC_DOT_R, INK);
+  textCenteredAt(g, "Jota", CENTER_X, 150);
 }
 
 int main(int argc, char **argv) {

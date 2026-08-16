@@ -56,9 +56,20 @@ static const uint8_t ROWS_MAX    = 5;
 // solid at any weight rather than a stack of aliased outlines. The outer
 // edge NEVER moves between idle and recording — only the annulus thickens
 // inward, which keeps the transition additive and safe for partial refresh.
-// The ring sits ABOVE centre now, because the recording timer moved out from
-// inside it to underneath it — and between the ring's old bottom edge (160)
-// and the battery gauge (168) there was no room for a figure.
+// ---- The idle mark -----------------------------------------------------
+// Just the word. The ring is gone: a circle around the name said nothing the
+// name did not, and once RECORDING drew a second ring inside the first the
+// screen was three shapes carrying one idea.
+//
+// RECORDING keeps the word exactly where it is and ADDS a filled dot above it
+// and a timer below. That is the whole difference, and it matters mechanically
+// as much as visually: the transition is then purely additive ink, which is
+// what lets it go out as a partial refresh and land instantly instead of after
+// a two-second full repaint.
+static const int16_t WORDMARK_CY          = 104;  // ink centre of "Jota"
+static const int16_t REC_DOT_CY           = 62;   // the record dot, above it
+static const int16_t REC_DOT_R            = 9;
+
 static const int16_t CIRCLE_CY            = 94;
 static const int16_t CIRCLE_R             = 46;
 static const int16_t CIRCLE_STROKE        = 3;
@@ -102,10 +113,10 @@ static const int16_t GAUGE_Y        = GAUGE_BASELINE - 10;  // centred on the ca
 // Areas that change on their own while a screen is displayed. Refreshing
 // only these keeps the panel quiet: a region update is both faster and
 // visibly cleaner than pushing all 200x200 pixels for five digits.
-// The recording timer, below the ring. Baseline 162 clears the ring's bottom
-// edge (138) and stays clear of the gauge line (168).
-static const int16_t TIMER_BASELINE = 162;
-static const int16_t TIMER_X = 40, TIMER_Y = 138, TIMER_W = 120, TIMER_H = 26;
+// The recording timer, below the word. Baseline 156 clears the wordmark's
+// descenders and stays clear of the gauge line (168).
+static const int16_t TIMER_BASELINE = 156;
+static const int16_t TIMER_X = 40, TIMER_Y = 132, TIMER_W = 120, TIMER_H = 28;
 
 // ---- Prose -------------------------------------------------------------
 static const int16_t META_BASELINE   = 46;  // note time / duration line

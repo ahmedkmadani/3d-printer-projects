@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../ble/device_scanner.dart';
+import '../ble/sync_service.dart';
 import '../design/theme.dart';
 import '../state/device_controller.dart';
 import 'bluetooth_off_screen.dart';
@@ -137,7 +138,23 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       return;
     }
     if (device.isSyncing) return;
-    await device.syncNow();
+    final SyncResult? r = await device.syncNow();
+    if (!mounted) return;
+
+    // SAY WHAT HAPPENED. A sync started from the chip used to report nowhere:
+    // the engine stored an error, the chip went back to idle, and the archive
+    // stayed empty with no account of why — which is indistinguishable from
+    // "there was nothing to fetch". On real hardware that cost an evening.
+    final String message = r == null
+        ? (device.lastError ?? 'Nothing to sync')
+        : r.ok
+            ? (r.notesAdded > 0
+                ? 'Got ${r.notesAdded} note${r.notesAdded == 1 ? '' : 's'}'
+                : 'Already up to date')
+            : (r.error ?? 'Sync failed');
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   /// The engine blocks mid-sync waiting for the digits on the e-paper, and a

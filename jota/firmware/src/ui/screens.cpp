@@ -67,12 +67,12 @@ void screenReady(Adafruit_GFX &g, const AppModel &m) {
   statusBar(g, id, count);
   linkDot(g, id, m.paired, m.authed);
 
-  // The mark is the whole screen. No "READY" label: there is nothing else this
-  // device does while sitting still, and a word saying so is a word to read.
-  ring(g, CENTER_X, CIRCLE_CY, CIRCLE_R, CIRCLE_STROKE);
+  // The word IS the screen. No ring, no label: there is nothing else this
+  // device does while sitting still, and a mark around the name only repeated
+  // it.
   g.setTextColor(INK);
-  g.setFont(font::figure());
-  textCenteredAt(g, "Jota", CENTER_X, CIRCLE_CY);
+  g.setFont(font::wordmark());
+  textCenteredAt(g, "Jota", CENTER_X, WORDMARK_CY);
 
   batteryGauge(g, CENTER_X, m.batteryPct, m.batteryKnown);
 }
@@ -80,11 +80,11 @@ void screenReady(Adafruit_GFX &g, const AppModel &m) {
 void screenRecording(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
 
-  // EVERY pixel of READY is redrawn identically — status line, wordmark, ring,
-  // gauge. Only the inner ring and the timer are new. That is what makes this
-  // transition safe as a partial refresh: partial updates can lay ink down
-  // cleanly but leave residue where ink is removed, so the rule is that
-  // RECORDING may only ADD to READY, never take away.
+  // EVERY pixel of READY is redrawn identically — status line, wordmark,
+  // gauge. Only the dot and the timer are new. That is what makes this
+  // transition safe as a partial refresh: partial updates lay ink down cleanly
+  // but leave residue where ink is REMOVED, so the rule is that RECORDING may
+  // only add to READY, never take away. It is also why the word does not move.
   char id[8];
   fmtShortId(id, sizeof(id), m.deviceId);
   char count[8];
@@ -92,11 +92,13 @@ void screenRecording(Adafruit_GFX &g, const AppModel &m) {
   statusBar(g, id, count);
   linkDot(g, id, m.paired, m.authed);
 
-  ring(g, CENTER_X, CIRCLE_CY, CIRCLE_R, CIRCLE_STROKE);
-  ring(g, CENTER_X, CIRCLE_CY, CIRCLE_INNER_R, CIRCLE_STROKE);
+  // The one mark everybody already reads as "recording", and the only filled
+  // shape on the device.
+  g.fillCircle(CENTER_X, REC_DOT_CY, REC_DOT_R, INK);
+
   g.setTextColor(INK);
-  g.setFont(font::figure());
-  textCenteredAt(g, "Jota", CENTER_X, CIRCLE_CY);
+  g.setFont(font::wordmark());
+  textCenteredAt(g, "Jota", CENTER_X, WORDMARK_CY);
 
   char t[12];
   fmtDuration(t, sizeof(t), m.recSecs);
