@@ -75,6 +75,60 @@ static void sheetRings(Adafruit_GFX &g) {
   textCenteredAt(g, "Jota", CENTER_X, 150);
 }
 
+
+// ---- idle variants, for choosing between --------------------------------
+// The question is how little the resting screen can say. Everything here is
+// drawn with the real widgets, so what is picked is what ships.
+
+// A — the word, and nothing else at all.
+static void idleA(Adafruit_GFX &g, const AppModel &m) {
+  clear(g);
+  g.setTextColor(INK);
+  g.setFont(font::wordmark());
+  textCenteredAt(g, "Jota", CENTER_X, SCREEN_H / 2);
+}
+
+// B — the word, and the one fact that changes: how many are waiting. Silent
+// when there is nothing to say.
+static void idleB(Adafruit_GFX &g, const AppModel &m) {
+  clear(g);
+  g.setTextColor(INK);
+  g.setFont(font::wordmark());
+  textCenteredAt(g, "Jota", CENTER_X, SCREEN_H / 2 - 10);
+  if (m.pending) {
+    char line[24];
+    snprintf(line, sizeof(line), "%u waiting", (unsigned)m.pending);
+    g.setFont(font::reading());
+    textCenteredAt(g, line, CENTER_X, SCREEN_H / 2 + 34);
+  }
+}
+
+// C — the word, with the chrome kept but stripped to one figure: no device id,
+// no battery percentage, just the count in the slot that exists for it.
+static void idleC(Adafruit_GFX &g, const AppModel &m) {
+  clear(g);
+  char count[8];
+  snprintf(count, sizeof(count), "%03u", (unsigned)m.pending);
+  statusBar(g, "", count);
+  g.setTextColor(INK);
+  g.setFont(font::wordmark());
+  textCenteredAt(g, "Jota", CENTER_X, CONTENT_MID);
+}
+
+// The recording state for B: the word stays put, a dot and the timer arrive.
+static void recB(Adafruit_GFX &g, const AppModel &m) {
+  clear(g);
+  g.setTextColor(INK);
+  g.setFont(font::wordmark());
+  textCenteredAt(g, "Jota", CENTER_X, SCREEN_H / 2 - 10);
+  g.fillCircle(CENTER_X, 52, REC_DOT_R, INK);
+  char t[12];
+  snprintf(t, sizeof(t), "%02u:%02u", (unsigned)(m.recSecs / 60),
+           (unsigned)(m.recSecs % 60));
+  g.setFont(font::figure());
+  textCentered(g, t, CENTER_X, SCREEN_H / 2 + 44);
+}
+
 int main(int argc, char **argv) {
   const std::string out = (argc > 1) ? argv[1] : ".";
 
@@ -111,6 +165,15 @@ int main(int argc, char **argv) {
   writePGM(canvas, out + "/00_widgets.pgm");
   sheetRings(canvas);
   writePGM(canvas, out + "/00b_rings.pgm");
+  idleA(canvas, m);
+  writePGM(canvas, out + "/A_idle_word_only.pgm");
+  idleB(canvas, m);
+  writePGM(canvas, out + "/B_idle_with_count.pgm");
+  recB(canvas, m);
+  writePGM(canvas, out + "/B_recording.pgm");
+  idleC(canvas, m);
+  writePGM(canvas, out + "/C_idle_status_slot.pgm");
+
   screenOff(canvas, m);
   writePGM(canvas, out + "/09_off.pgm");
 
