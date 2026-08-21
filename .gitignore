@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 .DS_Store
 /tmp/
+
+# local secrets — never commit
+*.local.sh
+*.local.env
