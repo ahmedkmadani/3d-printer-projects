@@ -44,7 +44,19 @@ CLEARANCE = 0.25          # printed-to-printed sliding fits: lid skirt, snaps
 # validate showed 0.000 mm3 of obstruction and exactly 0.25 of slack, with no
 # margin for vertical walls printing proud, which they always do. A rigid PCB
 # in a printed pocket needs room for the process, not just for the part.
-PCB_CLEARANCE = 0.40      # [print-derived 2026-08-29] was CLEARANCE (0.25)
+# [measured off the first print 2026-08-29] The cavity came out 47.0 between
+# the end stops against a 47.50 nominal, on a 47.0 board: zero slack, which is
+# why it jammed and sat tilted. The print loses 0.25 PER WALL to proud vertical
+# surfaces, so a nominal clearance only half buys real clearance:
+#
+#     0.25  the fit we actually want
+#   + 0.25  what the process takes
+#   = 0.50  what has to be drawn
+#
+# 0.40 was an intermediate guess and would have left 0.15 of real room, which
+# is still not a drop-in fit. This is now derived from a measurement of a real
+# printed part rather than from a tolerance table.
+PCB_CLEARANCE = 0.50      # [print-derived 2026-08-29] was CLEARANCE (0.25)
 NOZZLE = 0.4
 LAYER_H = 0.2
 MIN_FEATURE = 0.8
