@@ -148,7 +148,7 @@ check(v_bb < TOL,
 print("\n4. Assembled skirt-to-wall clearance == CLEARANCE")
 # Measure the horizontal gap between the base's rebated wall outer face and
 # the lid skirt inner face on the -X wall, at a mid-skirt height.
-from build123d import Plane
+from build123d import Box, Plane, Pos
 z_probe = P.RIM_Z - P.SKIRT_DEPTH / 2
 base_sec = base.intersect(Plane.XY.offset(z_probe))
 lid_sec = lid.intersect(Plane.XY.offset(z_probe))
@@ -178,6 +178,20 @@ check(abs(gap - P.CLEARANCE) < 0.05,
 # THINNER, and nothing above notices: section 5 probes fixed points and never
 # lands on the boss. Setting SWITCH_TIP_X = 17.50 gave a 0.85 mm boss and, via
 # a seat ledge that used to reach it by coincidence, a base in five pieces.
+# Can the board actually GET to its seat? Every other check here tests the PCB
+# where it ends up, never the path it takes. That gap is why a case whose end
+# stops were set for PCB_L = 39.0 got printed and assembled: the board could
+# not pass the stops, and two pilasters were broken off to force it in. Sweep
+# the footprint from the seat plane to the rim and require the base to be
+# absent from all of it.
+_h = P.RIM_Z - P.PCB_BACK_Z
+_path = Pos(0, 0, P.PCB_BACK_Z + _h / 2) * Box(P.PCB_W, P.PCB_L, _h)
+_hit = base.intersect(_path)
+_v = 0.0 if _hit is None else _hit.volume
+check(_v < 1e-6,
+      f"PCB drop-in path {P.PCB_W:.1f} x {P.PCB_L:.1f} swept to the rim is "
+      f"clear of base structure ({_v:.3f} mm3)")
+
 check(P.SNAP_STRAIN <= P.STRAIN_LIMIT,
       f"snap strain {P.SNAP_STRAIN*100:.2f} % <= {P.STRAIN_LIMIT*100:.2f} % "
       f"allowable for {P.MATERIAL} (bending normal to the layer planes)")
