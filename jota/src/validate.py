@@ -113,6 +113,26 @@ for a, b in pairs:
     v = vol(comps[a].intersect(comps[b]))
     check(v < TOL, f"internal: {a} ∩ {b} = {v:.3f} mm3 (== 0)")
 
+# 3b-header. The stock 2x6 expansion header, if it is still on the board.
+# Reported as its own named check with the actual overlap in mm, because
+# "component 'header' vs enclosure = 812 mm3" does not tell an assembler what
+# to do and this is the defect that wasted the first real print.
+if P.HEADER_FITTED:
+    hdr = C.header_keepout()
+    hb = hdr.bounding_box()
+    through = max(0.0, -hb.min.Z)          # how far it pokes below the floor
+    v_hb = vol(hdr.intersect(comps["battery"]))
+    check(through <= TOL,
+          f"header underside {hb.min.Z:.2f} is {through:.2f} mm BELOW the "
+          f"interior floor (needs PCB_BACK_Z >= HEADER_H = {P.HEADER_H})")
+    check(v_hb < TOL,
+          f"header ∩ battery = {v_hb:.1f} mm3 — they overlap in PLAN, so "
+          f"sinking the floor cannot fix it; desolder the header or fit a "
+          f"cell narrower than {P.BATT_W} mm")
+else:
+    print("  [SKIP] stock 2x6 header assumed DESOLDERED (HEADER_FITTED=False)")
+    print("         set HEADER_FITTED=True to prove why it has to come off")
+
 # 3c. battery must sit fully under the PCB back plane (no crush)
 bb = comps["battery"].bounding_box()
 check(bb.max.Z <= P.PCB_BACK_Z + TOL,
@@ -152,6 +172,31 @@ gap = base_rebate_x - lid_skirt_inner_x
 check(abs(gap - P.CLEARANCE) < 0.05,
       f"wall-outer ({base_rebate_x:.2f}) − skirt-inner ({lid_skirt_inner_x:.2f}) "
       f"= {gap:.2f} mm ≈ CLEARANCE {P.CLEARANCE}")
+
+# The button boss, which SWITCH_TIP_X sizes by subtraction. The boss spans
+# SWITCH_TIP_X..IN_W/2, so measuring the switch tip further outboard makes it
+# THINNER, and nothing above notices: section 5 probes fixed points and never
+# lands on the boss. Setting SWITCH_TIP_X = 17.50 gave a 0.85 mm boss and, via
+# a seat ledge that used to reach it by coincidence, a base in five pieces.
+boss_t = P.BTN_BOSS_T
+check(boss_t >= P.MIN_FEATURE,
+      f"button boss = IN_W/2 ({P.IN_W/2:.2f}) − SWITCH_TIP_X "
+      f"({P.SWITCH_TIP_X:.2f}) = {boss_t:.2f} mm (>= MIN_FEATURE "
+      f"{P.MIN_FEATURE}); boss vanishes at SWITCH_TIP_X "
+      f"{P.IN_W/2 - P.MIN_FEATURE:.2f}")
+
+# The pin must rest CLEAR of the switch tip, or it holds the button pressed
+# for ever. Flange rest face = pocket shoulder − flange length.
+free_travel = (P.SWITCH_TIP_X + P.BTN_POCKET_L - P.BTN_FLANGE_L) - P.SWITCH_TIP_X
+check(abs(free_travel - P.BTN_FREE_TRAVEL) < 1e-9,
+      f"pocket geometry realises BTN_FREE_TRAVEL: POCKET {P.BTN_POCKET_L:.2f} − "
+      f"FLANGE {P.BTN_FLANGE_L:.2f} = {free_travel:.2f} mm")
+check(free_travel > 0.1,
+      f"plunger rests {free_travel:.2f} mm clear of the switch tip "
+      f"(> 0 or the button is held down)")
+check(free_travel + P.BTN_SWITCH_TRAVEL < P.BTN_HEAD_PROUD,
+      f"full stroke {free_travel + P.BTN_SWITCH_TRAVEL:.2f} < head proud "
+      f"{P.BTN_HEAD_PROUD} — the cap stays proud through the press")
 
 # barb penetration into the window: barb proud SNAP_BARB_H, skirt gap CLEARANCE
 pen = P.SNAP_BARB_H - P.CLEARANCE

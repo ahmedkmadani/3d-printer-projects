@@ -130,7 +130,7 @@ def _align_nubs() -> Part:
     """Two ribs on the lid underside hugging the +X wall inner face —
     the side that has no skirt still gets located."""
     nubs = None
-    for y in (-16.0, 5.0):
+    for y in (-P.PCB_L / 2 + 3.5, P.PCB_L / 2 - 18.5):
         n = Pos(P.IN_W / 2 - 0.25 - 0.6, y, P.RIM_Z - 0.75) * Box(1.2, 5.0, 1.5)
         nubs = n if nubs is None else nubs + n
     return nubs

@@ -84,13 +84,21 @@ def _ledge(x, y, w, l, reach_dir) -> Part:
 
 
 def _supports() -> Part:
-    """Pilasters + seat ledges + locating rails + button boss columns."""
+    """Pilasters + seat ledges + locating rails + button boss columns.
+
+    Every Y here is anchored on the PCB edges. It used to be written as bare
+    numbers (-19.75, 20.55, -18.4 ...) that silently encoded PCB_L = 39. When
+    the real board turned out to be 47 long, those numbers did not move, the
+    end stops landed inside the board and the base came out as two bodies."""
     parts = []
+    y0e, y1e = -P.PCB_L / 2, P.PCB_L / 2      # PCB bottom / top edge
+    cl = P.CLEARANCE
+    seat0, seat1 = y0e - cl, y1e + cl         # seat faces the PCB rests against
 
     # --- -X wall rail: full-length pilaster beside the battery
     rail_face = -(P.BATT_CTR_X - P.BATT_W / 2 - P.CLEARANCE) * -1  # -16.5
     rail_t = P.IN_W / 2 - abs(rail_face)               # 1.85
-    for y0, y1 in ((-19.0, -8.0), (2.0, 13.0)):
+    for y0, y1 in ((y0e + 0.5, y0e + 11.5), (y1e - 17.5, y1e - 6.5)):
         parts.append(
             Pos(-(P.IN_W / 2) + rail_t / 2, (y0 + y1) / 2, P.POST_SEAT_Z / 2)
             * Box(rail_t, y1 - y0, P.POST_SEAT_Z)
@@ -104,12 +112,12 @@ def _supports() -> Part:
             Pos((x0 + x1) / 2, P.IN_Y_MIN + pil_t / 2, P.POST_SEAT_Z / 2)
             * Box(x1 - x0, pil_t, P.POST_SEAT_Z)
         )
-        parts.append(_ledge((x0 + x1) / 2, -18.4, x1 - x0, 2.7, "Y"))
+        parts.append(_ledge((x0 + x1) / 2, seat0 + 2.7 / 2, x1 - x0, 2.7, "Y"))
 
     # --- top (+Y) edge posts gripping the PCB top corners
     for x0, x1 in ((-16.35, -10.0), (10.0, 16.35)):
         parts.append(
-            Pos((x0 + x1) / 2, 20.55, P.POST_SEAT_Z / 2)
+            Pos((x0 + x1) / 2, seat1 + 1.6 / 2, P.POST_SEAT_Z / 2)
             * Box(x1 - x0, 1.6, P.POST_SEAT_Z)
         )
         # The +X-side ledge sits over the microSD holder's back-side keepout
@@ -120,12 +128,13 @@ def _supports() -> Part:
         # Trim from the TIP, keeping the root on the pilaster face at y=19.75
         # — shifting the whole ledge instead detaches it from the pilaster.
         reach = 2.7 if x1 < 0 else 1.3
-        parts.append(_ledge((x0 + x1) / 2, 19.75 - reach / 2, x1 - x0, reach,
+        parts.append(_ledge((x0 + x1) / 2, seat1 - reach / 2, x1 - x0, reach,
                             "Y"))
 
     # --- upper locating rails (above the seat, faces at PCB + clearance)
     loc_t = P.IN_W / 2 - (P.PCB_W / 2 + P.CLEARANCE)   # 1.6
-    for y0, y1 in ((-19.0, -8.0), (2.0, 13.0)):        # -X side, above rail
+    for y0, y1 in ((y0e + 0.5, y0e + 11.5),
+                   (y1e - 17.5, y1e - 6.5)):          # -X side, above rail
         parts.append(
             Pos(-(P.IN_W / 2) + loc_t / 2, (y0 + y1) / 2,
                 (P.POST_SEAT_Z + P.RIM_Z) / 2)
@@ -133,32 +142,40 @@ def _supports() -> Part:
         )
     for x0, x1 in ((-16.0, -10.0), (10.0, 15.0)):      # -Y side
         parts.append(
-            Pos((x0 + x1) / 2, -19.75 + -1.6 / 2, (P.POST_SEAT_Z + P.RIM_Z) / 2)
+            Pos((x0 + x1) / 2, seat0 - 1.6 / 2, (P.POST_SEAT_Z + P.RIM_Z) / 2)
             * Box(x1 - x0, 1.6, P.RIM_Z - P.POST_SEAT_Z)
         )
     for x0, x1 in ((-16.35, -10.0), (10.0, 16.35)):    # +Y side
         parts.append(
-            Pos((x0 + x1) / 2, 19.75 + 1.6 / 2, (P.POST_SEAT_Z + P.RIM_Z) / 2)
+            Pos((x0 + x1) / 2, seat1 + 1.6 / 2, (P.POST_SEAT_Z + P.RIM_Z) / 2)
             * Box(x1 - x0, 1.6, P.RIM_Z - P.POST_SEAT_Z)
         )
 
     # --- button boss columns on the +X wall (floor to above the bores)
-    boss_face = P.SWITCH_TIP_X                          # 17.05
-    boss_t = P.IN_W / 2 - boss_face                     # 1.3
+    boss_face = P.SWITCH_TIP_X
+    boss_t = P.BTN_BOSS_T
+    LEDGE_X0 = 15.35                                    # inboard edge of the seat
     for y in (P.BTN1_CTR_Y, P.BTN2_CTR_Y):
         parts.append(
             Pos(boss_face + boss_t / 2, y, 10.5 / 2) * Box(boss_t, 8.0, 10.5)
         )
-        parts.append(_ledge(16.2, y, 1.7, 8.0, "X"))
+        # The seat ledge must REACH the boss, not merely happen to touch it.
+        # This was `_ledge(16.2, y, 1.7, ...)` — outer face at exactly 16.2 +
+        # 0.85 = 17.05, which was the old SWITCH_TIP_X. The two were equal by
+        # coincidence, so the moment the switch datum moved the ledges became
+        # free-floating bodies and the base stopped being one solid. Anchor the
+        # outer face on boss_face and the coincidence becomes a constraint.
+        parts.append(_ledge((LEDGE_X0 + boss_face) / 2, y,
+                            boss_face - LEDGE_X0, 8.0, "X"))
 
     # --- battery corral ribs (floor, h=BATT_RIB_H): +X side and -Y side
     parts.append(Pos(14.5 + 0.6, -6.0, 2.0) * Box(1.2, 14.0, 4.0))
     parts.append(Pos(-4.0, -17.75 - 0.6, 2.0) * Box(12.0, 1.2, 4.0))
 
     # --- speaker pocket ribs (envelope 16x5 centered at y=23.75, z 0..9)
-    parts.append(Pos(-8.65, 23.75, 4.0) * Box(1.2, 5.0, 8.0))   # left rib
-    parts.append(Pos(10.25, 23.75, 4.0) * Box(1.2, 5.0, 8.0))   # right rib
-    parts.append(Pos(0.8, 20.5, 4.0) * Box(18.9, 1.2, 8.0))     # front rib (y<21.25)
+    parts.append(Pos(-8.65, P.SPK_CTR_Y, 4.0) * Box(1.2, 5.0, 8.0))   # left rib
+    parts.append(Pos(10.25, P.SPK_CTR_Y, 4.0) * Box(1.2, 5.0, 8.0))   # right rib
+    parts.append(Pos(0.8, y1e + 1.0, 4.0) * Box(18.9, 1.2, 8.0))      # front rib
 
     out = parts[0]
     for p_ in parts[1:]:

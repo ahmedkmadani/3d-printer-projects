@@ -57,6 +57,19 @@ def sd_keepout() -> Part:
     )
 
 
+def header_keepout() -> Part:
+    """Stock 2x6 female expansion header, hanging off the PCB back face.
+
+    Modelled from the PCB back face DOWNWARD, which is the whole point: its
+    underside lands at PCB_BACK_Z - HEADER_H, and PCB_BACK_Z is smaller than
+    HEADER_H, so the solid pokes straight through the interior floor. That is
+    what makes the interference check fail rather than merely warn."""
+    z0 = P.PCB_BACK_Z - P.HEADER_H
+    return Pos(P.HEADER_CTR_X, P.HEADER_CTR_Y, z0 + P.HEADER_H / 2) * Box(
+        P.HEADER_W, P.HEADER_L, P.HEADER_H
+    )
+
+
 def speaker() -> Part:
     """Oval speaker unit in its bay beyond the +Y PCB edge, seated against
     the grille wall (behind the front retaining rib)."""
@@ -83,6 +96,8 @@ def all_components() -> dict[str, Part]:
         "sd": sd_keepout(),
         "speaker": speaker(),
     }
+    if P.HEADER_FITTED:
+        d["header"] = header_keepout()
     for i, s in enumerate(switches(), 1):
         d[f"switch{i}"] = s
     return d

@@ -1,8 +1,15 @@
 """All enclosure parameters in one place. Units: mm.
 
-Target hardware (Pala Note BOM): Waveshare ESP32-S3-ePaper-1.54 board
-(1.54" 200x200 e-paper AIoT board: mic, speaker header, SD slot, LiPo
-charger) + 3.7 V 503035 LiPo.
+Target hardware: Waveshare ESP32-S3-ePaper-1.54 board (1.54" 200x200
+e-paper AIoT board: mic, ES8311 codec, SD slot, LiPo charger, SHTC3,
+PCF85063 RTC, ETA6098 PMIC) + 3.7 V 503035 LiPo.
+
+The unit actually in hand is the TOUCH variant, silkscreen
+"ESP32-S3-Touch-ePaper-1.54", rev V2 — the same product, same page, same
+stock case, plus an FT6336 touch controller. Waveshare sells both from
+https://www.waveshare.com/esp32-s3-epaper-1.54.htm . If the touch layer makes
+the display stack thicker than DISPLAY_RAISE below, that is the number to
+re-measure first.
 
 Dimension provenance, three tiers:
   [datasheet]  published number, citation given
@@ -36,43 +43,133 @@ PLA_DENSITY = 1.24        # g/cm^3
 # Board: Waveshare ESP32-S3-ePaper-1.54
 # Published data: case 39.8 x 53.0 x 16.9, window 27.8 sq @ 14.3 from bottom,
 #   screws 28.1 apart (https://docs.waveshare.com/ESP32-S3-ePaper-1.54);
-#   1.54" V2 panel active area 27.00 x 27.00
+#   1.54" V2 panel active area 27.00 x 27.00, outline 37.32 x 31.80 x 1.05
 #   (https://files.waveshare.com/wiki/common/1.54inch_e-paper_V2_Datasheet.pdf)
 # Everything about the bare PCB below is [case-meas] unless marked.
 # ---------------------------------------------------------------------------
-PCB_W = 33.0              # [case-meas] front cavity 33.4 minus fit
-PCB_L = 39.0              # [case-meas] front cavity 39.4 minus fit
-PCB_T = 1.6               # GUESS: standard FR4, not published
+# [measured 2026-08-28, calipers on the rev-V2 board] --------------------
+# PCB_L was 39.0, taken by sectioning the Pala Note reference STEP. The real
+# board is 47. That is the whole disaster: the interior allowed the PCB 39.5
+# of length, the board needed 47.5, so it sat on the rim and never seated.
+# The stock 2x6 header made it worse but was never the cause.
+# The measurements corroborate each other: 47 - 4 (ear) = 43 = the hole pitch
+# M5, and 33 - 27 (hole pitch M4) = 6 = 3.0 in from each side.
+PCB_W = 33.0              # [measured] unchanged - the old value was right
+PCB_L = 47.0              # [measured] was 39.0 [case-meas]. +8.0
+PCB_T = 1.6               # GUESS: standard FR4. M16 came back as 5, which is
+                          # not a credible FR4 thickness - re-measure.
 
-PANEL_W = 31.8            # [datasheet] 1.54" V2 panel outline
-PANEL_L = 37.32           # [datasheet]
-PANEL_T = 1.18            # [datasheet]
+# Mounting holes. Now real numbers, not a claim that they do not exist.
+HOLE_PITCH_X = 27.0       # [measured] H1-H2 across
+HOLE_PITCH_Y = 43.0       # [measured] H3-H1 down
+EAR_PROUD = 4.0           # [measured] ears stand past the body's top edge
+HOLE_D = 2.2              # GUESS: not measured (M3 blank). M2 screws assumed
+
+# Reverted to the datasheet 2026-08-28. The [measured] 29.0 claimed the bonded
+# module is narrower than the bare panel, which cannot be true: 31.80 is the
+# TFT outline (glass), and bonding it to a board does not shrink it. 29.0 was
+# most likely the visible white area read through the stock case window.
+# It mattered: the lid bezel ring is 31.00 outer / 28.00 inner, so against a
+# 29.0 panel sanity() reported 0.50 mm of bearing per side with the ring
+# overhanging air. Against the real 31.80 — which carries a symmetric 2.40
+# border around the 27.00 active area — the ring bears 1.90 per side, landing
+# centred on that border. The wrong number made the design look worse than it
+# is; the interference check is 0.00 mm3 either way.
+PANEL_W = 31.80           # [datasheet] TFT OD, +/-0.1
+PANEL_L = 37.32           # [datasheet] TFT OD
+PANEL_T = 1.05            # [datasheet] bare panel D. Unused by geometry - the
+                          # modelled stack height is DISPLAY_RAISE, not this.
 ACTIVE = 27.0             # [datasheet] active area, square
 
 # Display module front face sits raised above the PCB front (panel + spacer
-# + connector): window seat -4.8 minus PCB seat -9.0 in the reference case.
-DISPLAY_RAISE = 4.2       # [case-meas] PCB front face -> panel front face
+# + connector). Was [case-meas], sectioned off the Pala Note reference STEP -
+# the same source that gave PCB_L = 39.0 against a real 47.0, so it was the
+# least trustworthy number in the whole Z stack.
+#
+# [measured 2026-08-28] the board in hand reads ~4.0, coarse. Two things that
+# buys: it is a read on the TOUCH variant, so the FT6336 layer the enclosure
+# never accounted for is now inside the figure; and 4.2 is confirmed as the
+# right order, not a reference-case artefact.
+#
+# The modelled value STAYS 4.2, deliberately. RIM_Z = PCB_FRONT_Z +
+# DISPLAY_RAISE + PANEL_LID_GAP, so this number decides whether the lid bezel
+# clears the panel or presses it, and the read is coarser (+/-0.2) than the
+# 0.25 gap it feeds. At 4.2 the lid only touches glass if the true raise
+# exceeds 4.45 - 0.45 of headroom, worst case ~0.5 of rattle. Dropping to 4.0
+# moves contact to 4.25, which "about 4" could plausibly be. Rattle is
+# recoverable; crushing e-paper glass with a printed bezel is not.
+#
+# Tighten it by measuring PCB front face -> panel front face with a depth gauge
+# and setting PANEL_LID_GAP from the result, rather than by trimming this.
+DISPLAY_RAISE = 4.2       # [measured ~4.0, held at 4.2 - see above]
 
 # Window / active-area center relative to PCB center. [case-meas]:
 # case window center (-1.45,-11.7); PCB center in case frame (-2.0,-14.7).
-ACTIVE_CTR_X = 0.55
-ACTIVE_CTR_Y = 3.0
+# [derived 2026-08-28 from Waveshare's published stock-case outline]
+# Case 39.80 x 53.00; window 27.80 square, 14.30 up from the case bottom.
+# With the real PCB at 33 x 47 the board sits 3.40 / 3.00 in from the case
+# walls, so the window spans 11.30..39.10 above the PCB bottom edge — centre
+# 25.20 against a PCB centre of 23.50. Supersedes the old [case-meas] pair,
+# which was measured against a 39 mm board and is therefore meaningless.
+# Assumes the board is centred in its case and the window centred on the
+# active area; both are visible in the drawing but neither is dimensioned.
+ACTIVE_CTR_X = 0.0        # [derived] window centred across the board
+ACTIVE_CTR_Y = 1.7        # [derived] was 3.0
 
 # Back-side components (SD holder, USB-C shell, RTC...) — keepout depths
 # below the PCB back face:
 BACK_CLEAR_MID = 1.5      # GUESS: small parts over the battery zone
 BACK_CLEAR_EDGE = 3.5     # GUESS: USB shell / SD holder at the bottom/right edges
-# NOTE: the stock 2x6 female header (~8.5 tall) does NOT fit — the Pala
-# reference case leaves only ~7.9 behind the PCB. It must be desoldered
-# (the Pala Note build evidently does). Documented in README.
+# ---------------------------------------------------------------------------
+# The stock 2x6 female expansion header.
+#
+# This used to be a comment and nothing else, so nothing enforced it and the
+# first real build was assembled with the header still fitted. The board then
+# sat ON the rim instead of dropping in, and the case was blamed. It is now a
+# keepout solid (components.header) that validate.py checks like any other, so
+# leaving it fitted FAILS the build instead of failing the assembly.
+#
+# It cannot be designed around. The header stands HEADER_H off the PCB back
+# face, which is more than the whole PCB_BACK_Z gap, so it must either pass
+# through the floor (as it does in Waveshare's own case, which slots the back)
+# or come off. Sinking the floor is not an escape either: the header's plan
+# footprint is inboard of the -X wall and the 503035 battery is 30.5 of the
+# 36.7 interior width, so the two overlap in plan no matter how deep the case
+# gets. Set HEADER_FITTED = True and validate.py will print exactly that
+# overlap rather than take this paragraph's word for it.
+#
+# So: desolder it, or fit a smaller cell than the 503035.
+HEADER_FITTED = False     # True = model a board with the stock header still on
+HEADER_W = 5.08           # [datasheet] 2 rows x 2.54 pitch, body across
+HEADER_L = 15.24          # [datasheet] 6 ways x 2.54 pitch, body along
+HEADER_H = 9.0            # [measured] M18, tallest thing on the back face
+# [derived] Waveshare's outline drawing dimensions the header opening in the
+# case back: 16.50 tall, 16.10 up from the case bottom, and 22.00 / 12.60 in
+# from the case sides (39.80 - 22.00 - 12.60 = 5.20 ~ the 5.08 header body).
+# With the board sitting 3.00 / 3.40 inside the case, the vertical figure maps
+# cleanly onto the board; the horizontal one depends on which way the back
+# view is mirrored, which the drawing does not say, so X stays a GUESS.
+HEADER_CTR_X = -13.0      # GUESS: -X side. Drawing implies |x| ~ 4.7 if the
+                          # back view mirrors, ~13 if it does not.
+HEADER_CTR_Y = -2.15      # [derived] header spans 13.10..29.60 above the PCB
+                          # bottom edge; PCB centre is 23.50
 
 # Interfaces, PCB-frame positions [case-meas]:
-BTN1_CTR_Y = -14.0        # PWR/BOOT tactile switches on the +X (right) edge
-BTN2_CTR_Y = -3.0
+# Waveshare's published outline drawing, stock case (not the bare PCB):
+#   case 39.80 x 53.00 x 16.90, corners R4.50
+#   window 27.80 square, 14.30 up from the case bottom
+#   case screws 28.10 apart  <- the board really does have mounting holes
+SCREW_SPACING_X = 28.10   # [datasheet] stock-case screw pitch across the board
+
+# [measured] PWR 9.0 and BOOT 19.0 up from the bottom edge; with PCB_L 47 the
+# centre is 23.5, so these are 9.0-23.5 and 19.0-23.5.
+BTN1_CTR_Y = -14.5        # [measured] PWR, on the +X (right) edge
+BTN2_CTR_Y = -4.5         # [measured] BOOT
 BTN_CAP_W = 7.0           # reference cap size (Y) — ours match
 BTN_CAP_H = 4.8           # reference cap size (Z)
-SD_CTR_Y = 10.5           # SD slot center on the right edge
-SD_SLOT_L = 12.2          # [case-meas] slot length (Y)
+SD_CTR_Y = 10.5           # GUESS: was [case-meas] against a 39 mm board, so
+                          # it no longer means anything. M29 is still blank.
+SD_SLOT_L = 14.0          # [measured] was 12.2 [case-meas]
 SD_SLOT_H = 2.8           # [case-meas] slot height (Z)
 USB_CTR_X = 0.8           # USB opening center on the -Y (bottom) edge
 USB_OPEN_W = 9.0          # [case-meas] core opening width (fits plug overmolds)
@@ -81,7 +178,9 @@ MIC_CTR_X = -8.15         # mic pinhole on the bottom edge
 LED_CTR_X = 8.8           # LED light-pipe hole on the bottom edge
 PINHOLE = 2.0             # [case-meas] 2x2 square in reference; we use round d=2
 SPK_CTR_X = 0.8           # speaker pocket center (X), just beyond the +Y PCB edge
-SPK_CTR_Y = 23.75         # speaker seated against the grille wall, behind the rib
+SPK_CTR_Y = PCB_L / 2 + 4.25   # speaker seated against the grille wall,
+                          # behind the rib. Anchored on the PCB top edge so it
+                          # tracks PCB_L instead of freezing at 23.75.
 SPK_L = 16.0              # [case-meas] oval speaker pocket
 SPK_W = 5.0
 SPK_GRILL_SLOTS = 4       # [case-meas] 0.8 x 4.0 slits in the wall
@@ -138,10 +237,14 @@ EDGE_FILLET_R = 8.0
 # droop. A 45 degree chamfer steps out 0.2 mm per layer and is self-supporting.
 RIM_CHAMFER = 1.6
 
-# Board support: PCB has NO usable mounting holes (Pala case screws pass
-# OUTSIDE the PCB outline — the board is clamped, not screwed). Ours:
-# four corner posts with seat ledges under the PCB back + side locating
-# nubs; the lid bezel presses the display stack down = same clamp concept.
+# Board support. NOTE, corrected 2026-08: an earlier comment here claimed the
+# PCB has "no usable mounting holes". That was wrong. Waveshare's own outline
+# drawing dimensions the stock case screws at SCREW_SPACING_X = 28.10 apart and
+# the board carries four corner holes; the stock case screws INTO them. We
+# still clamp rather than screw, because the hole positions relative to the PCB
+# outline are not published and have not been measured — see MEASURED_TODO.
+# Ours: four corner posts with seat ledges under the PCB back + side locating
+# nubs; the lid bezel presses the display stack down.
 POST_SEAT_Z = PCB_BACK_Z
 POST_W = 5.0              # square posts at the four PCB corners
 PCB_CORNER_GRIP = 2.5     # how far the seat ledge reaches under the PCB edge
@@ -257,14 +360,43 @@ BTN_HEAD_PROUD = 0.8      # stands proud of the wall, and stays proud through
 BTN_FLANGE_D = 5.6        # > BORE: the outward stop
 BTN_FLANGE_L = 1.0
 BTN_POCKET_D = 6.0        # flange pocket bored into the boss from inside
-BTN_POCKET_L = 1.3
+
+# Free travel is the DESIGN INTENT and is now stated once. It used to be an
+# accident: BTN_POCKET_L was the literal 1.3 and BTN_FREE_TRAVEL = 0.30 sat
+# here driving nothing, so the real 0.30 was whatever 1.3 - 1.0 happened to be.
+# Two numbers encoding one intention, with nothing keeping them agreed - edit
+# the pocket and the travel silently changes.
+#
+# The pin rests with its flange face this far outboard of the switch tip, so
+# a press is 0.30 of nothing followed by 0.25 of switch. It must be > 0, or
+# the pin holds the button down for ever.
 BTN_FREE_TRAVEL = 0.30    # pin motion before it meets the switch
 BTN_SWITCH_TRAVEL = 0.25  # tactile switch actuation
-
-BTN_BOSS_T = 3.2          # local wall thickening for the bore tiers
+BTN_POCKET_L = BTN_FLANGE_L + BTN_FREE_TRAVEL      # [derived] 1.30
 BTN_CTR_Z = PCB_BACK_Z - 1.0   # GUESS: switch bodies on the PCB back edge
-SWITCH_TIP_X = 17.05      # GUESS: side-switch plunger tip ~0.55 beyond PCB edge.
-                          # Drives plunger pin length — adjust after a test fit.
+# [measured 2026-08-29] span across the board at the PWR line, far PCB edge to
+# actuator tip, read ~34.0 -> 34.0 - PCB_W/2 = 17.50. Was 17.05 (GUESS), which
+# put the tip 0.15 OUTBOARD of the pin's rest face: the printed pin would have
+# held PWR down permanently. On a board with no reset button and an e-paper
+# that keeps its last frame, that is a fault with almost no symptom.
+#
+# The read is coarse. The set value tolerates a true tip of 17.25..17.80
+# (span 33.75..34.30): below that the stroke exceeds BTN_HEAD_PROUD and the cap
+# sinks into the bore before the switch actuates; above it the free travel is
+# gone. Re-measure carefully before a final print.
+#
+# It cannot simply be raised further. The boss spans SWITCH_TIP_X..IN_W/2, so
+# it is 0.85 mm here and reaches MIN_FEATURE at 17.55. Past that the interior
+# has to grow — validate.py now gates this instead of leaving it to be found
+# in a print.
+SWITCH_TIP_X = 17.50      # [measured ~34.0 span] tip 1.00 beyond the PCB edge
+
+# The boss reaches inward from the wall to the switch tip and stops there - it
+# cannot go further without fouling the actuator, so this is a physical ceiling,
+# not a free choice. Was a dead literal 3.2 while base.py computed the real
+# value by subtraction; that is why moving SWITCH_TIP_X could thin the boss to
+# nothing with no constant showing it. validate.py gates it against MIN_FEATURE.
+BTN_BOSS_T = IN_W / 2 - SWITCH_TIP_X               # [derived] 0.85
 
 # Derived opening heights (interfaces live relative to the PCB planes)
 MIC_CTR_Z = 9.0           # [case-meas] pinhole straddles the PCB front plane
