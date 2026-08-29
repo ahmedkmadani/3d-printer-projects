@@ -33,7 +33,18 @@ import math
 # ---------------------------------------------------------------------------
 # Global print / fit parameters
 # ---------------------------------------------------------------------------
-CLEARANCE = 0.25          # per-side clearance wherever a part meets a component
+CLEARANCE = 0.25          # printed-to-printed sliding fits: lid skirt, snaps
+
+# The board pocket is a DIFFERENT fit and now has its own number. It used to
+# share CLEARANCE, which meant the only way to loosen the board was to loosen
+# the lid and the snaps with it.
+#
+# 0.25/side was proved too tight by a print: the board fouled the locating
+# rails and would not drop onto its ledges. It was not a modelling error —
+# validate showed 0.000 mm3 of obstruction and exactly 0.25 of slack, with no
+# margin for vertical walls printing proud, which they always do. A rigid PCB
+# in a printed pocket needs room for the process, not just for the part.
+PCB_CLEARANCE = 0.40      # [print-derived 2026-08-29] was CLEARANCE (0.25)
 NOZZLE = 0.4
 LAYER_H = 0.2
 MIN_FEATURE = 0.8
@@ -265,9 +276,9 @@ POST_W = 5.0              # square posts at the four PCB corners
 PCB_CORNER_GRIP = 2.5     # how far the seat ledge reaches under the PCB edge
 
 # Interior: PCB + posts behind each edge + speaker bay beyond +Y edge
-IN_W = PCB_W + 2 * CLEARANCE + 2 * 1.6     # side nub/post structure per side
+IN_W = PCB_W + 2 * PCB_CLEARANCE + 2 * 1.6     # side nub/post structure per side
 SPK_BAY = SPK_W + 2.0                      # speaker pocket depth beyond PCB edge
-IN_L = PCB_L + 2 * CLEARANCE + SPK_BAY + 1.6
+IN_L = PCB_L + 2 * PCB_CLEARANCE + SPK_BAY + 1.6
 IN_CTR_Y = (SPK_BAY - 1.6) / 2 + 0.0       # interior center shifted toward +Y
 
 OUT_W = IN_W + 2 * WALL_T
@@ -432,8 +443,8 @@ LED_CTR_Z = 9.0           # [case-meas]
 SD_CTR_Z = PCB_BACK_Z - 0.8    # [case-meas] SD holder on the PCB back face
 
 # Interior Y extents (asymmetric: speaker bay beyond the +Y PCB edge)
-IN_Y_MIN = -(PCB_L / 2 + CLEARANCE + 1.6)
-IN_Y_MAX = PCB_L / 2 + CLEARANCE + SPK_BAY
+IN_Y_MIN = -(PCB_L / 2 + PCB_CLEARANCE + 1.6)
+IN_Y_MAX = PCB_L / 2 + PCB_CLEARANCE + SPK_BAY
 BARB_CATCH_Z = RIM_Z - SNAP_ENGAGE_DEPTH   # flat catch face height on the base
 
 def sanity() -> list[str]:

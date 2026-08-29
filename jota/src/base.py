@@ -92,7 +92,7 @@ def _supports() -> Part:
     end stops landed inside the board and the base came out as two bodies."""
     parts = []
     y0e, y1e = -P.PCB_L / 2, P.PCB_L / 2      # PCB bottom / top edge
-    cl = P.CLEARANCE
+    cl = P.PCB_CLEARANCE          # board pocket, not the lid fit
     seat0, seat1 = y0e - cl, y1e + cl         # seat faces the PCB rests against
 
     # --- -X wall rail: full-length pilaster beside the battery
@@ -132,7 +132,7 @@ def _supports() -> Part:
                             "Y"))
 
     # --- upper locating rails (above the seat, faces at PCB + clearance)
-    loc_t = P.IN_W / 2 - (P.PCB_W / 2 + P.CLEARANCE)   # 1.6
+    loc_t = P.IN_W / 2 - (P.PCB_W / 2 + P.PCB_CLEARANCE)   # 1.6
     for y0, y1 in ((y0e + 0.5, y0e + 11.5),
                    (y1e - 17.5, y1e - 6.5)):          # -X side, above rail
         parts.append(
