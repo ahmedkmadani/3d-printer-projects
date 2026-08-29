@@ -178,6 +178,13 @@ check(abs(gap - P.CLEARANCE) < 0.05,
 # THINNER, and nothing above notices: section 5 probes fixed points and never
 # lands on the boss. Setting SWITCH_TIP_X = 17.50 gave a 0.85 mm boss and, via
 # a seat ledge that used to reach it by coincidence, a base in five pieces.
+check(P.SNAP_STRAIN <= P.STRAIN_LIMIT,
+      f"snap strain {P.SNAP_STRAIN*100:.2f} % <= {P.STRAIN_LIMIT*100:.2f} % "
+      f"allowable for {P.MATERIAL} (bending normal to the layer planes)")
+check(P.SNAP_DEFLECT >= 0.4,
+      f"retention = deflection = {P.SNAP_DEFLECT:.2f} mm (>= 0.4); these are "
+      f"the same number, so strain cannot be bought here")
+
 boss_t = P.BTN_BOSS_T
 check(boss_t >= P.MIN_FEATURE,
       f"button boss = IN_W/2 ({P.IN_W/2:.2f}) − SWITCH_TIP_X "

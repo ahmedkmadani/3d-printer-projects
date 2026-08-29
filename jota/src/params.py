@@ -40,6 +40,21 @@ MIN_FEATURE = 0.8
 PLA_DENSITY = 1.24        # g/cm^3
 
 # ---------------------------------------------------------------------------
+# Material. This is not a note, it sizes the snaps: STRAIN_LIMIT is the design
+# allowable for a cantilever printed so it bends NORMAL TO THE LAYER PLANES,
+# which is the weak direction and far below the handbook figures for the same
+# polymer moulded. Printed PLA elongates ~0.8-1.5 % in Z and PETG ~2-4 %; the
+# allowables below take roughly half the low end, because the snaps are cycled
+# every time the battery is changed and the 1-D beam formula ignores the stress
+# concentration at the root.
+#
+# Set MATERIAL and validate.py gates SNAP_STRAIN against it. Switching to PETG
+# does not require retuning — it just leaves margin on the table.
+# ---------------------------------------------------------------------------
+MATERIAL = "PLA"
+STRAIN_LIMIT = {"PLA": 0.006, "PETG": 0.020}[MATERIAL]
+
+# ---------------------------------------------------------------------------
 # Board: Waveshare ESP32-S3-ePaper-1.54
 # Published data: case 39.8 x 53.0 x 16.9, window 27.8 sq @ 14.3 from bottom,
 #   screws 28.1 apart (https://docs.waveshare.com/ESP32-S3-ePaper-1.54);
@@ -266,15 +281,24 @@ OUT_H = FLOOR_T + RIM_Z + LID_T
 # base engage through-windows in discrete skirt panels (slotted, so each snap
 # is a true cantilever, not a hoop).
 # ---------------------------------------------------------------------------
-SKIRT_T = 1.2
-SKIRT_DEPTH = 10.0        # >= SNAP_ENGAGE_DEPTH + 1.0
+# Retuned for PLA 2026-08-29. Strain goes as 1.5*t*y/L^2, so the skirt got
+# thinner (t) and the engagement deeper (L, quadratic). Thinning the skirt also
+# WIDENS the rebated wall, 0.95 -> 1.25, because REBATE tracks SKIRT_T — the one
+# place where the PLA retune makes the base stronger rather than weaker.
+SKIRT_T = 0.9             # was 1.2
+SKIRT_DEPTH = 11.5        # was 10.0; >= SNAP_ENGAGE_DEPTH + 1.0
 REBATE = SKIRT_T + CLEARANCE
-REBATED_WALL = WALL_T - REBATE            # 0.95 >= MIN_FEATURE
+REBATED_WALL = WALL_T - REBATE            # 1.25 >= MIN_FEATURE
 
 # Deflection is a FIRST-CLASS parameter, not a by-product of CLEARANCE.
 # It used to be (SNAP_BARB_H - CLEARANCE), which meant loosening a sliding fit
 # silently reduced both snap deflection and retention.
-SNAP_DEFLECT = 0.50                       # skirt deflection during insertion
+# Deflection and retention are the SAME number: the skirt must flex past the
+# barb to seat, so whatever it deflects is exactly how far the barb then sits
+# past the skirt inner face. That is why this cannot simply be reduced to buy
+# strain — validate.py holds it at >= 0.4. 0.42 keeps a little margin over that
+# floor while taking 16 % off the strain.
+SNAP_DEFLECT = 0.42                       # was 0.50
 SNAP_BARB_H = SNAP_DEFLECT + CLEARANCE    # clearance is taken up first
 SNAP_BARB_L = 8.0
 
@@ -292,7 +316,11 @@ SNAP_WINDOW_L = SNAP_BARB_L + 2 * CLEARANCE
 # isotropic, single assembly) is far too generous here. L 7 -> 9 takes strain
 # from 1.84 % to 1.11 %, inside PETG's range with margin for the stress
 # concentration at the root that the 1-D formula ignores.
-SNAP_ENGAGE_DEPTH = 9.0
+# 2026-08-29: 9.0 -> 10.5 for PLA. L is the only quadratic lever, so it does
+# most of the work here: 1.11 % -> 0.51 %. The cost is visible, not structural —
+# the skirt now covers 11.5 of the 13.55 mm side, so the lid reads as most of
+# the case. Accepted deliberately; the alternative is a case that cracks.
+SNAP_ENGAGE_DEPTH = 10.5
 
 # Panel width. Force scales with w, and at w=18/L=7 closing the lid needed an
 # estimated ~150 N in PLA — you would bow the plate before the snaps deflected.
