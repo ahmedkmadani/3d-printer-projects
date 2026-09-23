@@ -147,5 +147,13 @@ abstract class SyncService {
     required PairCodeRequest onPairCodeNeeded,
   });
 
+  /// Break the bond on the DEVICE, so the next pairing needs fresh digits.
+  ///
+  /// Throws if the device cannot be reached. That is deliberate: a forget that
+  /// only cleared the phone's own record left the Jota still trusting this
+  /// install for ever, because the app id minted at first run never changes.
+  /// "Forgotten" has to mean forgotten by both, or it means nothing.
+  Future<void> forgetOnDevice(String remoteId);
+
   Future<void> dispose();
 }

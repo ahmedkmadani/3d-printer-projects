@@ -10,8 +10,8 @@
 //  the two questions actually asked on opening the app — "how was my week" and
 //  "is the device fine" — and carries the findings on the way past.
 //
-//  The device chip above the nav answers the second question, so this screen
-//  does not repeat it.
+//  The device card, first under the hairline, answers the second question —
+//  and tapping it syncs.
 //
 //  Laid out against the design lock (docs/brand.md and the Jota Design Lock
 //  sheet): serif title, the two figures, a hairline, then two field-coloured
@@ -31,6 +31,7 @@ import '../insights/insights.dart';
 import '../state/notes_controller.dart';
 import 'note_detail_screen.dart';
 import 'patterns_screen.dart';
+import 'widgets/device_card.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, this.onSeeNotes});
@@ -79,7 +80,8 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: JotaGrid.gapL),
           const JotaRule(),
           const SizedBox(height: JotaGrid.gapL),
-
+          const DeviceCard(),
+          const SizedBox(height: JotaGrid.gapL),
           if (week.topics.isEmpty)
             _NothingYet(hasNotes: notes.notes.isNotEmpty)
           else
@@ -91,7 +93,6 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
-
           if (week.latest != null) ...<Widget>[
             const SizedBox(height: JotaGrid.gapL),
             _LatestCard(
@@ -174,7 +175,7 @@ class _Figures extends StatelessWidget {
       children: <Widget>[
         _Figure(value: '${week.noteCount}', unit: 'NOTES'),
         const SizedBox(width: JotaGrid.gapXL),
-        _Figure(value: '${week.totalMinutes}', unit: 'MINUTES'),
+        _Figure(value: week.spokenValue, unit: week.spokenUnit),
       ],
     );
   }
@@ -311,8 +312,7 @@ class _LatestCard extends StatelessWidget {
             // Inverted, as the sheet draws it: on a card that holds exactly one
             // note, the pill is the note's own mark rather than one of a set
             // you are choosing between.
-            if (note.tag != null)
-              JotaTagPill(label: note.tag!, selected: true),
+            if (note.tag != null) JotaTagPill(label: note.tag!, selected: true),
           ],
         ),
         NoteText(

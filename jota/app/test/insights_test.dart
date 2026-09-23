@@ -25,6 +25,33 @@ Note note(int id, {required int daysAgo, String? text, int secs = 60}) {
 }
 
 void main() {
+  test('a week of short notes does not report zero', () {
+    // 8 + 5 + 12 seconds. In minutes that rounds to zero, so the Home screen
+    // said "0 MINUTES" for a week that had three real notes in it — a figure
+    // that is arithmetically right and reports nothing. Most thoughts worth
+    // catching take seconds to say, so seconds is the honest unit down here.
+    const WeekSummary w = WeekSummary(
+      noteCount: 3,
+      totalSeconds: 25,
+      topics: <Topic>[],
+      latest: null,
+    );
+    expect(w.spokenValue, '25');
+    expect(w.spokenUnit, 'SECONDS');
+  });
+
+  test('a real week still reports minutes', () {
+    const WeekSummary w = WeekSummary(
+      noteCount: 4,
+      totalSeconds: 305,
+      topics: <Topic>[],
+      latest: null,
+    );
+    expect(w.spokenValue, '5');
+    expect(w.spokenUnit, 'MINUTES');
+  });
+
+
   test('this week counts notes and minutes, not the whole window', () {
     final WeekSummary s = summarise(
       <Note>[

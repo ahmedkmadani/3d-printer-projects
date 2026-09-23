@@ -16,6 +16,8 @@ import 'package:jota/ble/sync_service.dart';
 import 'package:jota/data/settings_store.dart';
 import 'package:jota/preview/preview_services.dart';
 import 'package:jota/preview/seed_data.dart';
+import 'package:jota/state/device_controller.dart';
+import 'package:jota/state/notes_controller.dart';
 import 'package:jota/state/services.dart';
 
 Future<Services> boot() async {
@@ -52,6 +54,85 @@ void main() {
     // reconnecting is silent.
     await services.sync.run(kPreviewDeviceId, onPairCodeNeeded: code);
     expect(prompts, 1, reason: 'the owner must never be asked again');
+  });
+
+  test('forgetting the device makes the next pairing ask again', () async {
+    final Services services = await boot();
+
+    int prompts = 0;
+    Future<String?> code() async {
+      prompts++;
+      return kPreviewPairCode;
+    }
+
+    await services.sync.run(kPreviewDeviceId, onPairCodeNeeded: code);
+    expect(prompts, 1);
+
+    // The bond holds, so no second prompt.
+    await services.sync.run(kPreviewDeviceId, onPairCodeNeeded: code);
+    expect(prompts, 1);
+
+    // Forget must reach the DEVICE. Clearing only the phone's own record left
+    // the Jota still trusting this install for ever — the app id minted at
+    // first run never changes — so the next connect authenticated silently and
+    // "unpaired" meant nothing. If this test ever passes with the device-side
+    // call removed, the bug is back.
+    await services.sync.forgetOnDevice(kPreviewDeviceId);
+
+    await services.sync.run(kPreviewDeviceId, onPairCodeNeeded: code);
+    expect(
+      prompts,
+      2,
+      reason: 'after forgetting, the device must demand the digits again',
+    );
+  });
+
+  test('a failed pairing does not leave a device recorded as paired', () async {
+    final Services services = await boot();
+    final NotesController notes = NotesController(
+      repository: services.notes,
+      transcription: services.transcription,
+    );
+    addTearDown(notes.dispose);
+    final DeviceController device = DeviceController(
+      settings: services.settings,
+      scanner: services.scanner,
+      sync: services.sync,
+      background: services.background,
+      notes: notes,
+    );
+    addTearDown(device.dispose);
+
+    await device.startScan();
+    for (int i = 0; i < 60 && device.inRange.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    expect(device.inRange, isNotEmpty, reason: 'the fake must advertise');
+    final JotaAdvertisement ad = device.inRange.first;
+
+    // Start pairing, wait for it to ask, then decline — nobody types the code.
+    final Future<bool> pairing = device.pairWith(ad);
+    for (int i = 0; i < 60 && !device.needsPairCode; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    expect(device.needsPairCode, isTrue, reason: 'it must ask for the code');
+
+    // While it is asking, the pairing is still in flight — and this is the
+    // flag Connect uses to stay put instead of jumping to Home.
+    expect(device.isPairing, isTrue);
+
+    device.submitPairCode(null);
+    final bool bonded = await pairing;
+    expect(bonded, isFalse);
+
+    // The bug: the id was written down BEFORE the handshake and never taken
+    // back, so the app claimed a Jota it had never actually paired with — and
+    // Connect, seeing hasPairedDevice, walked straight past the code prompt.
+    expect(
+      device.hasPairedDevice,
+      isFalse,
+      reason: 'a pairing that never bonded must leave nothing behind',
+    );
   });
 
   test('a wrong code is refused and moves no notes', () async {

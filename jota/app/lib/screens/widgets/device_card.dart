@@ -90,7 +90,16 @@ class DeviceCard extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: () => _tapped(context),
         child: Container(
-          padding: const EdgeInsets.all(JotaGrid.gapM + JotaGrid.unit),
+          // The design draws this card taller than Home's other two: the
+          // figure is the point of it. Sized so it stays that height in every
+          // state — on the first real install the charge was unknown and the
+          // device out of range, the figure slot went empty, and the card
+          // shrank to one line, which is the chip it replaced, only filled.
+          constraints: const BoxConstraints(minHeight: 88),
+          padding: const EdgeInsets.symmetric(
+            horizontal: JotaGrid.gapL,
+            vertical: JotaGrid.gapM + JotaGrid.unit,
+          ),
           decoration: BoxDecoration(
             color: c.field,
             borderRadius: const BorderRadius.all(
@@ -125,7 +134,7 @@ class DeviceCard extends StatelessWidget {
                   if (line.figure != null) ...<Widget>[
                     Text(
                       line.figure!,
-                      style: t.figure.copyWith(fontSize: 26, height: 1),
+                      style: t.figure.copyWith(fontSize: 34, height: 1),
                     ),
                     const SizedBox(height: JotaGrid.unit),
                   ],
@@ -190,9 +199,10 @@ class _DeviceLine {
   /// Right, large: the one figure worth a glance — the charge when the device
   /// is quiet, the count when it is holding notes for you.
   ///
-  /// Null when there is nothing honest to print. The charge is unknown on
-  /// every device built so far, because BATTERY_ADC_PIN is still -1 and the
-  /// panel has no figure to give. Inventing one would be worse than a gap.
+  /// A dash when the charge is unknown — which it is on every device built so
+  /// far, because BATTERY_ADC_PIN is still -1 and the panel has no figure to
+  /// give. A dash is an honest gap; a number would be an invented one. Null
+  /// only when there is no device to have a figure.
   final String? figure;
 
   /// Right, small: HOW it is, in caps.
@@ -201,9 +211,9 @@ class _DeviceLine {
   final bool present;
   final bool busy;
 
-  static String? _charge(DeviceController device) {
+  static String _charge(DeviceController device) {
     final int? pct = device.batteryOnDevice;
-    return pct == null ? null : '$pct%';
+    return pct == null ? '—' : '$pct%';
   }
 
   static _DeviceLine of(DeviceController device) {
@@ -211,7 +221,7 @@ class _DeviceLine {
       return const _DeviceLine(name: 'NO JOTA', status: 'TAP TO CONNECT');
     }
     final String name = device.pairedName;
-    final String? charge = _charge(device);
+    final String charge = _charge(device);
 
     if (device.isSyncing) {
       return _DeviceLine(
@@ -223,10 +233,14 @@ class _DeviceLine {
       );
     }
     if (device.adapter == AdapterStatus.unauthorized) {
-      return _DeviceLine(name: name, status: 'NEEDS PERMISSION');
+      return _DeviceLine(
+        name: name,
+        figure: charge,
+        status: 'NEEDS PERMISSION',
+      );
     }
     if (!device.bluetoothReady) {
-      return _DeviceLine(name: name, status: 'BLUETOOTH OFF');
+      return _DeviceLine(name: name, figure: charge, status: 'BLUETOOTH OFF');
     }
 
     final int? pending = device.pendingOnDevice;
@@ -248,7 +262,7 @@ class _DeviceLine {
     return _DeviceLine(
       name: name,
       figure: '$pending',
-      status: charge == null ? 'WAITING' : 'WAITING · $charge',
+      status: 'WAITING · $charge',
       present: true,
     );
   }

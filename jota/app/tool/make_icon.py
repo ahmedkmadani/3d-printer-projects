@@ -3,23 +3,31 @@
 
     .venv/bin/python jota/app/tool/make_icon.py
 
-The mark is a circle with `Jota` inside it (docs/brand.md). This draws the SAME
-geometry lib/design/mark.dart draws — ink ring, serif word, proportional stroke
-— from the same bundled Plex Serif, so the icon and the in-app mark cannot
-drift apart.
+The circle is your head; the dots are the thoughts in it. `Jota` is Sudanese
+Arabic for *many thoughts, all at once* (docs/brand.md), and a scatter of
+unequal dots says that where a single centred dot says the opposite — one
+thought, tidily held.
 
-Inverted for the launcher: an outlined ring on paper disappears against a light
-wallpaper, and a launcher icon has to hold its own shape against anything. So
-the disc is ink and the word is knocked out, which is the same inversion the
-product uses for "selected" everywhere else.
+Five dots, one dominant and four lesser, at unequal sizes and unequal
+distances. The irregularity is the point: evenly spaced dots of one size read
+as a loading indicator or a dot-matrix, and brand.md rules both out.
+
+Paper, not ink, and no ring — the light treatment, rather than the filled disc
+with the word knocked out that this file used to draw. The cost is known: on a
+pale wallpaper the disc's edge nearly disappears, so what a person sees is the
+dots floating rather than a badge.
+
+The smallest dot is what decides this icon. At mdpi the disc is 48 px and that
+dot is under 4 px, so every position and radius below is held clear of the rim
+and checked at 48 before anything else — a scatter that dissolves into grey
+mush at the size most launchers actually draw is not a mark.
 """
 import os
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = os.path.dirname(HERE)
-FONT = os.path.join(APP, "assets", "fonts", "IBMPlexSerif-Regular.ttf")
 RES = os.path.join(APP, "android", "app", "src", "main", "res")
 
 INK = (35, 32, 28, 255)      # #23201C
@@ -34,9 +42,29 @@ SIZES = {
     "mipmap-xxxhdpi": 192,
 }
 
-# Supersample, then downsample: the ring and the serif stems are thin enough
-# that drawing them straight at 48px gives a stair-stepped circle.
+# Supersample, then downsample: at mdpi the smallest dot is under 4 px across,
+# and drawn straight at that size it is a square.
 SS = 8
+
+# The scatter, as (centre x, centre y, radius) in FRACTIONS of the diameter, so
+# one set of numbers serves every density. Ordered largest first.
+#
+# Held inside radius 0.33 of centre: the furthest dot's outer edge lands at
+# 0.37 against the disc's 0.48, which keeps the whole mark clear of whatever
+# shape a launcher masks it into.
+#
+# NO TWO DOTS SHARE A HEIGHT, and no pair mirrors across the vertical axis.
+# That is not fussiness. The first arrangement had two dots level either side
+# of a large central one, with two more level below, and it read unmistakably
+# as a face — eyes, nose, mouth. Tidying these numbers into anything
+# symmetrical brings the face straight back.
+DOTS = (
+    (0.395, 0.415, 0.098),
+    (0.585, 0.600, 0.070),
+    (0.660, 0.335, 0.055),
+    (0.315, 0.640, 0.040),
+    (0.470, 0.235, 0.030),
+)
 
 
 def render(px: int) -> Image.Image:
@@ -46,24 +74,16 @@ def render(px: int) -> Image.Image:
 
     # A hair inside the canvas so the disc's own edge is not clipped by it.
     pad = n * 0.02
-    d.ellipse([pad, pad, n - pad, n - pad], fill=INK)
+    d.ellipse([pad, pad, n - pad, n - pad], fill=PAPER)
 
-    # Same proportion as JotaMark: the word fills a little under a third of the
-    # diameter. Measured and centred on the INK BOX rather than the font's
-    # metrics — a serif's ascent leaves the word visibly high otherwise.
-    font = ImageFont.truetype(FONT, int(n * 0.30))
-    box = d.textbbox((0, 0), "Jota", font=font)
-    w, h = box[2] - box[0], box[3] - box[1]
-    d.text((n / 2 - w / 2 - box[0], n / 2 - h / 2 - box[1]), "Jota",
-           font=font, fill=PAPER)
+    for cx, cy, r in DOTS:
+        x, y, rad = cx * n, cy * n, r * n
+        d.ellipse([x - rad, y - rad, x + rad, y + rad], fill=INK)
 
     return img.resize((px, px), Image.LANCZOS)
 
 
 def main() -> None:
-    if not os.path.exists(FONT):
-        raise SystemExit(f"font not found: {FONT}")
-
     for folder, px in SIZES.items():
         out_dir = os.path.join(RES, folder)
         os.makedirs(out_dir, exist_ok=True)

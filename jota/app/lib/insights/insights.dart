@@ -57,6 +57,21 @@ class WeekSummary {
   final Note? latest;
 
   int get totalMinutes => (totalSeconds / 60).round();
+
+  /// The spoken figure and the unit it is in.
+  ///
+  /// Minutes alone cannot report this. Three notes of 8, 5 and 12 seconds are
+  /// 25 seconds, which rounds to ZERO minutes — so a week with real notes in it
+  /// read as "0 MINUTES" and looked like nothing had been captured at all. The
+  /// figure was arithmetically right and completely useless, which is worse
+  /// than wrong: it is wrong in a way that looks deliberate.
+  ///
+  /// Under a minute, say seconds. That is also the honest unit for this
+  /// product — most thoughts worth catching take a few seconds to say.
+  String get spokenValue =>
+      totalSeconds < 60 ? '$totalSeconds' : '$totalMinutes';
+
+  String get spokenUnit => totalSeconds < 60 ? 'SECONDS' : 'MINUTES';
   bool get isEmpty => noteCount == 0;
 }
 

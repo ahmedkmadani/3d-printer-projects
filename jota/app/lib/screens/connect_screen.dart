@@ -93,10 +93,23 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // Paired and not mid-prompt: this step is done. Move on by itself rather
-      // than making someone confirm what they can already see happened.
-      if (device.hasPairedDevice && !wantsCode) _onwards();
-      if (wantsCode && !_codeFocus.hasFocus) _codeFocus.requestFocus();
+      // Bonded, and not mid-prompt: this step is done. Move on by itself
+      // rather than making someone confirm what they can already see happened.
+      //
+      // `isPairing` is the fix for a real defect: hasPairedDevice goes true as
+      // soon as the id is written down, which is BEFORE the handshake, so this
+      // fired mid-pairing and replaced the screen with Home. The code prompt
+      // then had nowhere to appear and Home raised a second one on top.
+      if (device.hasPairedDevice && !wantsCode && !device.isPairing) {
+        _onwards();
+      }
+      // Never grab the keyboard from a screen that is sitting on top of this
+      // one.
+      final ModalRoute<Object?>? route = ModalRoute.of(context);
+      final bool visible = route == null || route.isCurrent;
+      if (wantsCode && visible && !_codeFocus.hasFocus) {
+        _codeFocus.requestFocus();
+      }
     });
 
     final List<JotaAdvertisement> found = device.inRange;

@@ -33,6 +33,19 @@ class DeviceController extends ChangeNotifier {
         _notes = notes {
     _progressSub = _sync.progress.listen((SyncProgress p) {
       _progress = p;
+      // Pairing is DONE the moment the handshake is behind us — the bond is
+      // stored on the device from that instant. Waiting for the whole first
+      // sync meant sitting on the pairing screen through every note transfer,
+      // which on a first pairing is the longest sync there will ever be, with
+      // nothing on screen explaining the wait. The transfer carries on; Home
+      // is where it belongs, because Home has the progress chip.
+      if (_pairing &&
+          p.phase != SyncPhase.connecting &&
+          p.phase != SyncPhase.authenticating &&
+          p.phase != SyncPhase.idle &&
+          p.phase != SyncPhase.failed) {
+        _pairing = false;
+      }
       notifyListeners();
       if (p.phase == SyncPhase.done) {
         // Notes are on disk; get the text moving without blocking the UI.
@@ -156,14 +169,42 @@ class DeviceController extends ChangeNotifier {
 
   // ---- pairing -------------------------------------------------------------
 
-  Future<void> pairWith(JotaAdvertisement ad) async {
+  /// True from the moment a pairing is attempted until it has settled.
+  ///
+  /// Connect needs this because `hasPairedDevice` goes true the instant an id
+  /// is WRITTEN DOWN, which happens before a single byte has been exchanged.
+  /// Treating that as "paired" made the Connect screen replace itself with
+  /// Home while the handshake was still running, so the code prompt arrived
+  /// with nowhere to appear.
+  bool get isPairing => _pairing;
+  bool _pairing = false;
+
+  /// Returns true only when the bond was actually made.
+  Future<bool> pairWith(JotaAdvertisement ad) async {
+    _pairing = true;
     // Store the id-bearing name, not the bare local name: every Jota advertises
     // as "JOTA", so remembering that tells you nothing later. `JOTA-91C4` is the
     // same four characters the device prints on its own screen.
     await _settings.setDevice(ad.remoteId, name: ad.shortName);
     notifyListeners();
     _autoSyncBlocked = false;
-    await syncNow();
+    try {
+      final SyncResult? r = await syncNow();
+      // The handshake is what "paired" means. Notes may still have failed to
+      // move — that is a transfer problem, not a pairing one, and it must not
+      // undo a bond the device has already stored.
+      final bool bonded = r != null && r.ok;
+      if (!bonded) {
+        // Never leave a device recorded as paired when the bond was never
+        // made. Otherwise a wrong code leaves the app claiming a Jota it
+        // cannot talk to, and every screen afterwards lies about it.
+        await _settings.setDevice(null);
+      }
+      return bonded;
+    } finally {
+      _pairing = false;
+      notifyListeners();
+    }
   }
 
   /// What to call the paired device in the UI. Prefers what it is broadcasting
@@ -175,9 +216,40 @@ class DeviceController extends ChangeNotifier {
   /// Jota belongs to.
   String get appId => _settings.appId;
 
-  Future<void> forgetDevice() async {
+  /// Forget the paired Jota.
+  ///
+  /// By default this needs the device in range, because forgetting has to mean
+  /// the same thing on both sides. This used to clear only the phone's own
+  /// record — and since the app id minted at install never changes, the very
+  /// next connection matched the stored owner and authenticated silently. A
+  /// person who unpaired in order to hand the Jota on had changed nothing.
+  ///
+  /// [force] is the way out when the device is lost, flat, broken or already
+  /// given away. It clears this side only and returns false, so the caller can
+  /// say plainly what is left behind: that Jota keeps trusting this phone until
+  /// it is erased on the device itself.
+  ///
+  /// Returns true when both sides were cleared.
+  Future<bool> forgetDevice({bool force = false}) async {
+    final String? id = pairedId;
+    if (id == null) return true;
+
+    bool onDevice = false;
+    try {
+      await _sync.forgetOnDevice(id);
+      onDevice = true;
+    } on Exception catch (e) {
+      if (!force) {
+        _lastError = e is SyncException ? e.message : e.toString();
+        notifyListeners();
+        rethrow;
+      }
+    }
+
     await _settings.setDevice(null);
+    _lastError = null;
     notifyListeners();
+    return onDevice;
   }
 
   /// Called by the pair screen when the user has typed the six digits.
@@ -247,23 +319,24 @@ class DeviceController extends ChangeNotifier {
       _syncStarting = false;
     }
 
-    // App-first tags: the phone owns the tag list, so push it to the device on
-    // every successful sync (covers tags added while it was out of range).
-    if (result.ok) {
-      try {
-        await _sync.writeTags(
-          id,
-          _settings.tags,
-          onPairCodeNeeded: _neverPrompt,
-        );
-      } on Exception catch (_) {
-        // Non-fatal: tags will try again next sync.
-      }
-    }
+    // Tags are NOT pushed here any more. This ran only when result.ok, and it
+    // opened a SECOND connection to do it — so while transfers were failing
+    // the device never received the list at all, and when they succeeded it
+    // paid for another connect. The push now happens inside the sync itself,
+    // on the connection that is already open and already authenticated.
+    //
+    // It also sent the whole list, without the kDeviceTagSlots cap that the
+    // manual path applies, leaving the two routes disagreeing about what the
+    // device should hold.
 
     if (!result.ok) _lastError = result.error;
     if (result.notesAdded > 0) await _notes.refresh();
-    if (wasScanning) await _scanner.start(timeout: null);
+    // Put the scan back whenever the app is on screen, not only when one
+    // happened to be running. A sync stops the scan, and if the scan had
+    // already timed out by then nothing ever restarted it — so the app went
+    // permanently blind to a device it had JUST finished talking to, and the
+    // chip settled on NOT IN RANGE.
+    if (wasScanning || _foreground) await _scanner.start(timeout: null);
     notifyListeners();
     return result;
   }
@@ -297,7 +370,18 @@ class DeviceController extends ChangeNotifier {
 
     // One failure parks the automatic path until something changes: the user
     // taps sync, or the app comes back to the foreground.
-    if (r != null && !r.ok) _autoSyncBlocked = true;
+    //
+    // "A sync that moved nothing" counts as a failure here, even though it
+    // raised no exception. A run where every transfer fails ends with ok=true
+    // and notesRemaining=3 — so this guard never engaged, and the app
+    // reconnected on every advertisement, a few seconds apart, for ever. Each
+    // attempt then held the radio for the better part of a minute, which is
+    // what made the app feel slow AND kept the device connected, so it stopped
+    // advertising and the chip flipped to NOT IN RANGE while the panel still
+    // said LINKED.
+    final bool movedNothing =
+        r != null && r.notesAdded == 0 && r.notesRemaining > 0;
+    if (r != null && (!r.ok || movedNothing)) _autoSyncBlocked = true;
   }
 
   /// True while the app is on screen. Set by the shell.
@@ -309,6 +393,15 @@ class DeviceController extends ChangeNotifier {
   void resumeAutoSync({bool foreground = true}) {
     _foreground = foreground;
     _autoSyncBlocked = false;
+    if (!foreground) {
+      // A continuous scan is the right thing while someone is looking at the
+      // app and the wrong thing in their pocket. Backgrounded, the device
+      // wakes us by advertising instead — see the app README on why a timer
+      // does not work on either phone OS.
+      unawaited(_scanner.stop());
+      return;
+    }
+    unawaited(startScan(timeout: null));
     unawaited(_maybeAutoSync());
   }
 

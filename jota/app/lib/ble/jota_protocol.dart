@@ -403,6 +403,20 @@ abstract final class JotaPayload {
     return Uint8List.fromList(utf8.encode(jsonEncode(body)));
   }
 
+  /// `auth` — "forget this phone", asked for by the phone that IS the owner.
+  ///
+  ///     {"app":"9f2c…","forget":true}
+  ///
+  /// It rides on `auth` because only the owner may ask, and `auth` is the one
+  /// characteristic that already establishes who is asking. The device clears
+  /// the stored bond and drops back to unowned, so the NEXT pairing needs six
+  /// fresh digits off the panel — which is the whole point of forgetting.
+  static Uint8List forget(String appId) {
+    return Uint8List.fromList(
+      utf8.encode(jsonEncode(<String, Object>{'app': appId, 'forget': true})),
+    );
+  }
+
   /// `clock` — Unix seconds as a decimal string, not a binary integer.
   static Uint8List clock(DateTime at) {
     final int secs = at.millisecondsSinceEpoch ~/ 1000;

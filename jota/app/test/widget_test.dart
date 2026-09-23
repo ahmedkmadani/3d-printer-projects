@@ -17,7 +17,7 @@ import 'package:jota/design/widgets.dart';
 import 'package:jota/preview/preview_services.dart';
 import 'package:jota/screens/note_detail_screen.dart';
 import 'package:jota/screens/connect_screen.dart';
-import 'package:jota/screens/widgets/device_chip.dart';
+import 'package:jota/screens/widgets/device_card.dart';
 import 'package:jota/state/services.dart';
 
 /// Boots the preview graph and guarantees its timers are cancelled, so a test
@@ -79,7 +79,12 @@ void main() {
     // The row leads with WHEN, not with an id: you reach for a note by the
     // afternoon it came from, never by its number. The id and duration still
     // exist on the note itself.
-    expect(find.textContaining(' AUG · '), findsWidgets);
+    // The seed is relative to today, so the month is whatever month it is:
+    // matching ' AUG · ' made this test expire on 1 September.
+    expect(
+      find.textContaining(RegExp(r'^[A-Z]{3} \d{1,2} [A-Z]{3} · \d{2}:\d{2}')),
+      findsWidgets,
+    );
     expect(find.byType(JotaTagPill), findsWidgets);
 
     // A transcript, rendered as prose in the row preview.
@@ -156,7 +161,7 @@ void main() {
     await quiesce(tester, services);
   });
 
-  testWidgets('the device chip opens the sync screen and finds a Jota', (
+  testWidgets('the device card opens Connect and finds a Jota', (
     WidgetTester tester,
   ) async {
     final Services services = await bootPreview(tester);
@@ -164,10 +169,10 @@ void main() {
     await pumpAwake(tester);
 
     // Sync is not a place you go (product.md), so there is no sync screen to
-    // reach any more. With nothing paired the chip has something to go TO —
+    // reach any more. With nothing paired the card has something to go TO —
     // pairing — so it opens Connect. Once a device IS paired the same tap
     // simply syncs, in place.
-    await tester.tap(find.byType(DeviceChip));
+    await tester.tap(find.byType(DeviceCard));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 

@@ -43,7 +43,13 @@ class _NoteListScreenState extends State<NoteListScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // A scan on open is what makes "put it on the desk and it syncs" true
       // while the app is in the foreground.
-      context.read<DeviceController>().startScan();
+      //
+      // No timeout, deliberately. The default 15 seconds meant the app knew
+      // where the Jota was for a quarter of a minute after this tab opened and
+      // never again — so the chip said NOT IN RANGE while the device sat next
+      // to it, and only a trip away from this tab and back would fix it.
+      // Presence is a live fact; it has to be watched, not sampled once.
+      context.read<DeviceController>().startScan(timeout: null);
       context.read<NotesController>().drainTranscriptions();
     });
   }
@@ -51,7 +57,7 @@ class _NoteListScreenState extends State<NoteListScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
-      context.read<DeviceController>().startScan();
+      context.read<DeviceController>().startScan(timeout: null);
       context.read<NotesController>().drainTranscriptions();
     }
   }

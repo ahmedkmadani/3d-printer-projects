@@ -6,6 +6,8 @@
 //  explicit service UUID.
 // ============================================================================
 import 'dart:async';
+
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'dart:io' show Platform;
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -123,17 +125,49 @@ class JotaScanner implements DeviceScanner {
       ads.sort(
         (JotaAdvertisement a, JotaAdvertisement b) => b.rssi.compareTo(a.rssi),
       );
+      // "Jota is not in range" is a claim about the radio, and it was being
+      // made with nothing written down. Log what the scan actually saw, so an
+      // empty list can be told apart from a scan that never ran and from a
+      // Jota whose advertisement did not parse.
+      if (ads.isEmpty) {
+        debugPrint(
+          'jota/ble  scan  ${results.length} device(s), no Jota among them',
+        );
+      } else {
+        final String seen = ads.map((JotaAdvertisement a) {
+          return '${a.remoteId} rssi=${a.rssi} pending=${a.pending} '
+              'paired=${a.paired}';
+        }).join(' | ');
+        debugPrint('jota/ble  scan  $seen');
+      }
       if (!_found.isClosed) _found.add(ads);
     });
 
+    debugPrint('jota/ble  scan  starting (timeout=$timeout)');
+    // NO withServices filter, and that is deliberate.
+    //
+    // The platform filter is applied by the Android BLE stack before anything
+    // reaches Dart, so when it fails to match it fails SILENTLY: the scanner
+    // registers, reports success, and simply never delivers a result. There is
+    // no error to catch and nothing to log — which is exactly what "Jota is
+    // not in range" looked like while the device sat there advertising at
+    // rssi -44.
+    //
+    // Jota's UUID is 128-bit, which with the manufacturer data and flags puts
+    // the advertisement within a couple of bytes of the 31-byte limit, so
+    // whether the UUID survives into the advertising packet rather than the
+    // scan response is not something the app should be betting on.
+    //
+    // Filtering in Dart costs a few more callbacks per second and removes the
+    // whole class of failure. JotaAdvertisement.from() already ignores
+    // anything that is not a Jota.
     await FlutterBluePlus.startScan(
-      withServices: <Guid>[JotaUuid.service],
       timeout: timeout,
       continuousUpdates: continuousUpdates,
       // Report a device as gone if it has not advertised for a while, so the
       // list does not accumulate ghosts.
       removeIfGone: continuousUpdates ? const Duration(seconds: 20) : null,
-      androidScanMode: AndroidScanMode.balanced,
+      androidScanMode: AndroidScanMode.lowLatency,
     );
   }
 

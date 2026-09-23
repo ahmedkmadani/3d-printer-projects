@@ -200,6 +200,12 @@ class JotaLink {
     return c.onValueReceived;
   }
 
+  /// Break the bond from this side. The caller must already be the owner.
+  Future<void> forgetMe(String appId) async {
+    final BluetoothCharacteristic c = _require(JotaUuid.auth, 'auth');
+    await c.write(JotaPayload.forget(appId));
+  }
+
   /// Ask for note [id] starting at [offset] bytes in.
   ///
   /// `offset` 0 is a fresh transfer; anything else is a resume and the device

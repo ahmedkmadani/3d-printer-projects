@@ -37,6 +37,7 @@ import '../security/local_authenticator.dart';
 import '../transcribe/transcriber.dart';
 import '../transcribe/transcription_queue.dart';
 import '../transcribe/google_stt_transcriber.dart';
+import '../transcribe/whisper_transcriber.dart';
 
 class Services {
   Services({
@@ -95,6 +96,11 @@ class Services {
     // The transcriber is rebuilt per use so a key or model changed in settings
     // takes effect on the very next note, with no restart and no stale client.
     Transcriber buildTranscriber() {
+      // On device first, because it is the only backend that can promise the
+      // audio never leaves the phone — and problem.md calls that a functional
+      // requirement, not a feature. English only for now; Sudanese Arabic
+      // still needs a cloud model until Gemma 3n is wired up.
+      if (settings.backend == 'device') return WhisperTranscriber();
       if (settings.backend != 'google') return const UnconfiguredTranscriber();
       return GoogleSttTranscriber(
         apiKey: settings.apiKey,

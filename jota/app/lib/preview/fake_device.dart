@@ -389,6 +389,18 @@ class FakeSyncService implements SyncService {
   }
 
   @override
+  Future<void> forgetOnDevice(String remoteId) async {
+    // The fake has to drop the bond exactly as the firmware does, or the tests
+    // pass on a device that behaves differently from the real one. Clearing
+    // only the phone's record is the bug this method exists to fix.
+    if (_device.ownerAppId != _settings.appId) {
+      throw const SyncException('this phone does not own that Jota');
+    }
+    _device.ownerAppId = null;
+    _device.paired = false;
+  }
+
+  @override
   Future<List<String>> readTags(
     String remoteId, {
     required PairCodeRequest onPairCodeNeeded,

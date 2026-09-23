@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../design/mark.dart';
 import '../design/theme.dart';
 import '../state/services.dart';
 import 'home_shell.dart';
@@ -46,7 +47,17 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
     // A visual beat, not real work — the graph is already booted before runApp.
-    _hold = Timer(const Duration(milliseconds: 900), _go);
+    //
+    // 2.6s, not the 900ms this was. The mark drifts on 9-to-17-second cycles,
+    // and at 900ms it had not visibly moved: the animation was there and no one
+    // ever saw it. This is long enough to register as movement and to let a
+    // person arrive before the app asks anything of them, which is the point —
+    // Jota is for catching a thought, and being hurried is how you lose one.
+    //
+    // It is deliberately NOT long enough to become a toll. If this ever needs
+    // to be longer, speed the drift instead; a splash that outstays its welcome
+    // is paid on every single launch.
+    _hold = Timer(const Duration(milliseconds: 2600), _go);
   }
 
   @override
@@ -80,7 +91,12 @@ class _SplashScreenState extends State<SplashScreen>
           opacity: _fade,
           child: Column(
             children: <Widget>[
-              // Just the wordmark, dead centre. No rule.
+              // The mark, drifting, above the wordmark.
+              //
+              // The splash is the one screen with nothing to do, which makes it
+              // the only place the drift can be watched rather than glanced at
+              // — and it is the same mark, and the same five dots, as the icon
+              // the person just tapped to get here.
               //
               // `Jota`, not `JOTA`. The serif wordmark is the name and the name
               // is capital-J-lowercase (docs/brand.md); the all-caps form is the
@@ -88,7 +104,16 @@ class _SplashScreenState extends State<SplashScreen>
               // `JOTA-91C4` is built from. Setting the identifier in the serif
               // face made the splash the one place the two forms were confused.
               Expanded(
-                child: Center(child: Text('Jota', style: t.wordmark)),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      const JotaMarkDrifting(size: 132),
+                      const SizedBox(height: JotaGrid.gapL),
+                      Text('Jota', style: t.wordmark),
+                    ],
+                  ),
+                ),
               ),
               // Version pinned to the bottom, small and quiet.
               Padding(

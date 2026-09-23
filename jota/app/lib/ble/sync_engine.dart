@@ -20,6 +20,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../audio/adpcm.dart';
@@ -33,6 +35,18 @@ import 'jota_link.dart';
 import 'jota_protocol.dart';
 import 'jota_scanner.dart';
 import 'sync_service.dart';
+
+// Every step of a sync, on one tag, so a stalled run can be read off logcat:
+//
+//     adb logcat -s flutter | grep jota/ble
+//
+// This file had no logging at all, and the cost was days: a sync that read the
+// index and then quietly stopped looked identical from the outside whether the
+// device sent nothing, the parse returned nothing, or a subscribe threw. All
+// three were guessed at before any of them was measured.
+void _log(String step, [Object? detail]) {
+  debugPrint('jota/ble  $step${detail == null ? '' : '  $detail'}');
+}
 
 class SyncEngine implements SyncService {
   SyncEngine({
@@ -185,6 +199,30 @@ class SyncEngine implements SyncService {
       );
       await link.setClock();
 
+      // ---- tags ----------------------------------------------------------
+      // The phone owns the tag list; the device holds a copy so it can offer
+      // them in the seconds after a recording. Pushing it HERE, as part of
+      // every authenticated connection, is the fix for a real bug: it used to
+      // happen only after a sync had completed successfully, so while
+      // transfers were failing the device kept whatever list it had — in
+      // practice a single leftover test tag — and the defaults never landed.
+      // Tags that only arrive once the thing they annotate already worked are
+      // no use to anyone.
+      //
+      // Only the top few travel. The device offers them one button-press at a
+      // time on a panel that takes two seconds to redraw, so its list is
+      // deliberately shorter than the app's — see kDeviceTagSlots.
+      try {
+        final List<String> want =
+            _settings.tags.take(kDeviceTagSlots).toList();
+        await link.writeTags(want);
+        _log('tags', 'pushed ${want.length}: $want');
+      } on Exception catch (e) {
+        // Never fatal. A device with a stale tag list still hands over audio,
+        // and that is the part that cannot wait.
+        _log('tags', 'push failed (not fatal): $e');
+      }
+
       // ---- index --------------------------------------------------------
       _emit(
         const SyncProgress(
@@ -193,6 +231,11 @@ class SyncEngine implements SyncService {
         ),
       );
       final List<JotaNoteIndexEntry> index = await link.readIndex();
+      _log('index', '${index.length} note(s): '
+          '${index.map((JotaNoteIndexEntry e) => '#${e.id}/${e.bytes}b').join(', ')}');
+      if (index.isEmpty) {
+        _log('index', 'EMPTY - nothing to fetch, this run ends here');
+      }
 
       // Drop partials for notes the device no longer offers — deleted on the
       // device, or acked in a run whose bookkeeping we lost.
@@ -204,9 +247,12 @@ class SyncEngine implements SyncService {
       // ---- data subscription, ONCE for the session ----------------------
       // Opened before the first `fetch` and kept for every note, so there is no
       // window in which a chunk can arrive unobserved.
+      _log('subscribe', 'opening data notifications');
       final Stream<List<int>> dataStream = await link.openDataStream();
+      _log('subscribe', 'open');
 
       final List<int> known = (await _notes.knownIds(deviceId)).toList();
+      _log('known', '${known.length} already stored: $known');
 
       _emit(
         SyncProgress(
@@ -227,6 +273,7 @@ class SyncEngine implements SyncService {
         if (known.contains(entry.id)) {
           final Note? have = await _notes.byId(deviceId, entry.id);
           if (have != null && have.crc == entry.crc) {
+            _log('skip', '#${entry.id} already stored byte-identical, re-acking');
             await link.sendAck(entry.id, entry.crc);
             added++;
             _emit(
@@ -242,6 +289,7 @@ class SyncEngine implements SyncService {
           }
         }
 
+        _log('transfer', 'starting #${entry.id} (${entry.bytes} bytes)');
         final bool ok = await _transferOne(
           link: link,
           dataStream: dataStream,
@@ -251,6 +299,7 @@ class SyncEngine implements SyncService {
           notesTotal: index.length,
         );
 
+        _log('transfer', '#${entry.id} ${ok ? 'complete' : 'INCOMPLETE'}');
         if (ok) {
           added++;
         } else {
@@ -267,11 +316,19 @@ class SyncEngine implements SyncService {
         ),
       );
 
+      _log('done', 'added=$added remaining=$remaining');
       return SyncResult(notesAdded: added, notesRemaining: remaining);
-    } on Exception catch (e) {
+    } on Exception catch (e, st) {
       // A failure here is routine, not exceptional: the user walked out of range.
       // Everything downloaded so far is on disk and the device still lists the
       // note, so the next connection continues.
+      //
+      // Routine is not the same as invisible, though. _humanise() throws away
+      // the type and the stack, and what reaches the screen is one soft line
+      // like "timed out" — which is why a sync that died inside the subscribe
+      // call was indistinguishable from a device with nothing to send.
+      _log('FAILED', '${e.runtimeType}: $e');
+      _log('FAILED', st.toString().split('\n').take(4).join(' | '));
       _emit(
         SyncProgress(
           phase: SyncPhase.failed,
@@ -307,7 +364,14 @@ class SyncEngine implements SyncService {
       expectedBytes: entry.bytes,
       crc: entry.crc,
       secs: entry.secs,
-      recordedAt: entry.time,
+      // A device that has never been told the time sends 0, and a note stamped
+      // 0 lands in 1970 — outside every window the app measures, so three real
+      // notes showed up as "0 notes, 0 minutes this week". The phone always
+      // knows the real time; when the device does not, the moment we received
+      // the note is the closest true thing we have.
+      recordedAt: entry.time > 0
+          ? entry.time
+          : DateTime.now().millisecondsSinceEpoch ~/ 1000,
     );
 
     // Where do we start? resumeOffset() rounds down to a 256-byte ADPCM block —
@@ -369,8 +433,29 @@ class SyncEngine implements SyncService {
       }
     });
 
+    // Disk writes are chained, and `received` moves BEFORE any await.
+    //
+    // This handler used to be `async` and await the append inline. Dart does
+    // not serialise async stream listeners: chunks arrive faster than a disk
+    // write completes, so several handlers ran at once, every one of them read
+    // the same stale `received`, and their appends interleaved. The byte count
+    // still reached the target — so nothing stalled and nothing threw — while
+    // the bytes on disk were out of order. Every note then failed its CRC and
+    // came back INCOMPLETE with no error to show for it.
+    //
+    // The laptop probe appends to an in-memory buffer synchronously, which is
+    // precisely why it could pull all three notes while the app could not pull
+    // one.
+    Future<void> writes = Future<void>.value();
+
+    // What actually came off the radio, so a CRC failure can be compared
+    // against a known-good capture instead of reasoned about.
+    int chunks = 0;
+    final List<int> firstBytes = <int>[];
+    final Set<int> chunkSizes = <int>{};
+
     final StreamSubscription<List<int>> dataSub = dataStream.listen(
-      (List<int> chunk) async {
+      (List<int> chunk) {
         if (done.isCompleted || chunk.isEmpty) return;
         resetStall();
 
@@ -379,11 +464,27 @@ class SyncEngine implements SyncService {
         // Clip a final chunk that overshoots the declared length rather than
         // writing bytes that are not part of the note.
         final int room = entry.bytes - received;
-        final List<int> use =
-            chunk.length > room ? chunk.sublist(0, room) : chunk;
+        if (room <= 0) return;
+        // OWN the bytes. `chunk` belongs to the platform channel and must not
+        // be held across an await — the write below is queued, so by the time
+        // it runs the underlying buffer may already carry a later
+        // notification. sublist() copies, but the unclipped path did not, so
+        // the common case was handing the file a reference to memory that was
+        // still moving.
+        final Uint8List use = Uint8List.fromList(
+          chunk.length > room ? chunk.sublist(0, room) : chunk,
+        );
 
-        await _partials.append(deviceId, entry.id, use);
+        // Synchronous, so the next chunk sees the true figure, and queued in
+        // arrival order so the file is written in that order too.
         received += use.length;
+        chunks++;
+        chunkSizes.add(chunk.length);
+        if (firstBytes.length < 16) {
+          firstBytes.addAll(use.take(16 - firstBytes.length));
+        }
+        writes = writes
+            .then((_) => _partials.append(deviceId, entry.id, use));
 
         _emit(
           SyncProgress(
@@ -416,6 +517,14 @@ class SyncEngine implements SyncService {
       // to ask for the bytes now.
       await link.requestFetch(entry.id, offset);
       await done.future;
+      // Every queued write must land before anything reads the file back to
+      // CRC it. Without this the verify races the last few chunks.
+      await writes;
+      _log(
+        'chunks',
+        '#${entry.id} $chunks notification(s), sizes=${chunkSizes.toList()..sort()}, '
+        'first16=${firstBytes.map((int b) => b.toRadixString(16).padLeft(2, "0")).join()}',
+      );
     } finally {
       stall?.cancel();
       await dataSub.cancel();
@@ -423,6 +532,14 @@ class SyncEngine implements SyncService {
     }
 
     if (failure != null) {
+      // WHY it failed, and how far it got. "INCOMPLETE" on its own cannot tell
+      // a transfer that never received a single byte from one that stalled
+      // near the end, and those have completely different causes.
+      _log(
+        'transfer',
+        '#${entry.id} failed after ${received - offset} of ${entry.bytes} '
+        'bytes (mtu=${link.mtu}): ${_humanise(failure!)}',
+      );
       // Partial bytes stay on disk. The note stays pending on the device because
       // we never acked, so it stays in the advertisement's count, so the phone
       // wakes for it again. Nothing to retry by hand.
@@ -478,6 +595,7 @@ class SyncEngine implements SyncService {
 
     final int held = await _partials.receivedBytes(deviceId, entry.id);
     if (held != entry.bytes) {
+      _log('verify', '#${entry.id} short: hold $held of ${entry.bytes} bytes');
       return false; // incomplete; try again next connection
     }
 
@@ -486,6 +604,15 @@ class SyncEngine implements SyncService {
     final int crc = await _partials.crc32Of(deviceId, entry.id);
 
     if (!Crc32.matches(crc, entry.crc)) {
+      // Say it. A CRC failure on a full-length file means the bytes arrived
+      // but were assembled wrongly, which is a completely different fault from
+      // a transfer that stopped early — and for a long time both showed up as
+      // the single word INCOMPLETE.
+      _log(
+        'verify',
+        '#${entry.id} CRC MISMATCH: got ${crc.toRadixString(16).padLeft(8, "0")} '
+        'want ${entry.crc} over $held bytes',
+      );
       // The bytes are not the note. Throw them away — keeping them would make
       // the next resume ask for the wrong offset — and let the device offer it
       // again. We do NOT ack, so nothing is lost on its side.
@@ -571,6 +698,19 @@ class SyncEngine implements SyncService {
 
   /// Run [body] against an authenticated link, serialised against every other
   /// tag operation.
+  @override
+  Future<void> forgetOnDevice(String remoteId) {
+    // _neverPrompt is not passed here: if this phone is NOT the owner there is
+    // nothing to forget, and asking for a pair code in order to un-pair would
+    // be a strange thing to put in front of someone.
+    return _withTagLink(remoteId, _neverPromptCode, (JotaLink link) async {
+      await link.forgetMe(_settings.appId);
+      _log('forget', 'bond cleared on ${link.remoteId}');
+    });
+  }
+
+  static Future<String?> _neverPromptCode() async => null;
+
   Future<T> _withTagLink<T>(
     String remoteId,
     PairCodeRequest onPairCodeNeeded,

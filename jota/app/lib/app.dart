@@ -9,9 +9,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'design/format.dart';
 import 'design/theme.dart';
+import 'preview/seed_data.dart';
 import 'screens/lock_screen.dart';
-import 'screens/splash_screen.dart';
+import 'screens/home_shell.dart';
+import 'screens/onboarding_screen.dart';
+import 'screens/splash_screen.dart' show kForceOnboarding;
 import 'state/device_controller.dart';
 import 'state/lock_controller.dart';
 import 'state/notes_controller.dart';
@@ -68,7 +72,13 @@ class JotaApp extends StatelessWidget {
         },
         // First run shows splash → onboarding → pair; every launch after that,
         // the splash reads the flag and goes straight to the notes.
-        home: const SplashScreen(),
+        // Straight in. The splash (mark, wordmark, 2.6 s hold) is switched
+        // off for now: it stood between you and your notes on every open and
+        // said nothing the shell does not. SplashScreen still exists; put it
+        // back here when there is a reason to.
+        home: !kForceOnboarding && services.settings.hasSeenOnboarding
+            ? const HomeShell()
+            : const OnboardingScreen(),
       ),
     );
   }
@@ -128,7 +138,10 @@ class _PreviewChrome extends StatelessWidget {
                   style: t.reading.copyWith(color: c.onInk, fontSize: 11),
                 ),
                 Text(
-                  'PAIR CODE 428 913',
+                  // From the fake's own constant, not typed again here: the
+                  // real device's code is random now, and a banner quoting a
+                  // literal is exactly how the two drift apart.
+                  'PAIR CODE ${fmtPairCode(kPreviewPairCode)}',
                   style: t.label.copyWith(color: c.onInk, fontSize: 11),
                 ),
               ],

@@ -30,8 +30,18 @@ import '../design/widgets.dart';
 import '../state/device_controller.dart';
 import '../state/lock_controller.dart';
 import '../state/services.dart';
-import 'splash_screen.dart';
+import 'onboarding_screen.dart';
+import 'splash_screen.dart' show kVersionLabel;
 import 'tag_editor_screen.dart';
+
+/// Whether the cloud transcription path is shown at all: the Google key row,
+/// the On device / Google Cloud switch, and the "what leaves your phone" card.
+///
+/// Off since Whisper runs inside the app. Everything hides behind this rather
+/// than being deleted, because the cloud path is still the only one that can
+/// read Arabic, and the day it comes back it should come back whole. While it
+/// is off, nothing leaves the phone, so there is nothing for the card to say.
+const bool kShowCloudTranscription = false;
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.embedded = false});
@@ -54,6 +64,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  /// Forgetting needs the Jota in range, and says so when it isn't.
+  ///
+  /// The device has to be told, or it keeps trusting this phone: the app id
+  /// minted at install never changes, so a forget that cleared only this side
+  /// let the very next connection authenticate silently. Someone unpairing in
+  /// order to hand the Jota on would have changed nothing at all.
+  ///
+  /// Requiring the device absolutely would be a trap of its own — a Jota that
+  /// is lost, flat, broken or already given away could never be removed, and
+  /// the only way out would be reinstalling. So the block is a warning with a
+  /// way past it, and the way past says exactly what it leaves behind.
+  Future<void> _forget(DeviceController device) async {
+    try {
+      await device.forgetDevice();
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Jota forgotten')));
+      return;
+    } on Exception {
+      // Out of range, or off. Fall through to the choice below.
+    }
+
+    if (!mounted) return;
+    final bool? anyway = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text('Jota isn’t in range', style: context.type.headline),
+          content: Text(
+            'Bring your Jota close and try again, so it forgets this phone '
+            'too.\n\nRemove it anyway and this Jota will still trust this '
+            'phone until you erase it on the device — hold both buttons.',
+            style: context.type.prose,
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text('Cancel', style: context.type.label),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                'Remove anyway',
+                style: context.type.label.copyWith(color: context.ink.signal),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (anyway != true || !mounted) return;
+    await device.forgetDevice(force: true);
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Removed here. Erase on the Jota to finish.'),
+        ),
+      );
   }
 
   Future<void> _load() async {
@@ -210,8 +286,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: widget.embedded
                   ? const SizedBox.shrink()
                   : SizedBox(
-                height: JotaGrid.statusHeight,
-                child: Align(
+                      height: JotaGrid.statusHeight,
+                      child: Align(
                         alignment: Alignment.centerLeft,
                         child: _BackChevron(
                           onTap: () => Navigator.of(context).pop(),
@@ -238,6 +314,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Text('Settings', style: t.headline),
                         const SizedBox(height: JotaGrid.gapM),
                         const JotaRule(),
+
+                        // Where transcription happens. On device keeps the
+                        // audio on the phone, which problem.md treats as a
+                        // functional requirement rather than a feature — but
+                        // it is English only today, so the cloud backend is
+                        // still the one that can read Arabic.
+                        _SettingRow(
+                          label: 'Transcribe',
+                          value: !kShowCloudTranscription
+                              ? 'ON DEVICE'
+                              : s.settings.backend == 'device'
+                                  ? 'On device →'
+                                  : 'Google Cloud →',
+                          // A plain fact while the cloud path is hidden: with
+                          // no key row a switch to Google would be a switch to
+                          // nothing.
+                          onTap: !kShowCloudTranscription
+                              ? null
+                              : () async {
+                                  final bool onDevice =
+                                      s.settings.backend == 'device';
+                                  await s.settings.setBackend(
+                                    onDevice ? 'google' : 'device',
+                                  );
+                                  if (!context.mounted) return;
+                                  setState(() {});
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          onDevice
+                                              ? 'Using Google Cloud'
+                                              : 'On device — English only, and the '
+                                                  'first note downloads a 75 MB model',
+                                        ),
+                                      ),
+                                    );
+                                },
+                        ),
 
                         // The four the design names, in its order.
                         _SettingRow(
@@ -276,16 +392,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // Everything below is a real behaviour the design's
                         // four rows do not cover. Same shape, so the list stays
                         // one list rather than growing sections again.
-                        _SettingRow(
-                          label: 'Transcription key',
-                          // Masked, never shown whole: enough to tell two keys
-                          // apart, not enough to use one over someone's
-                          // shoulder.
-                          value: hasKey
-                              ? SettingsStore.maskKey(_apiKey!)
-                              : 'NOT SET →',
-                          onTap: () => _editKey(s, hasKey: hasKey),
-                        ),
+                        if (kShowCloudTranscription)
+                          _SettingRow(
+                            label: 'Transcription key',
+                            // Masked, never shown whole: enough to tell two keys
+                            // apart, not enough to use one over someone's
+                            // shoulder.
+                            value: hasKey
+                                ? SettingsStore.maskKey(_apiKey!)
+                                : 'NOT SET →',
+                            onTap: () => _editKey(s, hasKey: hasKey),
+                          ),
                         _SettingRow(
                           label: 'Transcribe automatically',
                           value: s.settings.autoTranscribe ? 'ON' : 'OFF',
@@ -333,7 +450,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             if (!context.mounted) return;
                             await Navigator.of(context).pushAndRemoveUntil(
                               MaterialPageRoute<void>(
-                                builder: (_) => const SplashScreen(),
+                                builder: (_) => const OnboardingScreen(),
                               ),
                               (Route<dynamic> route) => false,
                             );
@@ -343,10 +460,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           _SettingRow(
                             label: 'Forget this Jota',
                             value: '→',
-                            onTap: () async {
-                              await device.forgetDevice();
-                              setState(() {});
-                            },
+                            onTap: () => _forget(device),
                           ),
                         const _SettingRow(
                           label: 'Version',
@@ -364,8 +478,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // would be the product quietly buying itself room,
                         // which is exactly what would make someone hesitate
                         // before speaking.
-                        _LeavesCard(hasKey: hasKey),
-                        const SizedBox(height: JotaGrid.gapL),
+                        if (kShowCloudTranscription) ...<Widget>[
+                          _LeavesCard(hasKey: hasKey),
+                          const SizedBox(height: JotaGrid.gapL),
+                        ],
                       ],
                     ),
             ),

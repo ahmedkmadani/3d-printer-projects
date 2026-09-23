@@ -8,7 +8,11 @@ plugins {
 android {
     namespace = "dev.jota.jota"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Pinned, not flutter.ndkVersion. whisper_ggml builds its native
+    // whisper.cpp against NDK 29 and every other plugin against 27; Flutter's
+    // default of 28.2 satisfies neither, and the rule is "use the highest,
+    // they are backward compatible".
+    ndkVersion = "29.0.13113456"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8

@@ -8,9 +8,10 @@
 //
 //  Sync is NOT a destination. A tab dedicated to a mechanism says the mechanism
 //  does not work by itself; syncing happens on its own, pull-to-refresh covers
-//  the times the OS blocks it, and the device chip above the nav answers "is it
-//  there" from everywhere. The full sync screen is still reachable — by tapping
-//  that chip — it just is not a place you live.
+//  the times the OS blocks it, and the device card on Home answers "is it
+//  there" — and syncs when tapped. There used to be a chip pinned above the
+//  nav on every tab for this; it floated between content and nav like a
+//  control that led nowhere, so it went into Home as a card.
 //
 //  Patterns are reached from Home, and Tags from Settings, for the same reason:
 //  both are occasional, and the bottom bar has three slots, not five.
@@ -23,16 +24,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../ble/device_scanner.dart';
-import '../ble/sync_service.dart';
 import '../design/theme.dart';
 import '../state/device_controller.dart';
 import 'bluetooth_off_screen.dart';
 import 'home_screen.dart';
 import 'note_list_screen.dart';
 import 'settings_screen.dart';
-import 'connect_screen.dart';
 import 'pair_screen.dart';
-import 'widgets/device_chip.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, this.initialIndex = 0});
@@ -122,49 +120,23 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     }
   }
 
-  /// The chip DOES the thing rather than going somewhere to do it.
-  ///
-  /// product.md: "Sync is never a place you go." It used to open a whole screen
-  /// whose only content was a button and a progress line — a destination for a
-  /// mechanism, which is the shape that says the mechanism does not work by
-  /// itself. With no device yet there is still something to go TO, so that case
-  /// pushes Connect.
-  Future<void> _chipTapped() async {
-    final DeviceController device = context.read<DeviceController>();
-    if (!device.hasPairedDevice) {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const ConnectScreen()),
-      );
-      return;
-    }
-    if (device.isSyncing) return;
-    final SyncResult? r = await device.syncNow();
-    if (!mounted) return;
-
-    // SAY WHAT HAPPENED. A sync started from the chip used to report nowhere:
-    // the engine stored an error, the chip went back to idle, and the archive
-    // stayed empty with no account of why — which is indistinguishable from
-    // "there was nothing to fetch". On real hardware that cost an evening.
-    final String message = r == null
-        ? (device.lastError ?? 'Nothing to sync')
-        : r.ok
-            ? (r.notesAdded > 0
-                ? 'Got ${r.notesAdded} note${r.notesAdded == 1 ? '' : 's'}'
-                : 'Already up to date')
-            : (r.error ?? 'Sync failed');
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
   /// The engine blocks mid-sync waiting for the digits on the e-paper, and a
-  /// sync can now start from anywhere — the chip, pull-to-refresh, or the
+  /// sync can now start from anywhere — the device card, pull-to-refresh, or the
   /// device simply coming into range. So the prompt lives HERE, above every
   /// tab, rather than on the one screen that used to own syncing. Without it a
   /// pull-to-refresh that needed a code would wait forever with nothing on
   /// screen to type into.
   Future<void> _maybeAskForCode(DeviceController device) async {
     if (!device.needsPairCode || _pairOpen) return;
+    // Only when Home is the screen you are actually looking at.
+    //
+    // Home stays mounted underneath Connect and keeps rebuilding on every
+    // notifyListeners, so without this it pushed its OWN code screen on top of
+    // the Connect screen's inline code field — two prompts for one code, and
+    // the one on top could not be typed into because the one underneath kept
+    // pulling the keyboard focus back. That is the "pair screen is stuck".
+    final ModalRoute<Object?>? route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
     _pairOpen = true;
     final String? code = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(builder: (_) => const PairScreen()),
@@ -193,15 +165,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             _visited.contains(i) ? _tab(i) : const SizedBox.shrink(),
         ],
       ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          // Above the nav, under every tab: the answer to "is it there" without
-          // having to open Sync and ask.
-          DeviceChip(onTap: _chipTapped),
-          HomeNavBar(current: _index, onSelect: _select),
-        ],
-      ),
+      bottomNavigationBar: HomeNavBar(current: _index, onSelect: _select),
     );
   }
 }

@@ -63,6 +63,7 @@ dependencies:
   # Minimal hairline line-icons (Feather's successor), drop-in IconData. Used in
   # the bottom nav and for back/add/edit throughout. Pinned exact.
   lucide_icons_flutter: 3.1.15
+  whisper_ggml: ^2.6.0
 
 dev_dependencies:
   flutter_test:

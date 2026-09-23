@@ -350,7 +350,7 @@ class InMemorySettingsStore implements SettingsStore {
   bool _appLockEnabled;
   String _model = 'latest_long';
   String? _language;
-  String _backend = 'google';
+  String _backend = 'device';
 
   @override
   Future<String?> apiKey() async => _apiKey;

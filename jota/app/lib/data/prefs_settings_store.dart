@@ -163,7 +163,7 @@ class PrefsSettingsStore implements SettingsStore {
   }
 
   @override
-  String get backend => _prefs.getString(_kBackend) ?? 'google';
+  String get backend => _prefs.getString(_kBackend) ?? 'device';
 
   @override
   Future<void> setBackend(String v) => _prefs.setString(_kBackend, v);
