@@ -141,8 +141,14 @@ void main() {
       find.textContaining(RegExp('tag', caseSensitive: false)),
       findsWidgets,
     );
-    // One quiet Delete, at the foot of the details card.
-    expect(find.text('Delete'), findsOneWidget);
+    // One quiet Delete note link, under the details card — below the fold
+    // in this viewport, so scroll the note's own list until it builds.
+    await tester.dragUntilVisible(
+      find.text('Delete note'),
+      find.byType(ListView).last,
+      const Offset(0, -120),
+    );
+    expect(find.text('Delete note'), findsOneWidget);
 
     await quiesce(tester, services);
   });
