@@ -7,9 +7,8 @@
 
 namespace jota {
 
-// Verified against Waveshare's user_config.h for this board.
-static const uint8_t PIN_BOOT = 0;
-static const uint8_t PIN_PWR  = 18;
+static const uint8_t PIN_BOOT = BTN_PIN_BOOT;
+static const uint8_t PIN_PWR  = BTN_PIN_PWR;
 
 static const uint32_t DEBOUNCE_MS = 30;
 static const uint32_t LONG_MS     = 1500;
@@ -25,6 +24,18 @@ void Buttons::begin() {
 
   pinMode(PIN_BOOT, INPUT_PULLUP);
   pinMode(PIN_PWR, INPUT_PULLUP);
+
+  // A button already down at boot is the press that WOKE us (or powered us
+  // on), and it has already been acted on. Swallow it whole: without this the
+  // release registers as a short press, and on a wake-to-record boot that
+  // short press lands on RECORDING and stops the note before it started.
+  for (Btn *b : {&boot_, &pwr_}) {
+    if (digitalRead(b->pin) == LOW) {
+      b->raw       = true;
+      b->down      = true;
+      b->longFired = true;
+    }
+  }
 }
 
 uint8_t Buttons::update(Btn &b, uint32_t nowMs) {

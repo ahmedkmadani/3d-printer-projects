@@ -112,10 +112,18 @@ void Recorder::run() {
     ok = fwrite(hdr, 1, sizeof(hdr), wav) == sizeof(hdr);
   }
 
+  // The codec clicks as it powers up: the first real note had full-scale
+  // clipping at 118 ms and nothing else above -12 dBFS. Drop the first three
+  // chunks (192 ms) — the panel takes longer than that to invert, so nobody
+  // has started talking yet.
+  static const uint8_t SKIP_CHUNKS = 3;
+  uint8_t skipped = 0;
+
   uint32_t crc = 0, samples = 0, blocks = 0;
   while (ok && !stopReq_) {
     const size_t n = mic_->read(mono, CHUNK);
     if (n == 0) { Serial.println("[rec] mic read failed"); ok = false; break; }
+    if (skipped < SKIP_CHUNKS) { skipped++; continue; }
     if (fwrite(mono, sizeof(int16_t), n, wav) != n) {
       Serial.println("[rec] card write failed");
       ok = false;

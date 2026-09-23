@@ -16,6 +16,10 @@ class SdCard {
   bool begin();
   bool mounted() const { return ok_; }
 
+  // Flush and unmount. Before deep sleep: the card loses power with the
+  // rails, and an unmounted FAT is the one that comes back clean.
+  void end();
+
  private:
   bool ok_ = false;
 };

@@ -40,4 +40,10 @@ bool SdCard::begin() {
   return true;
 }
 
+void SdCard::end() {
+  if (!ok_) return;
+  SD_MMC.end();
+  ok_ = false;
+}
+
 }  // namespace jota

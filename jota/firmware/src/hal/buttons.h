@@ -11,6 +11,11 @@
 
 namespace jota {
 
+// Verified against Waveshare's user_config.h for this board. Public because
+// main.cpp arms the same two pins as deep-sleep wake sources.
+static const uint8_t BTN_PIN_BOOT = 0;
+static const uint8_t BTN_PIN_PWR  = 18;
+
 enum class BtnEvent : uint8_t {
   None,
   BootShort,  // record / stop / confirm

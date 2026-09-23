@@ -24,21 +24,19 @@
 namespace jota {
 
 // ---------------------------------------------------------------------------
-// GUESS: NOT YET VERIFIED against this board's schematic.
+// GPIO4, from two independent sources: the back of the board is silkscreened
+// `ADC GP4`, and Waveshare's 01_ADC_Test example reads ADC1 channel 3 — which
+// is GPIO4 on the S3 — at 12 dB attenuation and multiplies the calibrated
+// millivolts by 2. So a 2:1 divider, and the pin below.
 //
-// The pin map in firmware/README.md was checked against Waveshare's own
-// examples and lists NO battery-sense pin, so this is left off until the real
-// one is known. Set it to the GPIO that carries the divided pack voltage and
-// the whole gauge comes alive; leave it at -1 and every surface honestly says
-// the charge is unknown.
-//
-// Check the board's schematic or wiki, then set BOTH of these.
+// This was -1 until 2026-09-23, justified by "the verified pin map has no
+// battery-sense pin". The pin map was incomplete, not the board.
 // ---------------------------------------------------------------------------
-static const int   BATTERY_ADC_PIN = -1;
+static const int   BATTERY_ADC_PIN = 4;
 
-// Pack voltage divided by this reaches the pin. A 2:1 divider (two equal
-// resistors) is the usual arrangement and keeps a 4.2 V pack at 2.1 V, inside
-// what the ADC can read on the 11 dB attenuation this uses.
+// Pack voltage divided by this reaches the pin. Waveshare's own example uses
+// exactly x2. It keeps a 4.2 V pack at 2.1 V, inside what the ADC reads at
+// the 11/12 dB attenuation this uses.
 static const float BATTERY_DIVIDER = 2.0f;
 
 // Below this, the device says so rather than just showing a small number.

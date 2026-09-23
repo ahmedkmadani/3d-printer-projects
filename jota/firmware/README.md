@@ -112,28 +112,21 @@ Verified against Waveshare's official examples
 > board powers itself off on battery. GPIO6 must be **LOW** to power the panel.
 > GPIO42 must be driven before the microphone will do anything at all.
 
-### Battery sense — one unresolved pin
+### Battery sense — GPIO4
 
-The table above has **no battery-sense pin**, because Waveshare's examples do
-not use one. The gauge is therefore built but switched off: `BATTERY_ADC_PIN`
-in `src/hal/battery.h` is `-1`, and every surface — the e-paper, the
-advertisement, `status`, the app — says the charge is *unknown* rather than
-inventing a figure.
+`BATTERY_ADC_PIN = 4`, divider 2:1, per the board's back label (`ADC GP4`) and
+Waveshare's 01_ADC_Test (ADC1 channel 3, calibrated millivolts × 2). The gauge
+was built long before the pin was found; setting it was all it took. Sanity
+figures on USB: 4052 mV → 85%, 4106 mV → 90%. If the reading looks wrong, the
+divider is wrong, not the pin.
 
-To turn it on, find the GPIO carrying the divided pack voltage (board
-schematic or the Waveshare wiki) and set two constants:
+### Standby
 
-```cpp
-static const int   BATTERY_ADC_PIN = <gpio>;   // was -1
-static const float BATTERY_DIVIDER = 2.0f;     // pack volts / pin volts
-```
-
-Nothing else changes: the ADC is read through `analogReadMilliVolts()` so the
-per-chip eFuse calibration applies, samples are median-filtered and smoothed,
-and sampling is skipped while the panel is refreshing (a refresh sags the pack
-by enough to read as flat). Sanity check after wiring: a full pack should
-report ~4.15–4.20 V, i.e. 100%; if it reports half of that, the divider ratio
-is wrong, not the pin.
+Two minutes idle on READY — no recording, no phone connected — and the device
+deep-sleeps behind its OFF frame. `ext1` on GPIO0 and GPIO18 wakes it; BOOT
+still held at boot means "record", and the capture starts before the first
+paint. GPIO17 is held through sleep so the latch does not drop. Verified on
+USB; battery-only still to be run.
 
 ## What is real, and what is not
 
@@ -174,5 +167,8 @@ wakes.
 1. Listen to a real note on the phone end to end: fetch over BLE, decode,
    transcribe. The app's BLE path has still never touched hardware.
 2. Mic gain: 45 dB is what both references use; tune by ear.
-3. Deep sleep between notes, waking on BOOT (`ext_wakeup` is already GPIO0).
+3. Battery-only soak: confirm the latch holds through deep sleep off USB and
+   measure how long a charge lasts with the two-minute standby.
 4. Orphan files: a WAV left by a power cut mid-recording is not indexed.
+5. GPIO42 polarity: Waveshare's power BSP drives the audio rail LOW for ON;
+   we drive it HIGH and the mic works. Find out which level is truly off.

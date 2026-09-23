@@ -14,6 +14,10 @@
 #include <SPI.h>
 #include <GxEPD2_BW.h>
 
+#include "driver/gpio.h"
+#include "driver/rtc_io.h"
+#include "esp_sleep.h"
+
 #include "app/model.h"
 #include "app/nav.h"
 #include "app/notes.h"
@@ -38,6 +42,18 @@ static const int EPD_BUSY = 8;
 static const int EPD_PWR  = 6;   // panel power, active LOW
 static const int PWR_LATCH = 17;  // HIGH keeps the board alive off USB
 
+// ---- Standby ------------------------------------------------------------
+// Two minutes with nothing happening and the device goes to deep sleep: the
+// panel keeps its resting frame for free, the latch is held so the board
+// stays powered, and either button wakes it. If it was BOOT, the wake press
+// IS the record press — the note starts before the panel has redrawn. Pala
+// Note behaves the same way and that is the behaviour being matched.
+//
+// Awake and idle the board draws tens of milliamps; a 500 mAh cell is gone
+// in hours. Asleep it is microamps. Without this, daily use means
+// remembering to hold PWR after every note.
+static const uint32_t IDLE_SLEEP_MS = 120000;
+
 GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(
     GxEPD2_154_D67(EPD_CS, EPD_DC, EPD_RST, EPD_BUSY));
 
@@ -52,6 +68,9 @@ static SdCard    sdcard;
 static Mic       mic;
 static Recorder  recorder;
 static Link      bleLink;   // not `link`: collides with POSIX link()
+
+static uint32_t lastActivityMs = 0;
+static bool     wakeToRecord   = false;
 
 // Full refresh clears e-paper ghosting; partial is fast but accumulates it.
 static uint16_t       partialsSinceFull = 0;
@@ -87,6 +106,42 @@ static bool updateClock(uint32_t nowMs) {
   return true;
 }
 
+// The frame the panel keeps while the device is off or asleep. E-paper holds
+// its last image forever, so without this the device sits in a drawer showing
+// whatever menu it was on, with a frozen clock.
+static void restingFrame() {
+  display.setFullWindow();
+  display.firstPage();
+  do {
+    screenOff(display, model);
+  } while (display.nextPage());
+  display.hibernate();
+}
+
+static void enterDeepSleep() {
+  Serial.println("[jota] idle: deep sleep. BOOT records, PWR wakes.");
+  restingFrame();
+  sdcard.end();
+  mic.powerOff();
+
+  // Both buttons pull to ground. Their pull-ups must survive sleep or the
+  // wake pins float and the device wakes itself at random — or never.
+  for (gpio_num_t pin : {(gpio_num_t)BTN_PIN_BOOT, (gpio_num_t)BTN_PIN_PWR}) {
+    rtc_gpio_pullup_en(pin);
+    rtc_gpio_pulldown_dis(pin);
+  }
+  esp_sleep_enable_ext1_wakeup((1ULL << BTN_PIN_BOOT) | (1ULL << BTN_PIN_PWR),
+                               ESP_EXT1_WAKEUP_ANY_LOW);
+
+  // The latch is the one output that must not drop: releasing it is how
+  // power-off works. Hold it through sleep.
+  gpio_hold_en((gpio_num_t)PWR_LATCH);
+  gpio_deep_sleep_hold_en();
+
+  delay(20);
+  esp_deep_sleep_start();
+}
+
 static void paint() {
   const bool ghostDue =
       partialsSinceFull >= FULL_EVERY && quietScreen(nav.screen());
@@ -118,7 +173,17 @@ static void paint() {
 }
 
 void setup() {
-  // 1) Hold power on. Without this the board drops dead on battery.
+  // Back from deep sleep? Then a button is what woke us, and BOOT means
+  // "record", right now, before anything else has a chance to be slow.
+  const bool fromSleep =
+      esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT1;
+  pinMode(BTN_PIN_BOOT, INPUT_PULLUP);
+  wakeToRecord = fromSleep && digitalRead(BTN_PIN_BOOT) == LOW;
+
+  // 1) Hold power on. Without this the board drops dead on battery. The hold
+  //    from the last sleep is released first so the pin is ours again.
+  gpio_deep_sleep_hold_dis();
+  gpio_hold_dis((gpio_num_t)PWR_LATCH);
   pinMode(PWR_LATCH, OUTPUT);
   digitalWrite(PWR_LATCH, HIGH);
 
@@ -128,7 +193,7 @@ void setup() {
 
   Serial.begin(115200);
   delay(200);
-  Serial.println("\n[jota] booting...");
+  Serial.printf("\n[jota] booting%s\n", fromSleep ? " (woken by a button)" : "...");
 
   buttons.begin();
 
@@ -160,11 +225,24 @@ void setup() {
   battery.begin();
   model.batteryKnown = battery.known();
   model.batteryPct   = battery.percent();
+  Serial.printf("[bat] %s %u mV -> %u%%\n", battery.known() ? "pack" : "unknown",
+                (unsigned)battery.millivolts(), (unsigned)battery.percent());
 
   bleLink.begin(notes, model);
   Serial.printf("[jota] BLE up, %u notes pending\n", (unsigned)notes.pending());
 
   nav.begin(millis());
+  lastActivityMs = millis();
+
+  if (wakeToRecord) {
+    // The wake press is the record press. Start the capture BEFORE the first
+    // paint: the panel takes over a second to invert and the user is already
+    // talking. The loop's screen-transition logic sees RECORDING already up
+    // and the recorder already busy, and leaves both alone.
+    nav.handle(BtnEvent::BootShort, model, millis());
+    const uint16_t id = notes.nextId();
+    if (recorder.start(id)) Serial.printf("[jota] woke to record N-%03u\n", (unsigned)id);
+  }
   paint();
 
     // Restore the bond into the model. Without this, `paired` was false on every
@@ -181,7 +259,10 @@ void loop() {
   const uint32_t now = millis();
 
   const BtnEvent e = buttons.poll(now);
-  if (e != BtnEvent::None) nav.handle(e, model, now);
+  if (e != BtnEvent::None) {
+    nav.handle(e, model, now);
+    lastActivityMs = now;
+  }
   nav.tick(now, model);
   updateClock(now);
 
@@ -316,21 +397,20 @@ void loop() {
       while (!recorder.takeResult(last)) delay(5);
       if (last.ok) notes.add(last.id, last.secs, last.bytes, last.crc, model.note.tag);
     }
-    // Leave a deliberate resting frame. E-paper holds its last image forever,
-    // so without this the device sits in a drawer showing whatever menu it
-    // was on, with a frozen clock.
-    display.setFullWindow();
-    display.firstPage();
-    do {
-      screenOff(display, model);
-    } while (display.nextPage());
-
-    display.hibernate();
+    restingFrame();
+    sdcard.end();
     digitalWrite(PWR_LATCH, LOW);  // release the latch: board cuts power
     while (true) delay(100);       // reached only while USB keeps us alive
   }
 
   if (nav.dirty()) paint();
+
+  // Anything that is not "READY with nobody around" counts as activity: a
+  // note being captured, a phone mid-sync, a screen with a timer on it.
+  if (nav.screen() != Screen::Ready || recorder.busy() || bleLink.connected()) {
+    lastActivityMs = now;
+  }
+  if (now - lastActivityMs >= IDLE_SLEEP_MS) enterDeepSleep();
 
   delay(5);
 }

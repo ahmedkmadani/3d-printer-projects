@@ -77,14 +77,22 @@ button HAL and e-paper refresh policy; the ADPCM encoder; the note store with
 byte-range serving, CRC and resume; the whole BLE service; the Flutter app
 (analyses clean, 27 tests pass).
 
-**Built but switched off, and it should not be:** the battery gauge.
-`BATTERY_ADC_PIN` in `jota/firmware/src/hal/battery.h` is `-1`, justified here
-until Aug 2026 by "the verified pin map has no battery-sense pin". **That was
-wrong.** Waveshare's own outline drawing labels the back of the board
-`ADC GP4`, alongside `LED GP3`. The sense pin is **GPIO4**. Everything
-downstream — the e-paper gauge, the advertisement byte, `status.battery`, the
-app — still reports *unknown*. Set the pin, work out the divider ratio against
-a known cell voltage, and it comes alive.
+**Battery gauge: live since 2026-09-23.** `BATTERY_ADC_PIN` is GPIO4 with a
+2:1 divider, from two sources: the board's own back label (`ADC GP4`) and
+Waveshare's 01_ADC_Test, which reads ADC1 channel 3 and doubles the calibrated
+millivolts. First readings on USB: 4052 mV → 85%, 4106 mV → 90%. The e-paper
+gauge, the advertisement byte, `status.battery` and the app's device card all
+carry the figure now. It was `-1` for a month on the claim that "the verified
+pin map has no battery-sense pin"; the pin map was incomplete, not the board.
+
+**Standby.** Two minutes idle on READY, with no recording and no phone
+connected, and the device deep-sleeps behind its OFF frame (dotted ring, the
+charge as a solid arc). Either button wakes it via `ext1`; if BOOT is the
+button still held at boot, the recording starts before the panel has redrawn
+(Pala Note does the same). A button held at boot is swallowed by the button
+HAL so the wake press cannot also stop the note. The latch on GPIO17 is
+`gpio_hold`-ed through sleep — verified on USB only so far, so the first
+battery-only overnight is still owed. PWR long is still a true power-off.
 
 Header pinout from the same drawing: `RXD`/`TXD`, `SDA`=GP20, `SCL`=GP19,
 `GND`, `GP5`, `3V3`, `GP2`, `VSYS`, `GP1`.

@@ -119,7 +119,12 @@ static const int16_t DOT_R                = 4;
 // across the room. Radius keeps 18 px clear of the lid crop.
 static const int16_t OFF_RING_R      = 82;
 static const int16_t OFF_RING_STROKE = 1;
-static const int16_t OFF_ARC_STROKE  = 3;
+// A solid 3 px arc on a solid 1 px track did not read as a gauge on the real
+// panel: at 90% the eye saw one ring with a break in it, not a ring nine
+// tenths full. The track is now DOTTED and the arc a pixel heavier, so the
+// solid part is unmistakably the charge and the dotted part the space left.
+static const int16_t OFF_ARC_STROKE  = 4;
+static const float   OFF_TRACK_DASH_DEG = 4.0f;   // dash and gap, in degrees
 static const int16_t OFF_PCT_CY      = 150;   // the figure, inside the ring
 
 // ---- Indicators --------------------------------------------------------

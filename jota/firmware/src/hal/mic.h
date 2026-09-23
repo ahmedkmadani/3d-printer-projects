@@ -35,6 +35,10 @@ class Mic {
   bool open();
   void close();
 
+  // Cut the audio rail. Deep sleep and power-off only: the codec is not
+  // re-initialised afterwards, so nothing here works again until reboot.
+  void powerOff();
+
   // Blocking read of `n` mono samples. Returns n, or 0 on failure.
   size_t read(int16_t *mono, size_t n);
 

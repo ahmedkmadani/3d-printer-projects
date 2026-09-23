@@ -277,25 +277,34 @@ void batteryGauge(Adafruit_GFX &g, int16_t cx, uint8_t pct, bool known) {
 
 void chargeRing(Adafruit_GFX &g, int16_t cx, int16_t cy, int16_t r,
                 uint8_t pct, bool known) {
-  // The track: a solid annulus, not drawCircle(), for the same reason ring()
-  // is — stacked outlines gap at the diagonals.
-  ring(g, cx, cy, r, OFF_RING_STROKE);
-  if (!known) return;
   if (pct > 100) pct = 100;
-  // The arc: a solid band, scanned pixel by pixel over the ring's bounding
-  // box rather than stroked as a chain of dots, which beads at this radius.
-  // Angle is measured from 12 o'clock, clockwise, the way a dial is read.
-  const float endDeg = 360.0f * (float)pct / 100.0f;
-  const float rIn    = (float)r - (float)OFF_ARC_STROKE / 2.0f;
-  const float rOut   = (float)r + (float)OFF_ARC_STROKE / 2.0f;
+  // One scan over the ring's bounding box draws both the dotted track and the
+  // solid arc, pixel by pixel: stroked circles bead at this radius and gap at
+  // the diagonals. Angle is measured from 12 o'clock, clockwise, the way a
+  // dial is read.
+  const float endDeg = known ? 360.0f * (float)pct / 100.0f : 0.0f;
+  const float tIn    = (float)r - (float)OFF_RING_STROKE / 2.0f;
+  const float tOut   = (float)r + (float)OFF_RING_STROKE / 2.0f;
+  const float aIn    = (float)r - (float)OFF_ARC_STROKE / 2.0f;
+  const float aOut   = (float)r + (float)OFF_ARC_STROKE / 2.0f;
   const int16_t span = r + OFF_ARC_STROKE;
   for (int16_t dy = -span; dy <= span; ++dy) {
     for (int16_t dx = -span; dx <= span; ++dx) {
       const float d = sqrtf((float)(dx * dx + dy * dy));
-      if (d < rIn || d > rOut) continue;
+      if (d < aIn || d > aOut) continue;
       float deg = atan2f((float)dx, (float)-dy) * 180.0f / 3.14159265f;
       if (deg < 0.0f) deg += 360.0f;
-      if (deg <= endDeg) g.drawPixel((int16_t)(cx + dx), (int16_t)(cy + dy), INK);
+      const bool onArc = known && deg <= endDeg;
+      if (onArc) {
+        g.drawPixel((int16_t)(cx + dx), (int16_t)(cy + dy), INK);
+      } else if (d >= tIn && d <= tOut) {
+        // Track: dashes of OFF_TRACK_DASH_DEG with equal gaps. Unknown charge
+        // draws the whole ring dotted — an unmeasured battery and a flat one
+        // must never look the same.
+        if (fmodf(deg, 2.0f * OFF_TRACK_DASH_DEG) < OFF_TRACK_DASH_DEG) {
+          g.drawPixel((int16_t)(cx + dx), (int16_t)(cy + dy), INK);
+        }
+      }
     }
   }
 }

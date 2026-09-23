@@ -147,6 +147,12 @@ bool Mic::open() {
   return true;
 }
 
+void Mic::powerOff() {
+  close();
+  digitalWrite(PIN_AUDIO_PWR, LOW);
+  ready_ = false;
+}
+
 void Mic::close() {
   if (!open_) return;
   esp_codec_dev_close((esp_codec_dev_handle_t)dev_);
