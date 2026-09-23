@@ -67,6 +67,7 @@ dependencies:
   share_plus: ^12.0.2
   # The corrections export is a zip of WAVs plus a manifest. Pure Dart.
   archive: ^3.6.1
+  flutter_local_notifications: ^18.0.1
 
 dev_dependencies:
   flutter_test:

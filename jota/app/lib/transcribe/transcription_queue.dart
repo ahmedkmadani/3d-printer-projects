@@ -15,6 +15,7 @@ import '../data/audio_store.dart';
 import '../data/note.dart';
 import '../data/note_repository.dart';
 import '../data/settings_store.dart';
+import 'done_notifier.dart';
 import 'transcriber.dart';
 
 class TranscriptionQueue {
@@ -23,14 +24,20 @@ class TranscriptionQueue {
     required AudioStore audio,
     required SettingsStore settings,
     required Transcriber Function() transcriber,
+    TranscriptionNotifier? notifier,
   })  : _notes = notes,
         _audio = audio,
         _settings = settings,
-        _transcriber = transcriber;
+        _transcriber = transcriber,
+        _notifier = notifier;
 
   final NoteRepository _notes;
   final AudioStore _audio;
   final SettingsStore _settings;
+
+  /// Tells the user when a note's words land while the app is not on screen.
+  /// Null in the preview and in tests.
+  final TranscriptionNotifier? _notifier;
 
   /// A factory, not an instance: the user can change the key or the model in
   /// settings between two items in the queue.
@@ -60,6 +67,7 @@ class TranscriptionQueue {
     _draining = true;
     try {
       final List<Note> queue = await _notes.awaitingTranscription();
+      if (queue.isNotEmpty) await _notifier?.prepare();
       for (final Note note in queue) {
         final bool keepGoing = await _transcribeOne(note, t);
         if (!keepGoing) break; // rate limited or offline: stop, try later
@@ -72,6 +80,7 @@ class TranscriptionQueue {
   /// Transcribe one note now, regardless of the auto-transcribe setting. This
   /// is the "TRANSCRIBE" button on the detail screen.
   Future<void> transcribeNow(Note note) async {
+    await _notifier?.prepare();
     await _transcribeOne(note, _transcriber());
   }
 
@@ -113,6 +122,8 @@ class TranscriptionQueue {
         await _notes.setTranscript(note, '', model: r.model);
       } else {
         await _notes.setTranscript(note, r.text, model: r.model);
+        final Note? done = await _notes.byId(note.deviceId, note.noteId);
+        if (done != null) await _notifier?.transcribed(done);
       }
       return true;
     } on TranscriptionException catch (e) {

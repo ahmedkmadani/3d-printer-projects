@@ -35,6 +35,7 @@ import '../data/sqflite_note_repository.dart';
 import '../security/authenticator.dart';
 import '../security/local_authenticator.dart';
 import '../transcribe/transcriber.dart';
+import '../transcribe/done_notifier.dart';
 import '../transcribe/transcription_queue.dart';
 import '../transcribe/google_stt_transcriber.dart';
 import '../transcribe/whisper_transcriber.dart';
@@ -131,6 +132,7 @@ class Services {
         audio: audio,
         settings: settings,
         transcriber: buildTranscriber,
+        notifier: LocalTranscriptionNotifier(),
       ),
       auth: LocalAuthenticator(),
       newPlayer: () => DecodedNotePlayer(audio),
