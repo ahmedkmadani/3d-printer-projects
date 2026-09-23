@@ -74,6 +74,13 @@ class WhisperTranscriber implements Transcriber {
     final File wav = File('${dir.path}/${request.filename}');
     await wav.writeAsBytes(request.wav, flush: true);
 
+    // The stored hint, or detection. A hint measurably helps `small` on short
+    // clips and on dialect: told "ar" it stops trying English on a Sudanese
+    // sentence with an English word in it.
+    final String lang = (request.language == null || request.language!.isEmpty)
+        ? 'auto'
+        : request.language!;
+
     try {
       // `var`, because whisper_ggml does not export TranscribeResult from its
       // public API — only the response type inside it. Naming it would mean
@@ -84,8 +91,8 @@ class WhisperTranscriber implements Transcriber {
         audioPath: wav.path,
         // whisper.cpp detects the language from the first 30 s when told
         // 'auto'. A note that switches Arabic->English mid-sentence is still
-        // decoded by one model pass; the detected language only seeds it.
-        lang: 'auto',
+        // decoded by one model pass; the language only seeds it.
+        lang: lang,
         // The note's own context, when the caller has any: names and jargon
         // measurably help on short clips, and short clips are most of what
         // this device records.
@@ -105,7 +112,7 @@ class WhisperTranscriber implements Transcriber {
       return TranscriptionResult(
         text: out.transcription.text.trim(),
         model: id,
-        language: 'auto',
+        language: lang,
         durationSeconds: out.time.inMilliseconds / 1000.0,
       );
     } finally {

@@ -355,6 +355,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 },
                         ),
 
+                        // Which language the notes are in. Auto lets
+                        // whisper.cpp guess from the first thirty seconds,
+                        // which on a short mixed clip is a coin toss; a hint
+                        // settles it. One tap cycles, like every other row.
+                        _SettingRow(
+                          label: 'Notes are in',
+                          value: _languageLabel(s.settings.language),
+                          onTap: () async {
+                            await s.settings.setLanguage(
+                              _nextLanguage(s.settings.language),
+                            );
+                            setState(() {});
+                          },
+                        ),
+
                         // The four the design names, in its order.
                         _SettingRow(
                           label: 'Tags',
@@ -523,6 +538,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
 ///
 /// A trailing `→` in the value is the whole affordance for a row that goes
 /// somewhere; a row that toggles simply shows ON or OFF and flips on tap.
+/// The language hint's three states, cycled in this order. Null is Whisper's
+/// own detection.
+const List<String?> _languages = <String?>[null, 'ar', 'en'];
+
+String _languageLabel(String? code) {
+  switch (code) {
+    case 'ar':
+      return 'ARABIC';
+    case 'en':
+      return 'ENGLISH';
+    default:
+      return 'AUTO';
+  }
+}
+
+String? _nextLanguage(String? code) {
+  final int i = _languages.indexOf(code);
+  return _languages[(i + 1) % _languages.length];
+}
+
 class _SettingRow extends StatelessWidget {
   const _SettingRow({required this.label, required this.value, this.onTap});
 
