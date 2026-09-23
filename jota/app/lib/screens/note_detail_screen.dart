@@ -734,14 +734,30 @@ class _TranscriptBlock extends StatelessWidget {
             // stays in the app's direction.
             NoteText(note.transcript!, style: t.prose),
             const SizedBox(height: JotaGrid.gapM),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                note.transcriptState == TranscriptState.manual
-                    ? 'Edited by hand'
-                    : 'Hold to edit',
-                style: t.prose.copyWith(color: c.inkMuted, fontSize: 12),
-              ),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    note.transcriptState == TranscriptState.manual
+                        ? 'Edited by hand'
+                        : 'Hold to edit',
+                    style: t.prose.copyWith(color: c.inkMuted, fontSize: 12),
+                  ),
+                ),
+                // A second pass is worth offering: the model changes (the
+                // first Arabic note went through an English-only model and
+                // came back English), and a note read badly once is not a
+                // note to re-record. Runs through whatever model Settings
+                // names now and replaces the words.
+                GestureDetector(
+                  onTap: onTranscribe,
+                  behavior: HitTestBehavior.opaque,
+                  child: Text(
+                    'Transcribe again',
+                    style: t.prose.copyWith(color: c.inkMuted, fontSize: 12),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
