@@ -52,6 +52,7 @@ class Note {
     this.transcriptState = TranscriptState.pending,
     this.transcriptError,
     this.transcriptModel,
+    this.machineTranscript,
     required this.syncedAt,
   });
 
@@ -91,7 +92,19 @@ class Note {
   /// better model is a visible change rather than a mystery.
   final String? transcriptModel;
 
+  /// What the model said before the user corrected it. Null until the first
+  /// hand edit. Kept because the pair (what it heard, what was meant) is the
+  /// training data for a better model — the corrections export is built on
+  /// it — and an edit that overwrote it would throw that away.
+  final String? machineTranscript;
+
   final DateTime syncedAt;
+
+  /// Edited by hand, and the model's own words are still here to compare.
+  bool get isCorrected =>
+      transcriptState == TranscriptState.manual &&
+      machineTranscript != null &&
+      hasTranscript;
 
   /// `N-012`
   String get displayId => fmtNoteId(noteId);
@@ -128,6 +141,7 @@ class Note {
     String? transcriptError,
     bool clearTranscriptError = false,
     String? transcriptModel,
+    String? machineTranscript,
   }) {
     return Note(
       rowId: rowId ?? this.rowId,
@@ -145,6 +159,7 @@ class Note {
           ? null
           : (transcriptError ?? this.transcriptError),
       transcriptModel: transcriptModel ?? this.transcriptModel,
+      machineTranscript: machineTranscript ?? this.machineTranscript,
       syncedAt: syncedAt,
     );
   }
@@ -164,6 +179,7 @@ class Note {
       'transcript_state': transcriptState.name,
       'transcript_error': transcriptError,
       'transcript_model': transcriptModel,
+      'machine_transcript': machineTranscript,
       'synced_at': syncedAt.millisecondsSinceEpoch ~/ 1000,
     };
   }
@@ -186,6 +202,7 @@ class Note {
           TranscriptState.fromName(r['transcript_state'] as String?),
       transcriptError: r['transcript_error'] as String?,
       transcriptModel: r['transcript_model'] as String?,
+      machineTranscript: r['machine_transcript'] as String?,
       syncedAt: DateTime.fromMillisecondsSinceEpoch(
         ((r['synced_at'] as int?) ?? 0) * 1000,
       ),

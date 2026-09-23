@@ -20,7 +20,7 @@ import 'package:sqflite/sqflite.dart';
 
 abstract final class JotaDatabase {
   static const String fileName = 'jota.db';
-  static const int version = 1;
+  static const int version = 2;
 
   static const String notes = 'notes';
   static const String partials = 'partials';
@@ -37,9 +37,14 @@ abstract final class JotaDatabase {
         await _createV1(db);
       },
       onUpgrade: (Database db, int from, int to) async {
-        // Nothing to migrate yet. When there is, migrate forward step by step
-        // here rather than dropping and recreating — these rows are the only
-        // copy of the user's transcripts.
+        // Forward, step by step, never drop and recreate — these rows are the
+        // only copy of the user's transcripts.
+        if (from < 2) {
+          // v2: keep the model's words when the user corrects them.
+          await db.execute(
+            'ALTER TABLE $notes ADD COLUMN machine_transcript TEXT',
+          );
+        }
       },
     );
   }
@@ -63,6 +68,7 @@ abstract final class JotaDatabase {
         transcript_state TEXT    NOT NULL DEFAULT 'pending',
         transcript_error TEXT,
         transcript_model TEXT,
+        machine_transcript TEXT,
         synced_at        INTEGER NOT NULL,
         UNIQUE (device_id, note_id)
       )

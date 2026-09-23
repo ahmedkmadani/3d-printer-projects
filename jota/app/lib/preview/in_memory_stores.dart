@@ -131,11 +131,21 @@ class InMemoryNoteRepository implements NoteRepository {
     String? model,
     bool manual = false,
   }) {
+    // A hand edit keeps what the model said (once — the first edit's
+    // "before" is the model's, later edits are the user's own). A model
+    // result replaces it, so a re-run pairs with the next correction.
+    final String? machine = manual
+        ? (note.machineTranscript ??
+            (note.transcriptState == TranscriptState.done
+                ? note.transcript
+                : null))
+        : text;
     return update(
       note.copyWith(
         transcript: text,
         transcriptState: manual ? TranscriptState.manual : TranscriptState.done,
         transcriptModel: model,
+        machineTranscript: machine,
         clearTranscriptError: true,
       ),
     );

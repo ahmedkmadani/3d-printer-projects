@@ -65,6 +65,8 @@ dependencies:
   lucide_icons_flutter: 3.1.15
   whisper_ggml: ^2.6.0
   share_plus: ^12.0.2
+  # The corrections export is a zip of WAVs plus a manifest. Pure Dart.
+  archive: ^3.6.1
 
 dev_dependencies:
   flutter_test:

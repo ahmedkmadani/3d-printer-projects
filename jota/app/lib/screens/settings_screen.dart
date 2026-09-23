@@ -19,6 +19,7 @@
 // ============================================================================
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -29,6 +30,7 @@ import 'package:share_plus/share_plus.dart';
 import '../data/note.dart';
 import '../data/settings_store.dart';
 import '../export/backup.dart';
+import '../export/corrections.dart';
 import '../design/format.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
@@ -462,6 +464,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           value: '→',
                           onTap: () => _shareBackup(s),
                         ),
+                        // Every note corrected by hand, as audio plus both
+                        // texts: the training data for a Whisper that knows
+                        // this voice. See lib/export/corrections.dart.
+                        _SettingRow(
+                          label: 'Export corrections',
+                          value: '→',
+                          onTap: () => _shareCorrections(context, s),
+                        ),
                         _SettingRow(
                           label: 'Playback cache',
                           value: '${fmtBytes(_cacheBytes)} →',
@@ -710,6 +720,35 @@ Future<void> _shareBackup(Services s) async {
     ShareParams(
       files: <XFile>[XFile(f.path, mimeType: 'application/json')],
       subject: 'Jota notes $stamp',
+    ),
+  );
+}
+
+/// The corrections zip to the share sheet, or a word when there is nothing
+/// corrected yet.
+Future<void> _shareCorrections(BuildContext context, Services s) async {
+  final List<Note> notes = await s.notes.all();
+  final Uint8List? zip = await buildCorrectionsZip(
+    notes,
+    s.audio,
+    language: s.settings.language,
+  );
+  if (zip == null) {
+    if (context.mounted) {
+      _say(context, 'No corrections yet — hold a transcript to edit it');
+    }
+    return;
+  }
+  final Directory dir = await getTemporaryDirectory();
+  final DateTime now = DateTime.now();
+  final String stamp = '${now.year}${now.month.toString().padLeft(2, '0')}'
+      '${now.day.toString().padLeft(2, '0')}';
+  final File f = File('${dir.path}/jota-corrections-$stamp.zip');
+  await f.writeAsBytes(zip, flush: true);
+  await SharePlus.instance.share(
+    ShareParams(
+      files: <XFile>[XFile(f.path, mimeType: 'application/zip')],
+      subject: 'Jota corrections $stamp',
     ),
   );
 }
