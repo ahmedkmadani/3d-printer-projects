@@ -2,9 +2,9 @@
 //  Jota — pocket voice-note device
 //  Waveshare ESP32-S3-ePaper-1.54 (200x200 mono, SSD1681)
 //
-//  PHASE 1: the complete UI and navigation, with recording and syncing
-//  SIMULATED. No audio, no SD, no WiFi yet — this build exists to lock the
-//  look and the interaction on real hardware.
+//  Records for real: mic -> ES8311 -> I2S -> WAV + ADPCM on the microSD, on
+//  a task of its own so the panel and the radio keep running. No WiFi, by
+//  design — the phone pulls notes over BLE and transcribes them itself.
 //
 //  Controls
 //    BOOT (star)  short = select / start+stop recording   long = back
@@ -17,8 +17,11 @@
 #include "app/model.h"
 #include "app/nav.h"
 #include "app/notes.h"
+#include "app/recorder.h"
 #include "hal/battery.h"
 #include "hal/buttons.h"
+#include "hal/mic.h"
+#include "hal/sdcard.h"
 #include "link/ble.h"
 #include "ui/screens.h"
 #include "ui/theme.h"
@@ -34,7 +37,6 @@ static const int EPD_RST  = 9;
 static const int EPD_BUSY = 8;
 static const int EPD_PWR  = 6;   // panel power, active LOW
 static const int PWR_LATCH = 17;  // HIGH keeps the board alive off USB
-static const int AUDIO_PWR = 42;  // codec rail — phase 2
 
 GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(
     GxEPD2_154_D67(EPD_CS, EPD_DC, EPD_RST, EPD_BUSY));
@@ -46,6 +48,9 @@ static Buttons   buttons;
 static Battery   battery;
 static AppModel  model;
 static NoteStore notes;
+static SdCard    sdcard;
+static Mic       mic;
+static Recorder  recorder;
 static Link      bleLink;   // not `link`: collides with POSIX link()
 
 // Full refresh clears e-paper ghosting; partial is fast but accumulates it.
@@ -121,10 +126,6 @@ void setup() {
   pinMode(EPD_PWR, OUTPUT);
   digitalWrite(EPD_PWR, LOW);
 
-  // 3) Keep the audio rail off until phase 2 actually needs it.
-  pinMode(AUDIO_PWR, OUTPUT);
-  digitalWrite(AUDIO_PWR, LOW);
-
   Serial.begin(115200);
   delay(200);
   Serial.println("\n[jota] booting...");
@@ -145,10 +146,14 @@ void setup() {
   updateClock(millis());
   model.clock = clockBuf;
 
-  // Dummy notes live in flash — no SD card and no microphone needed yet, so
-  // the phone app can be built against a real protocol today.
-  notes.begin();
-  model.pending = notes.pending();
+  // Card first, then the index on it, then the mic. Without a card the store
+  // is empty and the recorder refuses to start; both say so on serial.
+  sdcard.begin();
+  notes.begin(sdcard.mounted());
+  model.pending   = notes.pending();
+  model.noteCount = notes.lastId();  // so the next N-xxx continues the card's
+  mic.begin();
+  recorder.begin(&mic, sdcard.mounted());
 
   // Before the first paint, so the idle screen shows a real figure rather than
   // filling one in half a minute later.
@@ -199,6 +204,37 @@ void loop() {
   // real note store rather than the recording simulation.
   static uint8_t lastPending = 0xFF;
   static Screen  lastScreen  = Screen::Ready;
+
+  // Recording follows the screen: up when RECORDING appears, down when it
+  // goes. nav decides when; main owns the mic and the card, as it owns every
+  // other piece of hardware.
+  const Screen scr = nav.screen();
+  if (scr == Screen::Recording && lastScreen != Screen::Recording) {
+    const uint16_t id = notes.nextId();
+    if (recorder.start(id)) Serial.printf("[jota] recording N-%03u\n", (unsigned)id);
+  }
+  if (scr != Screen::Recording && recorder.running()) recorder.stop();
+
+  RecResult rr;
+  if (recorder.takeResult(rr)) {
+    if (rr.ok) {
+      // The tag may already have been chosen on SAVED while the task was
+      // closing its files; whatever is chosen after lands via setTag below.
+      const char *tag = (model.note.id == rr.id) ? model.note.tag : nullptr;
+      if (!notes.add(rr.id, rr.secs, rr.bytes, rr.crc, tag)) {
+        Serial.println("[jota] note recorded but NOT indexed");
+      }
+    } else {
+      Serial.println("[jota] recording lost");
+    }
+    // Keep the panel's numbering tied to the card's, even after a failure.
+    model.noteCount = notes.lastId();
+  }
+  // The tag on SAVED is a toggle until the screen is left; then it is final.
+  if (lastScreen == Screen::Saved && scr != Screen::Saved) {
+    notes.setTag(model.note.id, model.note.tag);
+  }
+
   model.pending = notes.pending();
 
   // Advertise fast for a minute whenever there is a fresh reason for the
@@ -259,7 +295,7 @@ void loop() {
     notes.eraseAll();
     bleLink.forgetOwner();
     tagsSetDefaults(model.tags);
-    model.noteCount = 0;
+    model.noteCount = notes.lastId();
     model.pending   = notes.pending();
     model.paired    = false;
     model.authed    = false;
@@ -272,6 +308,14 @@ void loop() {
 
   if (nav.powerOff()) {
     Serial.println("[jota] powering off");
+    // A power press while recording saves first (nav committed the note);
+    // give the task time to close its files before the latch drops.
+    if (recorder.busy()) {
+      recorder.stop();
+      RecResult last;
+      while (!recorder.takeResult(last)) delay(5);
+      if (last.ok) notes.add(last.id, last.secs, last.bytes, last.crc, model.note.tag);
+    }
     // Leave a deliberate resting frame. E-paper holds its last image forever,
     // so without this the device sits in a drawer showing whatever menu it
     // was on, with a frozen clock.

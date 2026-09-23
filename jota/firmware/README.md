@@ -142,12 +142,21 @@ policy, the ADPCM encoder, the note store's byte-range serving and CRC
 checking, and the complete BLE service — pairing, index, chunked transfer,
 resume-from-offset, tags, clock.
 
-**Not yet:** the microphone. `app/notes` serves three short notes synthesised
-in flash, so the phone app can be built and tested end to end — connect, pair,
-fetch, resume, ack — with no SD card and no mic. Swapping the source for the
-recorder changes nothing the app can see.
+**Real as of 2026-09-23:** the microphone and the card. `hal/mic` brings up
+the ES8311 over I2C 47/48 and I2S (MCLK 14, BCLK 15, WS 38, DIN 16) with
+Espressif's `esp_codec_dev` component, vendored under `src/vendor` (Apache-2.0;
+one IDF-version guard restored so it builds on this core's IDF 4.4). `hal/sdcard`
+mounts the microSD over 1-bit SDMMC (CLK 39, CMD 41, D0 40) at `/sdcard`.
+`app/recorder` runs the capture on its own task and writes two files per
+note under `/sdcard/jota`: `NNNN.wav`, the raw 16 kHz mono archive, and
+`NNNN.ima`, the ADPCM copy the phone receives. `app/notes` indexes them in
+`index.txt` on the card and serves the `.ima` by byte range.
 
-The pairing code is currently the fixed `428 913`.
+First real recording: N-001, 8 s, on a 128 GB card the device formatted
+itself (it shipped exFAT, which this core's FAT driver cannot read; the
+one-time format flag has since been reverted).
+
+The pairing code is six random digits per pairing offer; see the BLE contract.
 
 ## Phone link
 
@@ -162,8 +171,8 @@ wakes.
 
 ## Next
 
-1. Microphone: ES8311 over I2C, I2S capture, ADPCM straight into the note store.
-2. microSD: keep the raw WAV as the archive; only the compressed copy is sent.
-3. Real pairing code per session. (GUIDE is gone — the device no longer
-   teaches itself on every boot.)
-4. Deep sleep between notes, waking on BOOT (`ext_wakeup` is already GPIO0).
+1. Listen to a real note on the phone end to end: fetch over BLE, decode,
+   transcribe. The app's BLE path has still never touched hardware.
+2. Mic gain: 45 dB is what both references use; tune by ear.
+3. Deep sleep between notes, waking on BOOT (`ext_wakeup` is already GPIO0).
+4. Orphan files: a WAV left by a power cut mid-recording is not indexed.

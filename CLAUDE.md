@@ -93,9 +93,14 @@ Tags are armed on the device (TAGS → select) and spent by the next recording,
 travelling to the phone as a string in `index`. Selecting the armed tag again
 disarms it.
 
-**Simulated:** the microphone. `jota/firmware/src/app/notes.cpp` synthesises
-three short notes in flash so the app can be built end to end with no SD card
-and no mic. Recording and syncing on the device UI are also simulated.
+**Real since 2026-09-23:** the microphone and the SD card. Recording writes
+`NNNN.wav` (raw archive) and `NNNN.ima` (ADPCM copy) under `/sdcard/jota` on
+a background task; the note store indexes them on the card and serves the
+`.ima` to the phone. The codec is driven by Espressif's Apache-licensed
+`esp_codec_dev`, vendored in `jota/firmware/src/vendor` — the same component
+Pala and Waveshare use; their `codec_board` wrapper is not used because it
+needs IDF 5. The synthetic notes are gone. The card must be FAT32: this
+core's FAT driver has exFAT off, and a card over 32 GB ships exFAT.
 
 **Never run against real hardware:** the app's BLE path. It has only ever
 talked to fakes.
