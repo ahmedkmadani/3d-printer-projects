@@ -20,8 +20,8 @@ import 'package:provider/provider.dart';
 import '../audio/note_player.dart';
 import '../data/note.dart';
 import '../design/format.dart';
-import '../design/script.dart';
 import '../design/theme.dart';
+import '../design/transcript.dart';
 import '../design/widgets.dart';
 import '../state/notes_controller.dart';
 import '../state/services.dart';
@@ -909,7 +909,9 @@ class _TranscriptBlock extends StatelessWidget {
             // device gives in screens.cpp. NoteText so an Arabic transcript
             // reads right to left in the Arabic face; the chrome around it
             // stays in the app's direction.
-            NoteText(note.transcript!, style: t.prose),
+            // Paragraphs, a looser line height, and a fold past about a
+            // minute of speech: see design/transcript.dart.
+            JotaTranscript(text: note.transcript!),
             const SizedBox(height: JotaGrid.gapM),
             // Two actions as two small stadiums, no caption. A long press
             // on the words still opens the editor; the button is what
