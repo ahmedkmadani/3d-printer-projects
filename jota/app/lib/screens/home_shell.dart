@@ -161,12 +161,15 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     // safe area, so no screen has to reserve room for the nav by hand.
     return Scaffold(
       backgroundColor: c.bg,
-      body: IndexedStack(
+      body: _TabReveal(
         index: _index,
-        children: <Widget>[
-          for (int i = 0; i < 3; i++)
-            _visited.contains(i) ? _tab(i) : const SizedBox.shrink(),
-        ],
+        child: IndexedStack(
+          index: _index,
+          children: <Widget>[
+            for (int i = 0; i < 3; i++)
+              _visited.contains(i) ? _tab(i) : const SizedBox.shrink(),
+          ],
+        ),
       ),
       bottomNavigationBar: HomeNavBar(current: _index, onSelect: _select),
     );
@@ -296,6 +299,56 @@ class _NavItem extends StatelessWidget {
             style: t.navLabel.copyWith(color: fg),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The body's entrance on a tab switch: a fade from half and a lift of a few
+/// pixels, once per switch. The IndexedStack underneath keeps every tab's
+/// state; only the reveal is animated, so nothing is rebuilt or rescanned.
+class _TabReveal extends StatefulWidget {
+  const _TabReveal({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  State<_TabReveal> createState() => _TabRevealState();
+}
+
+class _TabRevealState extends State<_TabReveal>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: JotaMotion.normal,
+    value: 1,
+  );
+
+  @override
+  void didUpdateWidget(_TabReveal old) {
+    super.didUpdateWidget(old);
+    if (old.index != widget.index) _c.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final CurvedAnimation a =
+        CurvedAnimation(parent: _c, curve: JotaMotion.curve);
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.4, end: 1).animate(a),
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.012),
+          end: Offset.zero,
+        ).animate(a),
+        child: widget.child,
       ),
     );
   }

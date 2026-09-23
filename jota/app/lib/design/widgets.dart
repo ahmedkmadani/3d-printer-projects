@@ -358,8 +358,7 @@ class JotaRow extends StatelessWidget {
     return Semantics(
       button: onTap != null,
       selected: selected,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: JotaPressable(
         onTap: enabled ? onTap : null,
         child: AnimatedContainer(
           duration: JotaMotion.fast,
@@ -502,10 +501,11 @@ class JotaButton extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: enabled,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: JotaPressable(
         onTap: enabled ? onTap : null,
-        child: Container(
+        child: AnimatedContainer(
+          duration: JotaMotion.fast,
+          curve: JotaMotion.curve,
           height: height,
           decoration: BoxDecoration(
             color: fill,
@@ -1111,6 +1111,55 @@ class _JotaSearchFieldState extends State<JotaSearchField> {
   }
 }
 
+/// Press feedback for every tappable shape: the shape sinks a hair under the
+/// finger and springs back on release. Without it a stadium is a drawing of
+/// a button; with it, it is one. Scale, not colour, because colour is spent
+/// on selection everywhere in this product.
+class JotaPressable extends StatefulWidget {
+  const JotaPressable({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.onLongPress,
+    this.scale = 0.97,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final double scale;
+
+  @override
+  State<JotaPressable> createState() => _JotaPressableState();
+}
+
+class _JotaPressableState extends State<JotaPressable> {
+  bool _down = false;
+
+  void _set(bool v) {
+    if (_down != v && mounted) setState(() => _down = v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = widget.onTap != null || widget.onLongPress != null;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: enabled ? (_) => _set(true) : null,
+      onTapUp: enabled ? (_) => _set(false) : null,
+      onTapCancel: enabled ? () => _set(false) : null,
+      onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
+      child: AnimatedScale(
+        scale: _down ? widget.scale : 1,
+        duration: JotaMotion.fast,
+        curve: JotaMotion.curve,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 /// A choice on a sheet — a tag to file under, a language — as a stadium a
 /// finger can read and hit: the `choice` role inside JotaRows.choicePadding,
 /// outlined in ink, inverted when it is the chosen one. A step up from the
@@ -1134,9 +1183,9 @@ class JotaTagChoice extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      child: GestureDetector(
+      child: JotaPressable(
         onTap: onTap,
-        behavior: HitTestBehavior.opaque,
+        scale: 0.94,
         child: AnimatedContainer(
           duration: JotaMotion.fast,
           curve: JotaMotion.curve,
@@ -1173,7 +1222,9 @@ class JotaTagPill extends StatelessWidget {
     // at 10pt over 2pt of padding it read as a tiny ring, out of scale with
     // every other stadium on the screen. Outlined in the ink of its label,
     // not the rule colour, so the shape is as present as the word inside it.
-    return Container(
+    return AnimatedContainer(
+      duration: JotaMotion.fast,
+      curve: JotaMotion.curve,
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
       decoration: BoxDecoration(
         color: selected ? c.ink : Colors.transparent,

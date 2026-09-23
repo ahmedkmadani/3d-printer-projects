@@ -204,14 +204,25 @@ class _Figure extends StatelessWidget {
         //
         // Regular weight, and tabular figures so 8 and 11 still occupy the
         // same width as the week turns over.
-        Text(
-          value,
-          style: t.prose.copyWith(
-            fontSize: 44,
-            fontWeight: FontWeight.w400,
-            height: 1,
-            letterSpacing: -0.5,
-            fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+        // Counts up from zero the first time it is drawn: the number lands
+        // rather than being there already, which is the difference between
+        // a page and a device.
+        TweenAnimationBuilder<double>(
+          tween: Tween<double>(
+            begin: 0,
+            end: (int.tryParse(value) ?? 0).toDouble(),
+          ),
+          duration: const Duration(milliseconds: 700),
+          curve: JotaMotion.curve,
+          builder: (BuildContext context, double v, _) => Text(
+            int.tryParse(value) == null ? value : v.round().toString(),
+            style: t.prose.copyWith(
+              fontSize: 44,
+              fontWeight: FontWeight.w400,
+              height: 1,
+              letterSpacing: -0.5,
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+            ),
           ),
         ),
         const SizedBox(height: JotaGrid.gapS),
@@ -305,11 +316,13 @@ class _LatestCard extends StatelessWidget {
               fmtNoteStamp(note.recordedAt),
               style: t.meta.copyWith(color: c.inkMuted),
             ),
-            const SizedBox(width: JotaGrid.gapS),
+            const SizedBox(width: JotaGrid.gapM),
             // Inverted, as the sheet draws it: on a card that holds exactly one
             // note, the pill is the note's own mark rather than one of a set
             // you are choosing between.
-            if (note.tag != null) JotaTagPill(label: note.tag!, selected: true),
+            // Outlined, as on the list: here the tag is a label on a note,
+            // and inversion is kept for a choice being made.
+            if (note.tag != null) JotaTagPill(label: note.tag!),
           ],
         ),
         NoteText(

@@ -299,10 +299,9 @@ class _NoteRow extends StatelessWidget {
     final JotaType t = context.type;
     final JotaColors c = context.ink;
 
-    return InkWell(
+    return JotaPressable(
       onTap: onTap,
-      splashColor: Colors.transparent,
-      highlightColor: Colors.transparent,
+      scale: 0.985,
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: JotaGrid.margin,
@@ -322,7 +321,7 @@ class _NoteRow extends StatelessWidget {
                   fmtNoteStamp(note.recordedAt),
                   style: t.meta.copyWith(color: c.inkMuted),
                 ),
-                const SizedBox(width: JotaGrid.gapS),
+                const SizedBox(width: JotaGrid.gapM),
                 if (note.tag != null) JotaTagPill(label: note.tag!),
               ],
             ),

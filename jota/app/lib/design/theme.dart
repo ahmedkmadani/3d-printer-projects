@@ -18,6 +18,7 @@
 //  the size of the same datum because the fonts were named by metric.
 // ============================================================================
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 
 // ---- Palette ---------------------------------------------------------------
 // The device has two colours. The phone gets six, and five of them are greys.
@@ -552,6 +553,15 @@ abstract final class JotaTheme {
 
     return ThemeData(
       useMaterial3: true,
+      // A page slides in from the right and can be dragged back out. The
+      // platform default on Android is a fade that most people never
+      // notice, which is what "the app feels dead" meant.
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: c.bg,

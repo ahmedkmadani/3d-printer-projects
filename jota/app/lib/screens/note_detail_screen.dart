@@ -112,16 +112,17 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 fmtNoteStamp(_note.recordedAt),
                 style: t.meta.copyWith(color: c.inkMuted),
               ),
-              const SizedBox(width: JotaGrid.gapS),
-              // Inverted here, outlined in the list: this is the tag that was
-              // chosen for this note, and inversion is what "chosen" looks
-              // like everywhere in the product. Tapping it opens the chooser,
-              // the same as the button below.
+              const SizedBox(width: JotaGrid.gapM),
+              // Outlined, the same as on the list and Home: a tag on a note
+              // is a label wherever it appears, and inversion is kept for a
+              // choice being made in a sheet. It was inverted here and
+              // outlined there, which read as two different things. Tapping
+              // it opens the chooser, the same as the button below.
               if (_note.tag != null)
                 GestureDetector(
                   onTap: () => _editTag(context, notes, services),
                   behavior: HitTestBehavior.opaque,
-                  child: JotaTagPill(label: _note.tag!, selected: true),
+                  child: JotaTagPill(label: _note.tag!),
                 ),
             ],
           ),
@@ -177,6 +178,14 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               style: t.reading.copyWith(color: c.signal),
             ),
           ],
+
+          // The note's facts, under its words: how long, how many words,
+          // which model wrote them, when it reached the phone. A short note
+          // left most of the screen empty; these are true things about it
+          // that were nowhere, and they fill the page with figures rather
+          // than air.
+          const SizedBox(height: JotaGrid.gapXL),
+          _FactsBlock(note: _note),
 
           const SizedBox(height: JotaGrid.gapL),
         ],
@@ -339,6 +348,86 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       await notes.setTranscript(_note, result);
     }
     controller.dispose();
+  }
+}
+
+/// The facts about a note, as a key/value column on a field card, the same
+/// shape as the cards on Home. Only what is known: a note without words has
+/// no word count and no model.
+class _FactsBlock extends StatelessWidget {
+  const _FactsBlock({required this.note});
+
+  final Note note;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    final JotaType t = context.type;
+    final int words = note.hasTranscript
+        ? note.transcript!.trim().split(RegExp(r'\s+')).length
+        : 0;
+    final String? model = note.transcriptModel;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: JotaGrid.gapL,
+        vertical: JotaGrid.gapM + 4,
+      ),
+      decoration: BoxDecoration(
+        color: c.field,
+        borderRadius: const BorderRadius.all(Radius.circular(JotaCards.radius)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text('DETAILS', style: t.cardLabel.copyWith(color: c.inkMuted)),
+          const SizedBox(height: JotaGrid.gapS),
+          _Fact(name: 'Length', value: fmtDuration(note.secs)),
+          // A plain count, not zero-padded: padding is for figures that
+          // line up in a column of their kind, and this one stands alone.
+          if (note.hasTranscript) _Fact(name: 'Words', value: '$words'),
+          if (model != null && model.isNotEmpty)
+            _Fact(
+              name: note.transcriptState == TranscriptState.manual
+                  ? 'Written by'
+                  : 'Read by',
+              value: note.transcriptState == TranscriptState.manual
+                  ? 'You'
+                  : model.replaceAll('-', ' ').toUpperCase(),
+            ),
+          _Fact(name: 'Synced', value: fmtNoteStamp(note.syncedAt)),
+          _Fact(name: 'Note', value: note.displayId),
+        ],
+      ),
+    );
+  }
+}
+
+/// One fact: the name in quiet prose, the value in the reading face — the
+/// same pairing as the rows on Home's cards, so the two cards read as kin.
+class _Fact extends StatelessWidget {
+  const _Fact({required this.name, required this.value});
+
+  final String name;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: JotaGrid.gapS),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: <Widget>[
+          Expanded(
+            child: Text(name, style: t.prose.copyWith(color: c.inkMuted)),
+          ),
+          const SizedBox(width: JotaGrid.gapM),
+          Text(value, style: t.reading.copyWith(color: c.ink)),
+        ],
+      ),
+    );
   }
 }
 
