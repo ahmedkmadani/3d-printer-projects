@@ -112,8 +112,8 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 fmtNoteStamp(_note.recordedAt),
                 style: t.reading.copyWith(
                   color: c.inkMuted,
-                  fontSize: 11,
-                  letterSpacing: 0.7,
+                  fontSize: 12,
+                  letterSpacing: 0.8,
                 ),
               ),
               const SizedBox(width: JotaGrid.gapS),

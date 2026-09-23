@@ -31,6 +31,7 @@ class PrefsSettingsStore implements SettingsStore {
   static const String _kDeviceName = 'device_name';
   static const String _kBackgroundSync = 'background_sync';
   static const String _kAutoTranscribe = 'auto_transcribe';
+  static const String _kNewestFirst = 'notes_newest_first';
   static const String _kSeenOnboarding = 'seen_onboarding';
   static const String _kTags = 'tags';
   static const String _kAppLock = 'app_lock';
@@ -121,6 +122,12 @@ class PrefsSettingsStore implements SettingsStore {
 
   @override
   Future<void> setAutoTranscribe(bool v) => _prefs.setBool(_kAutoTranscribe, v);
+
+  @override
+  bool get notesNewestFirst => _prefs.getBool(_kNewestFirst) ?? true;
+
+  @override
+  Future<void> setNotesNewestFirst(bool v) => _prefs.setBool(_kNewestFirst, v);
 
   @override
   bool get hasSeenOnboarding => _prefs.getBool(_kSeenOnboarding) ?? false;

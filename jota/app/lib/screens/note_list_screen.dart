@@ -134,14 +134,26 @@ class _NoteListScreenState extends State<NoteListScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Notes', style: t.headline),
-                const SizedBox(height: JotaGrid.gapS),
-                // The only instruction on the screen, and it is one line. It
-                // names the gesture that covers the times the OS refuses to
-                // wake the app for the device.
-                Text(
-                  'Pull down to sync',
-                  style: t.prose.copyWith(color: c.inkMuted),
+                // No "pull down to sync" line: everyone pulls a list to
+                // refresh, and the pull still works. The one thing beside
+                // the title is the order, a quiet link that flips.
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    Expanded(child: Text('Notes', style: t.headline)),
+                    if (notes.count > 1)
+                      GestureDetector(
+                        onTap: () => notes.setNewestFirst(!notes.newestFirst),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            notes.newestFirst ? 'Newest first' : 'Oldest first',
+                            style: t.prose.copyWith(color: c.inkMuted),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 if (notes.count > 0) ...<Widget>[
                   const SizedBox(height: JotaGrid.gapL),
@@ -316,8 +328,8 @@ class _NoteRow extends StatelessWidget {
                   fmtNoteStamp(note.recordedAt),
                   style: t.reading.copyWith(
                     color: c.inkMuted,
-                    fontSize: 11,
-                    letterSpacing: 0.7,
+                    fontSize: 12,
+                    letterSpacing: 0.8,
                   ),
                 ),
                 const SizedBox(width: JotaGrid.gapS),
@@ -404,7 +416,7 @@ class _TagFilterRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 28,
+      height: 32,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: <Widget>[

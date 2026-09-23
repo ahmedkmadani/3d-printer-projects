@@ -59,6 +59,11 @@ abstract class SettingsStore {
   bool get autoTranscribe;
   Future<void> setAutoTranscribe(bool v);
 
+  /// The archive's order. Newest first by default; the link beside the
+  /// Notes title flips it and it stays flipped.
+  bool get notesNewestFirst;
+  Future<void> setNotesNewestFirst(bool v);
+
   /// Whether the first-run splash → onboarding flow has been completed. False on
   /// a fresh install; set true once the user finishes or skips onboarding, so
   /// every launch after the first goes straight to the notes.

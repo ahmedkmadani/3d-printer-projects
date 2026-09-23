@@ -1129,7 +1129,7 @@ class JotaTagPill extends StatelessWidget {
     // every other stadium on the screen. Outlined in the ink of its label,
     // not the rule colour, so the shape is as present as the word inside it.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
       decoration: BoxDecoration(
         color: selected ? c.ink : Colors.transparent,
         border: Border.all(
@@ -1141,10 +1141,10 @@ class JotaTagPill extends StatelessWidget {
       child: Text(
         label.toUpperCase(),
         style: t.reading.copyWith(
-          fontSize: 11,
-          letterSpacing: 0.9,
+          fontSize: 12,
+          letterSpacing: 1.0,
           height: 1.1,
-          color: selected ? c.onInk : c.inkMuted,
+          color: selected ? c.onInk : c.ink,
         ),
       ),
     );

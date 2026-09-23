@@ -35,6 +35,7 @@ class JotaApp extends StatelessWidget {
           create: (_) => NotesController(
             repository: services.notes,
             transcription: services.transcription,
+            settings: services.settings,
           )..refresh(),
         ),
         ChangeNotifierProxyProvider<NotesController, DeviceController>(

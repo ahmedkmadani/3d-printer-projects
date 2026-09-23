@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/note.dart';
 import '../data/note_repository.dart';
+import '../data/settings_store.dart';
 import '../design/format.dart';
 import '../transcribe/transcription_queue.dart';
 
@@ -17,13 +18,17 @@ class NotesController extends ChangeNotifier {
   NotesController({
     required NoteRepository repository,
     required TranscriptionQueue transcription,
+    SettingsStore? settings,
   })  : _repo = repository,
-        _transcription = transcription {
+        _transcription = transcription,
+        _settings = settings,
+        _newestFirst = settings?.notesNewestFirst ?? true {
     _sub = _transcription.changes.listen((_) => refresh());
   }
 
   final NoteRepository _repo;
   final TranscriptionQueue _transcription;
+  final SettingsStore? _settings;
   StreamSubscription<void>? _sub;
 
   List<Note> _notes = <Note>[];
@@ -32,6 +37,18 @@ class NotesController extends ChangeNotifier {
   /// Null means "all". Set by the tag pills on the list screen.
   String? _tagFilter;
   String? get tagFilter => _tagFilter;
+
+  /// The archive's order. The repository hands notes newest first; oldest
+  /// first is the same list read backwards.
+  bool _newestFirst;
+  bool get newestFirst => _newestFirst;
+
+  void setNewestFirst(bool v) {
+    if (_newestFirst == v) return;
+    _newestFirst = v;
+    _settings?.setNotesNewestFirst(v);
+    notifyListeners();
+  }
 
   /// Words typed into the list's search field. Empty means "everything".
   String _query = '';
@@ -48,8 +65,9 @@ class NotesController extends ChangeNotifier {
 
   List<Note> get visible {
     final String q = _query.trim().toLowerCase();
-    if (_tagFilter == null && q.isEmpty) return _notes;
-    return _notes
+    final Iterable<Note> ordered = _newestFirst ? _notes : _notes.reversed;
+    if (_tagFilter == null && q.isEmpty) return ordered.toList();
+    return ordered
         .where((Note n) => _tagFilter == null || n.tag == _tagFilter)
         .where((Note n) => q.isEmpty || _matches(n, q))
         .toList();

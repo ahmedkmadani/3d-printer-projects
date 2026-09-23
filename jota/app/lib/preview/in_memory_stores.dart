@@ -417,6 +417,12 @@ class InMemorySettingsStore implements SettingsStore {
   @override
   Future<void> setAutoTranscribe(bool v) async => _autoTranscribe = v;
 
+  bool _newestFirst = true;
+  @override
+  bool get notesNewestFirst => _newestFirst;
+  @override
+  Future<void> setNotesNewestFirst(bool v) async => _newestFirst = v;
+
   @override
   bool get hasSeenOnboarding => _hasSeenOnboarding;
 
