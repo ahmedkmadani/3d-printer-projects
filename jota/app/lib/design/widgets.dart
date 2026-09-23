@@ -1124,12 +1124,16 @@ class JotaTagPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final JotaColors c = context.ink;
     final JotaType t = context.type;
+    // The same size as the stamp it sits beside, with room around the word:
+    // at 10pt over 2pt of padding it read as a tiny ring, out of scale with
+    // every other stadium on the screen. Outlined in the ink of its label,
+    // not the rule colour, so the shape is as present as the word inside it.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
       decoration: BoxDecoration(
         color: selected ? c.ink : Colors.transparent,
         border: Border.all(
-          color: selected ? c.ink : c.rule,
+          color: selected ? c.ink : c.inkMuted,
           width: JotaGrid.hairline,
         ),
         borderRadius: const BorderRadius.all(Radius.circular(999)),
@@ -1137,8 +1141,9 @@ class JotaTagPill extends StatelessWidget {
       child: Text(
         label.toUpperCase(),
         style: t.reading.copyWith(
-          fontSize: 10,
-          letterSpacing: 0.8,
+          fontSize: 11,
+          letterSpacing: 0.9,
+          height: 1.1,
           color: selected ? c.onInk : c.inkMuted,
         ),
       ),

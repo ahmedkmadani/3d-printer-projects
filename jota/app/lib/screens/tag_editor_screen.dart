@@ -128,6 +128,61 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
     await saveTags(context, _tags);
   }
 
+  /// Most-used first. The top five are the ones the Jota offers after a
+  /// recording, so "sort by use" really means "put the tags I reach for on
+  /// the device". One tap, then drag to fine-tune. Stable, so tags with the
+  /// same count keep their order.
+  Future<void> _sortByUse() async {
+    final Map<String, int> counts =
+        _counts(context.read<NotesController>().notes);
+    final List<String> sorted = List<String>.of(_tags)
+      ..sort((String a, String b) => (counts[b] ?? 0) - (counts[a] ?? 0));
+    if (_listEquals(sorted, _tags)) {
+      _say(context, 'Already in order of use');
+      return;
+    }
+    setState(() => _tags = sorted);
+    await saveTags(context, _tags);
+  }
+
+  /// Swipe left. No dialog: the row is gone, the snackbar offers it back.
+  /// Notes that carried the tag keep it as a label; only the list of choices
+  /// changes.
+  Future<void> _remove(int index) async {
+    final String tag = _tags[index];
+    setState(() => _tags.removeAt(index));
+    // The offer to undo goes up BEFORE the save: the save's push to the
+    // device can fail at once when the Jota is asleep, and its own message
+    // would otherwise land on top of this one.
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('$tag removed'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'UNDO',
+            onPressed: () {
+              if (!mounted || _tags.contains(tag)) return;
+              setState(
+                () => _tags.insert(index.clamp(0, _tags.length), tag),
+              );
+              saveTags(context, _tags);
+            },
+          ),
+        ),
+      );
+    await saveTags(context, _tags);
+  }
+
+  static bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   /// How many notes carry each tag. The count is the reason to keep a tag or
   /// drag it above the cut, so it is on the row rather than a screen away.
   Map<String, int> _counts(List<Note> notes) {
@@ -187,9 +242,12 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
                   : TagList(
                       tags: _tags,
                       counts: _counts(notes.notes),
-                      header: const _TagsHeader(),
+                      header: _TagsHeader(
+                        onSortByUse: _tags.length > 1 ? _sortByUse : null,
+                      ),
                       onEdit: _edit,
                       onReorder: _reorder,
+                      onRemove: _remove,
                     ),
             ),
             Padding(
@@ -215,7 +273,10 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
 /// The title block, above the list and scrolling with it: what this screen is,
 /// and the one sentence that says the order is the setting.
 class _TagsHeader extends StatelessWidget {
-  const _TagsHeader();
+  const _TagsHeader({this.onSortByUse});
+
+  /// Null hides the action: one tag has no order to sort.
+  final VoidCallback? onSortByUse;
 
   @override
   Widget build(BuildContext context) {
@@ -224,10 +285,30 @@ class _TagsHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text('Tags', style: t.headline),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: <Widget>[
+            Expanded(child: Text('Tags', style: t.headline)),
+            if (onSortByUse != null)
+              // The same quiet text link as "Edit tags" on the note's tag
+              // sheet: an action, not a mode, so it is not a stadium.
+              GestureDetector(
+                onTap: onSortByUse,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    'Sort by use',
+                    style: t.prose.copyWith(color: c.inkMuted),
+                  ),
+                ),
+              ),
+          ],
+        ),
         const SizedBox(height: JotaGrid.gapS),
         Text(
-          'Drag to reorder. Only the top five fit on the device.',
+          'Drag to reorder, swipe left to remove. '
+          'Only the top five fit on the device.',
           style: t.prose.copyWith(color: c.inkMuted),
         ),
         const SizedBox(height: JotaGrid.gapM),
@@ -419,6 +500,7 @@ class TagList extends StatelessWidget {
     this.counts = const <String, int>{},
     this.header,
     this.onReorder,
+    this.onRemove,
     this.padding = const EdgeInsets.symmetric(horizontal: JotaGrid.margin),
   });
 
@@ -437,6 +519,10 @@ class TagList extends StatelessWidget {
   /// non-draggable list — which is what the first-run step wants, since there
   /// is no device to send anything to yet.
   final void Function(int oldIndex, int newIndex)? onReorder;
+
+  /// Swipe left to remove. Null means the rows do not swipe — the first-run
+  /// step has nothing to remove yet.
+  final ValueChanged<int>? onRemove;
   final EdgeInsets padding;
 
   Widget _row(BuildContext context, int i, {required bool belowCut}) {
@@ -462,7 +548,21 @@ class TagList extends StatelessWidget {
             ),
       onTap: () => onEdit(i),
     );
-    return belowCut ? Opacity(opacity: 0.45, child: row) : row;
+    final Widget dimmed = belowCut ? Opacity(opacity: 0.45, child: row) : row;
+    if (onRemove == null) return dimmed;
+    // The same gesture as a note in the archive: the row slides out and the
+    // list closes the gap. One word uncovered, in the signal colour, because
+    // it is the destructive one.
+    return Dismissible(
+      key: ValueKey<String>('remove-${tags[i]}'),
+      direction: DismissDirection.endToStart,
+      dismissThresholds: const <DismissDirection, double>{
+        DismissDirection.endToStart: 0.35,
+      },
+      background: const _RemoveHint(),
+      onDismissed: (_) => onRemove!(i),
+      child: dimmed,
+    );
   }
 
   @override
@@ -502,6 +602,28 @@ class TagList extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// What a swipe uncovers: REMOVE, right-aligned, on the field colour.
+class _RemoveHint extends StatelessWidget {
+  const _RemoveHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    return Container(
+      color: c.field,
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: JotaGrid.gapM),
+      child: Text(
+        'REMOVE',
+        style: context.type.label.copyWith(
+          color: c.signal,
+          letterSpacing: 1.2,
+        ),
+      ),
     );
   }
 }

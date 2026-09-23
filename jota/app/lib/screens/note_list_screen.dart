@@ -404,7 +404,7 @@ class _TagFilterRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 22,
+      height: 28,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: <Widget>[
