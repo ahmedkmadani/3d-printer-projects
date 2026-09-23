@@ -118,8 +118,10 @@ into N-010 the reset gave back a 4 s note on the next boot. The card also
 carries `battery.log` (time, uptime, event, mV, %) for the soak; the phone's
 clock write now sets the system clock, so notes are stamped as they are made.
 
-**Never run against real hardware:** the app's BLE path. It has only ever
-talked to fakes.
+**The app's BLE path met real hardware on 2026-09-23:** pairing, clock,
+index, fetch, tags and forget all ran phone-to-Jota, foreground only.
+**Still never tested for real: background sync** (app closed, device
+advertising with pending notes, OS wakes the app).
 
 The pairing code is **six random digits from the hardware RNG**, minted when a
 pairing offer opens and dropped when it closes — it is never persisted and
