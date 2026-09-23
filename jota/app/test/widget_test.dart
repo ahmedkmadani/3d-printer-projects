@@ -10,6 +10,7 @@
 //  exactly as a real one does, so there is no quiet moment to settle to. Frames
 //  are pumped by hand instead.
 // ============================================================================
+import 'package:flutter/widgets.dart' show ListView;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jota/app.dart';
 import 'package:jota/design/widgets.dart';
