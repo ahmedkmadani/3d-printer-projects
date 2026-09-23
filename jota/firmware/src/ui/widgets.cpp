@@ -280,9 +280,15 @@ void chargeRing(Adafruit_GFX &g, int16_t cx, int16_t cy, int16_t r,
   if (pct > 100) pct = 100;
   // One scan over the ring's bounding box draws both the dotted track and the
   // solid arc, pixel by pixel: stroked circles bead at this radius and gap at
-  // the diagonals. Angle is measured from 12 o'clock, clockwise, the way a
-  // dial is read.
-  const float endDeg = known ? 360.0f * (float)pct / 100.0f : 0.0f;
+  // the diagonals. Angle is measured from 12 o'clock, clockwise.
+  //
+  // The arc ENDS at 12 o'clock rather than starting there. A full cell is the
+  // whole ring; as it drains, the dotted gap opens at the top and grows
+  // clockwise, the way a clock hand moves. The arc used to start at 12 and
+  // end at the charge, which made the gap grow anticlockwise as the days
+  // went by — read as "the power is going backwards" by the one person who
+  // watched it drain.
+  const float startDeg = known ? 360.0f - 360.0f * (float)pct / 100.0f : 361.0f;
   const float tIn    = (float)r - (float)OFF_RING_STROKE / 2.0f;
   const float tOut   = (float)r + (float)OFF_RING_STROKE / 2.0f;
   const float aIn    = (float)r - (float)OFF_ARC_STROKE / 2.0f;
@@ -294,7 +300,7 @@ void chargeRing(Adafruit_GFX &g, int16_t cx, int16_t cy, int16_t r,
       if (d < aIn || d > aOut) continue;
       float deg = atan2f((float)dx, (float)-dy) * 180.0f / 3.14159265f;
       if (deg < 0.0f) deg += 360.0f;
-      const bool onArc = known && deg <= endDeg;
+      const bool onArc = known && deg >= startDeg;
       if (onArc) {
         g.drawPixel((int16_t)(cx + dx), (int16_t)(cy + dy), INK);
       } else if (d >= tIn && d <= tOut) {

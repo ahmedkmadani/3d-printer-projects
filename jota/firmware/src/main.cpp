@@ -73,6 +73,16 @@ static Link      bleLink;   // not `link`: collides with POSIX link()
 
 static uint32_t lastActivityMs = 0;
 static bool     wakeToRecord   = false;
+
+// Asleep, the panel shows the charge it fell asleep with, for ever: deep
+// sleep runs nothing and e-paper keeps its last frame. So the chip wakes on
+// a timer every half hour, reads the cell, redraws the OFF frame and goes
+// straight back to sleep — no radio, no card index, no buttons. A few
+// seconds of work per wake, well under a percent of the cell a day, and the
+// battery log gets a reading every half hour through the night, which is
+// exactly what a soak test wants.
+static const uint64_t SLEEP_TICK_US = 30ULL * 60ULL * 1000000ULL;
+static bool           sleepTick     = false;
 static uint32_t lastPaintMs    = 0;
 
 // ---- Battery log ---------------------------------------------------------
@@ -143,7 +153,7 @@ static void restingFrame() {
 
 static void enterDeepSleep() {
   Serial.println("[jota] idle: deep sleep. BOOT records, PWR wakes.");
-  logBattery("sleep");
+  logBattery(sleepTick ? "tick" : "sleep");
   restingFrame();
   sdcard.end();
   mic.powerOff();
@@ -156,6 +166,7 @@ static void enterDeepSleep() {
   }
   esp_sleep_enable_ext1_wakeup((1ULL << BTN_PIN_BOOT) | (1ULL << BTN_PIN_PWR),
                                ESP_EXT1_WAKEUP_ANY_LOW);
+  esp_sleep_enable_timer_wakeup(SLEEP_TICK_US);
 
   // The latch is the one output that must not drop: releasing it is how
   // power-off works. Hold it through sleep.
@@ -200,8 +211,9 @@ static void paint() {
 void setup() {
   // Back from deep sleep? Then a button is what woke us, and BOOT means
   // "record", right now, before anything else has a chance to be slow.
-  const bool fromSleep =
-      esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT1;
+  const esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+  const bool fromSleep = cause == ESP_SLEEP_WAKEUP_EXT1;
+  sleepTick            = cause == ESP_SLEEP_WAKEUP_TIMER;
   pinMode(BTN_PIN_BOOT, INPUT_PULLUP);
   wakeToRecord = fromSleep && digitalRead(BTN_PIN_BOOT) == LOW;
 
@@ -226,6 +238,17 @@ void setup() {
   display.init(115200, /*initial=*/true, /*reset_duration=*/2,
                /*pulldown_rst=*/false);
   display.setRotation(0);  // vertical
+
+  if (sleepTick) {
+    // The half-hour tick: cell, card for the log, the OFF frame, back to
+    // sleep. Nothing else is brought up.
+    model = AppModel{};
+    sdcard.begin();
+    battery.begin();
+    model.batteryKnown = battery.known();
+    model.batteryPct   = battery.percent();
+    enterDeepSleep();
+  }
 
   model           = AppModel{};
   model.noteCount = 0;
