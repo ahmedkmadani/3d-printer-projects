@@ -12,6 +12,10 @@
 //
 //  Stamp and tag in mono because they are figures and identifiers; the summary
 //  in sans because it is prose. That split is the product.
+//
+//  Finding a note: one search stadium and, when tags are in use, one row of
+//  tag pills under the title. Both only appear once there is something to
+//  search — an empty archive gets no controls to operate on nothing.
 // ============================================================================
 
 import 'package:flutter/material.dart';
@@ -49,9 +53,12 @@ class _NoteListScreenState extends State<NoteListScreen>
 
   static String _keyOf(Note n) => '${n.deviceId}/${n.noteId}';
 
+  final TextEditingController _search = TextEditingController();
+
   @override
   void initState() {
     super.initState();
+    _search.text = context.read<NotesController>().query;
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // A scan on open is what makes "put it on the desk and it syncs" true
@@ -78,6 +85,7 @@ class _NoteListScreenState extends State<NoteListScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _search.dispose();
     super.dispose();
   }
 
@@ -135,22 +143,45 @@ class _NoteListScreenState extends State<NoteListScreen>
                   'Pull down to sync',
                   style: t.prose.copyWith(color: c.inkMuted),
                 ),
+                if (notes.count > 0) ...<Widget>[
+                  const SizedBox(height: JotaGrid.gapL),
+                  _SearchField(
+                    controller: _search,
+                    onChanged: notes.setQuery,
+                    onClear: () {
+                      _search.clear();
+                      notes.setQuery('');
+                    },
+                  ),
+                  if (notes.tagsInUse.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: JotaGrid.gapM),
+                    _TagFilterRow(
+                      tags: notes.tagsInUse,
+                      selected: notes.tagFilter,
+                      onSelect: notes.setTagFilter,
+                    ),
+                  ],
+                ],
                 const SizedBox(height: JotaGrid.gapL),
                 const JotaRule(),
               ],
             ),
           ),
-          // No filter strip and no "add a key" banner. Both were chrome
-          // sitting between you and the list: the strip spent a row of the
-          // screen on a control for an archive that is usually short enough to
-          // scroll, and the banner turned every empty morning into a nag about
-          // configuration. Where the key matters is Settings, and it says so
-          // there — see the "what leaves your phone" card.
+          // No "add a key" banner: it turned every empty morning into a nag
+          // about configuration. Where the key matters is Settings, and it
+          // says so there — see the "what leaves your phone" card.
           Expanded(
             child: notes.loading
                 ? const SizedBox.shrink()
                 : visible.isEmpty
-                    ? _EmptyArchive(hasDevice: device.hasPairedDevice)
+                    ? notes.filtering
+                        ? _NoMatch(
+                            onClear: () {
+                              _search.clear();
+                              notes.clearFilters();
+                            },
+                          )
+                        : _EmptyArchive(hasDevice: device.hasPairedDevice)
                     : RefreshIndicator(
                         color: c.ink,
                         backgroundColor: c.bg,
@@ -175,7 +206,8 @@ class _NoteListScreenState extends State<NoteListScreen>
                             return Dismissible(
                               key: ValueKey<String>(k),
                               direction: DismissDirection.horizontal,
-                              dismissThresholds: const <DismissDirection, double>{
+                              dismissThresholds: const <DismissDirection,
+                                  double>{
                                 DismissDirection.startToEnd: 0.35,
                                 DismissDirection.endToStart: 0.35,
                               },
@@ -344,10 +376,177 @@ class _EmptyArchive extends StatelessWidget {
                 upcase: false,
                 height: JotaRows.heightTall,
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const ConnectScreen()),
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ConnectScreen(),
+                  ),
                 ),
               ),
             ),
+    );
+  }
+}
+
+/// The search field as one stadium: hairline, the label face for the hint,
+/// and a clear mark on the right only while there is something to clear.
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+    return Container(
+      height: JotaRows.heightCompact,
+      padding: const EdgeInsets.symmetric(horizontal: JotaGrid.gapM),
+      decoration: BoxDecoration(
+        borderRadius: JotaRows.borderRadiusOf(JotaRows.heightCompact),
+        border: Border.all(color: c.rule, width: JotaGrid.hairline),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              textInputAction: TextInputAction.search,
+              textAlignVertical: TextAlignVertical.center,
+              style: t.prose.copyWith(fontSize: 15),
+              cursorColor: c.ink,
+              decoration: InputDecoration(
+                isCollapsed: true,
+                // The app's field theme fills text fields; inside a stadium
+                // that fill is a second, darker stadium.
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                hintText: 'Search notes',
+                hintStyle: t.prose.copyWith(color: c.inkMuted, fontSize: 15),
+              ),
+            ),
+          ),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (BuildContext context, TextEditingValue v, _) {
+              if (v.text.isEmpty) return const SizedBox.shrink();
+              return GestureDetector(
+                onTap: onClear,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: JotaGrid.gapM),
+                  child: Text(
+                    'CLEAR',
+                    style: t.label.copyWith(
+                      color: c.inkMuted,
+                      fontSize: 10,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// ALL and then every tag in use, as pills; the chosen one inverts, which is
+/// what "chosen" looks like everywhere in the product. Scrolls sideways
+/// rather than wrapping so it costs one row whatever the tag count.
+class _TagFilterRow extends StatelessWidget {
+  const _TagFilterRow({
+    required this.tags,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<String> tags;
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 22,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: <Widget>[
+          _FilterPill(
+            label: 'ALL',
+            selected: selected == null,
+            onTap: () => onSelect(null),
+          ),
+          for (final String tag in tags) ...<Widget>[
+            const SizedBox(width: JotaRows.gap),
+            _FilterPill(
+              label: tag,
+              selected: selected == tag,
+              // Tapping the chosen one again clears it, the same rule as
+              // the device's TAGS screen.
+              onTap: () => onSelect(selected == tag ? null : tag),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Center(child: JotaTagPill(label: label, selected: selected)),
+      ),
+    );
+  }
+}
+
+/// A search or a tag that nothing matches. Says so, and offers the way back.
+class _NoMatch extends StatelessWidget {
+  const _NoMatch({required this.onClear});
+
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return JotaEmpty(
+      message: 'No notes match',
+      action: SizedBox(
+        width: 160,
+        child: JotaButton(
+          label: 'Show all',
+          upcase: false,
+          height: JotaRows.heightCompact,
+          onTap: onClear,
+        ),
+      ),
     );
   }
 }
@@ -417,7 +616,8 @@ class _AppearState extends State<_Appear> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final CurvedAnimation a = CurvedAnimation(parent: _c, curve: JotaMotion.curve);
+    final CurvedAnimation a =
+        CurvedAnimation(parent: _c, curve: JotaMotion.curve);
     return FadeTransition(
       opacity: a,
       child: SlideTransition(

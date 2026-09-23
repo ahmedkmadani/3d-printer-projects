@@ -23,8 +23,9 @@ import '../design/script.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/notes_controller.dart';
-import 'widgets/note_actions.dart';
 import '../state/services.dart';
+import 'tag_editor_screen.dart';
+import 'widgets/note_actions.dart';
 
 class NoteDetailScreen extends StatefulWidget {
   const NoteDetailScreen({super.key, required this.note});
@@ -66,13 +67,30 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       // the card and the pill already separate themselves, and a rule under the
       // status line would be the only divider on a page that needs none.
       rule: false,
-      // Pinned, as drawn: everything above it scrolls, the one action does
-      // not. Outlined rather than filled — this screen is for reading, and a
-      // solid pill would read as the thing you came here to do.
-      footer: JotaButton(
-        label: 'Edit tag',
-        upcase: false,
-        onTap: () => _editTag(context, notes, services),
+      // Pinned, as drawn: everything above it scrolls, the actions do not.
+      // Two of them, outlined — this screen is for reading, and a solid pill
+      // would read as the thing you came here to do. Share, and the tag: the
+      // tag button carries the tag itself, so what the note is filed under is
+      // readable from the button and changing it is one tap away. No Delete
+      // here — that is the swipe on the list, and one route is enough.
+      footer: Row(
+        children: <Widget>[
+          Expanded(
+            child: JotaButton(
+              label: 'Share',
+              upcase: false,
+              onTap: () => shareNote(context, _note),
+            ),
+          ),
+          const SizedBox(width: JotaRows.gap),
+          Expanded(
+            child: JotaButton(
+              label: _note.tag == null ? 'Add tag' : 'Tag: ${_note.tag}',
+              upcase: false,
+              onTap: () => _editTag(context, notes, services),
+            ),
+          ),
+        ],
       ),
       child: ListView(
         padding: const EdgeInsets.only(top: JotaGrid.gapM),
@@ -95,9 +113,14 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               const SizedBox(width: JotaGrid.gapS),
               // Inverted here, outlined in the list: this is the tag that was
               // chosen for this note, and inversion is what "chosen" looks
-              // like everywhere in the product.
+              // like everywhere in the product. Tapping it opens the chooser,
+              // the same as the button below.
               if (_note.tag != null)
-                JotaTagPill(label: _note.tag!, selected: true),
+                GestureDetector(
+                  onTap: () => _editTag(context, notes, services),
+                  behavior: HitTestBehavior.opaque,
+                  child: JotaTagPill(label: _note.tag!, selected: true),
+                ),
             ],
           ),
           const SizedBox(height: JotaGrid.gapL),
@@ -151,46 +174,18 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
             ),
           ],
 
-          // NOT in the design sheet, and kept anyway: deleting a note has no
-          // other route in the app, and a note you cannot delete is a promise
-          // the privacy story does not get to make. It sits at the very bottom
-          // of the scroll, label-only in the signal colour, so it is reachable
-          // without being offered.
-          const SizedBox(height: JotaGrid.gapXL),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: JotaButton(
-                  label: 'Share',
-                  upcase: false,
-                  height: JotaRows.heightCompact,
-                  onTap: () => shareNote(context, _note),
-                ),
-              ),
-              const SizedBox(width: JotaRows.gap),
-              Expanded(
-                child: JotaButton(
-                  label: 'Delete',
-                  danger: true,
-                  upcase: false,
-                  height: JotaRows.heightCompact,
-                  onTap: () => _confirmDelete(context, notes),
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: JotaGrid.gapL),
         ],
       ),
     );
   }
 
-  /// The tag list, on a sheet rather than inline.
+  /// The tag chooser, on a sheet.
   ///
-  /// It used to be a wrap of stadium rows sitting permanently under the
-  /// transcript — a settings control parked on a reading screen, and the
-  /// heaviest block on it. The design has one outlined button instead, so the
-  /// choice comes when it is asked for.
+  /// The tags as stadium rows with the note's own one inverted; a "No tag"
+  /// row when it has one, so clearing is a choice you can see rather than a
+  /// second tap you have to know about; and the way to the tag editor, so a
+  /// missing tag can be made from here instead of a trip through Settings.
   Future<void> _editTag(
     BuildContext context,
     NotesController notes,
@@ -198,7 +193,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
   ) async {
     final List<String> tags = services.settings.tags;
 
-    await showModalBottomSheet<void>(
+    final bool? manage = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: context.ink.bg,
       builder: (BuildContext sheetContext) {
@@ -216,12 +211,30 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Tag', style: t.headline.copyWith(fontSize: 28)),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        'Tag',
+                        style: t.headline.copyWith(fontSize: 28),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.of(sheetContext).pop(true),
+                      behavior: HitTestBehavior.opaque,
+                      child: Text(
+                        'Edit tags',
+                        style: t.prose.copyWith(color: c.inkMuted),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: JotaGrid.gapS),
                 Text(
                   tags.isEmpty
-                      ? 'No tags yet — add them in Settings.'
-                      : 'Tap the one it belongs to. Tap it again to clear it.',
+                      ? 'No tags yet. Make some, and they show up on the '
+                          'Jota too.'
+                      : 'Tap the one it belongs to.',
                   style: t.prose.copyWith(color: c.inkMuted),
                 ),
                 if (tags.isNotEmpty) ...<Widget>[
@@ -241,7 +254,18 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                                 _note,
                                 _note.tag == tag ? null : tag,
                               );
-                              Navigator.of(sheetContext).pop();
+                              Navigator.of(sheetContext).pop(false);
+                            },
+                          ),
+                        ),
+                      if (_note.tag != null)
+                        IntrinsicWidth(
+                          child: JotaRow(
+                            label: 'No tag',
+                            height: JotaRows.heightCompact,
+                            onTap: () {
+                              notes.setTag(_note, null);
+                              Navigator.of(sheetContext).pop(false);
                             },
                           ),
                         ),
@@ -254,6 +278,12 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         );
       },
     );
+
+    if (manage == true && context.mounted) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const TagEditorScreen()),
+      );
+    }
   }
 
   Future<void> _editTranscript(
@@ -312,16 +342,6 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     }
     controller.dispose();
   }
-
-  Future<void> _confirmDelete(
-    BuildContext context,
-    NotesController notes,
-  ) async {
-    if (!await confirmDeleteNote(context)) return;
-    if (!context.mounted) return;
-    await notes.delete(_note);
-    if (context.mounted) Navigator.of(context).pop();
-  }
 }
 
 /// "What it was about" — the few real points inside a ramble.
@@ -346,8 +366,7 @@ class _SummaryCard extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: c.field,
-        borderRadius:
-            const BorderRadius.all(Radius.circular(JotaCards.radius)),
+        borderRadius: const BorderRadius.all(Radius.circular(JotaCards.radius)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

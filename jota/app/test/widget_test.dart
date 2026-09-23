@@ -10,7 +10,6 @@
 //  exactly as a real one does, so there is no quiet moment to settle to. Frames
 //  are pumped by hand instead.
 // ============================================================================
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jota/app.dart';
 import 'package:jota/design/widgets.dart';
@@ -132,18 +131,16 @@ void main() {
     // it, so finding it proves we are actually on it. Delete lives further
     // down the scroll now that the card is above the transcript.
     expect(find.text('WHAT IT WAS ABOUT'), findsOneWidget);
-    // A transcribed note offers the hold-to-edit affordance and, at the foot
-    // of the scroll, Share beside Delete — all unique to the detail screen,
-    // so they prove we're actually on it. The archive's own ListView is still
-    // mounted under this route, so the detail's is the LAST one.
+    // A transcribed note offers the hold-to-edit affordance and, pinned at
+    // the foot, Share beside the tag button. No Delete on this screen: that
+    // is the swipe on the list, and one route is enough.
     expect(find.text('Hold to edit'), findsOneWidget);
-    await tester.dragUntilVisible(
-      find.text('Delete'),
-      find.byType(ListView).last,
-      const Offset(0, -120),
-    );
-    expect(find.text('Delete'), findsOneWidget);
     expect(find.text('Share'), findsOneWidget);
+    expect(
+      find.textContaining(RegExp('tag', caseSensitive: false)),
+      findsWidgets,
+    );
+    expect(find.text('Delete'), findsNothing);
 
     await quiesce(tester, services);
   });
