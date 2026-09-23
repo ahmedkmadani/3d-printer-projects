@@ -261,7 +261,24 @@ class _NoteListScreenState extends State<NoteListScreen>
                               },
                               onDismissed: (_) {
                                 setState(() => _removed.add(k));
-                                notes.delete(note);
+                                notes.scheduleDelete(note);
+                                ScaffoldMessenger.of(context)
+                                  ..hideCurrentSnackBar()
+                                  ..showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Note deleted'),
+                                      duration: const Duration(seconds: 5),
+                                      action: SnackBarAction(
+                                        label: 'UNDO',
+                                        onPressed: () {
+                                          if (!notes.undoDelete(note)) return;
+                                          if (mounted) {
+                                            setState(() => _removed.remove(k));
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  );
                               },
                               child: _Appear(
                                 animate: fresh,
@@ -456,7 +473,7 @@ class _FilterButton extends StatelessWidget {
 /// The filter sheet. Two questions — which way round, and which tag — each
 /// as stadium rows with the chosen one inverted. Choices apply as they are
 /// tapped, so the list behind the sheet is already right when it closes.
-/// "Clear" in the corner puts everything back; "Done" just closes.
+/// "Clear" in the corner puts everything back.
 class _FilterSheet extends StatelessWidget {
   const _FilterSheet({required this.onClear});
 
@@ -543,13 +560,9 @@ class _FilterSheet extends StatelessWidget {
                 ],
               ),
             ],
-            const SizedBox(height: JotaGrid.gapL),
-            JotaButton(
-              label: 'Done',
-              primary: true,
-              upcase: false,
-              onTap: () => Navigator.of(context).pop(),
-            ),
+            // No Done: every choice applies as it is tapped and the sheet
+            // swipes away, so a button that only closed it was a step.
+            const SizedBox(height: JotaGrid.gapS),
           ],
         ),
       ),

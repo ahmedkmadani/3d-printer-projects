@@ -87,15 +87,16 @@ class _DeviceCardState extends State<DeviceCard> {
     // added=0, remaining=3 and error=null — so ok is true — and the old
     // wording reported that as "Already up to date" while three notes sat on
     // the device.
+    // Notes that arrived are announced by the shell, for every sync path
+    // alike; this only has to cover the runs that brought nothing.
+    if (r != null && r.ok && r.notesAdded > 0) return;
     final String message = r == null
         ? (device.lastError ?? 'Nothing to sync')
         : !r.ok
             ? (r.error ?? 'Sync failed')
-            : r.notesAdded > 0
-                ? 'Got ${r.notesAdded} note${r.notesAdded == 1 ? '' : 's'}'
-                : r.notesRemaining > 0
-                    ? '${r.notesRemaining} still on Jota — could not transfer'
-                    : 'Already up to date';
+            : r.notesRemaining > 0
+                ? '${r.notesRemaining} still on Jota — could not transfer'
+                : 'Already up to date';
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));

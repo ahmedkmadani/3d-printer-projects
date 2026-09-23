@@ -363,10 +363,11 @@ class JotaRow extends StatelessWidget {
         child: AnimatedContainer(
           duration: JotaMotion.fast,
           curve: JotaMotion.curve,
-          height: height,
+          height: scaledHeight(context, height),
           decoration: BoxDecoration(
             color: selected ? c.ink : Colors.transparent,
-            borderRadius: JotaRows.borderRadiusOf(height),
+            borderRadius:
+                JotaRows.borderRadiusOf(scaledHeight(context, height)),
             border: Border.all(
               color: selected ? c.ink : (enabled ? c.ink : c.rule),
               width: JotaGrid.hairline,
@@ -506,10 +507,11 @@ class JotaButton extends StatelessWidget {
         child: AnimatedContainer(
           duration: JotaMotion.fast,
           curve: JotaMotion.curve,
-          height: height,
+          height: scaledHeight(context, height),
           decoration: BoxDecoration(
             color: fill,
-            borderRadius: JotaRows.borderRadiusOf(height),
+            borderRadius:
+                JotaRows.borderRadiusOf(scaledHeight(context, height)),
             border: Border.all(color: border, width: JotaGrid.hairline),
           ),
           alignment: Alignment.center,
@@ -1105,8 +1107,7 @@ class _JotaSearchFieldState extends State<JotaSearchField> {
                             color: c.ink,
                             shape: BoxShape.circle,
                           ),
-                          child:
-                              Icon(LucideIcons.x, size: 12, color: c.onInk),
+                          child: Icon(LucideIcons.x, size: 12, color: c.onInk),
                         ),
                       ),
                     ),
@@ -1151,7 +1152,8 @@ class JotaTextLink extends StatelessWidget {
         onTap: onTap,
         scale: 0.96,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: hitSize, minWidth: hitSize),
+          constraints:
+              const BoxConstraints(minHeight: hitSize, minWidth: hitSize),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: JotaGrid.gapS),
             child: Center(

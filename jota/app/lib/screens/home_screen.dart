@@ -82,10 +82,20 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: JotaGrid.gapL),
           const DeviceCard(),
           const SizedBox(height: JotaGrid.gapL),
+          // Nothing recorded yet: one sentence about what to do, in place
+          // of two cards about nothing.
+          if (notes.notes.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: JotaGrid.gapXL),
+              child: JotaEmpty(
+                message: 'Press the button on your Jota and say something. '
+                    'It will be here when you get back.',
+              ),
+            )
           // Hidden until there are enough notes for a count to mean
           // something: see kMinNotesForPatterns.
-          if (!enoughForPatterns(notes.notes) || week.topics.isEmpty)
-            _NothingYet(hasNotes: notes.notes.isNotEmpty)
+          else if (!enoughForPatterns(notes.notes) || week.topics.isEmpty)
+            const _NothingYet()
           else
             _TopicsCard(
               topics: week.topics,
@@ -270,22 +280,17 @@ class _TopicsCard extends StatelessWidget {
 }
 
 class _NothingYet extends StatelessWidget {
-  const _NothingYet({required this.hasNotes});
-
-  final bool hasNotes;
+  const _NothingYet();
 
   @override
   Widget build(BuildContext context) {
     final JotaType t = context.type;
     final JotaColors c = context.ink;
     return Text(
-      hasNotes
-          // Said plainly, because "no patterns" reads as a failure otherwise —
-          // and the honest reason is simply that there is not enough yet.
-          ? 'Nothing has come back often enough to call a pattern yet. Keep '
-              'talking and it will.'
-          : 'Press the button on your Jota and say something. It will be here '
-              'when you get back.',
+      // Said plainly, because "no patterns" reads as a failure otherwise —
+      // and the honest reason is simply that there is not enough yet.
+      'Nothing has come back often enough to call a pattern yet. Keep '
+      'talking and it will.',
       style: t.prose.copyWith(color: c.inkMuted),
     );
   }

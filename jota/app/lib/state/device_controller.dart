@@ -144,6 +144,13 @@ class DeviceController extends ChangeNotifier {
   String? _lastError;
   String? get lastError => _lastError;
 
+  /// Fires with the count each time a sync brings notes over, whichever
+  /// path started it. The shell turns it into one line on screen; before
+  /// this an automatic sync landed notes with no account of it, now that
+  /// the SYNC word is gone from the archive's corner.
+  final StreamController<int> _syncedNotes = StreamController<int>.broadcast();
+  Stream<int> get syncedNotes => _syncedNotes.stream;
+
   /// Set while a sync is blocked waiting for the user to type the code from the
   /// e-paper.
   Completer<String?>? _pairCodeRequest;
@@ -330,7 +337,10 @@ class DeviceController extends ChangeNotifier {
     // device should hold.
 
     if (!result.ok) _lastError = result.error;
-    if (result.notesAdded > 0) await _notes.refresh();
+    if (result.notesAdded > 0) {
+      await _notes.refresh();
+      if (!_disposed) _syncedNotes.add(result.notesAdded);
+    }
     // Put the scan back whenever the app is on screen, not only when one
     // happened to be running. A sync stops the scan, and if the scan had
     // already timed out by then nothing ever restarted it — so the app went
@@ -495,6 +505,7 @@ class DeviceController extends ChangeNotifier {
     _progressSub?.cancel();
     _adapterSub?.cancel();
     _scanSub?.cancel();
+    _syncedNotes.close();
     super.dispose();
   }
 }

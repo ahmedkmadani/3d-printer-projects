@@ -65,7 +65,10 @@ class NotesController extends ChangeNotifier {
 
   List<Note> get visible {
     final String q = _query.trim().toLowerCase();
-    final Iterable<Note> ordered = _newestFirst ? _notes : _notes.reversed;
+    final Iterable<Note> ordered =
+        (_newestFirst ? _notes : _notes.reversed).where(
+      (Note n) => !_pendingDeletes.containsKey(_keyOf(n)),
+    );
     if (_tagFilter == null && q.isEmpty) return ordered.toList();
     return ordered
         .where((Note n) => _tagFilter == null || n.tag == _tagFilter)
@@ -161,8 +164,52 @@ class NotesController extends ChangeNotifier {
     await refresh();
   }
 
+  // ---- delete with a way back --------------------------------------------
+  // A swipe hides the note at once and deletes it a few seconds later,
+  // unless it is called back. The archive on the phone is the only copy,
+  // so a slip of the thumb needs a way back that a dialog does not give.
+  final Map<String, Timer> _pendingDeletes = <String, Timer>{};
+
+  static String _keyOf(Note n) => '${n.deviceId}/${n.noteId}';
+
+  bool isPendingDelete(Note n) => _pendingDeletes.containsKey(_keyOf(n));
+
+  void scheduleDelete(
+    Note note, {
+    Duration delay = const Duration(seconds: 5),
+  }) {
+    final String key = _keyOf(note);
+    _pendingDeletes[key]?.cancel();
+    _pendingDeletes[key] = Timer(delay, () async {
+      _pendingDeletes.remove(key);
+      await delete(note);
+    });
+    notifyListeners();
+  }
+
+  /// True if the note was still waiting and is now back.
+  bool undoDelete(Note note) {
+    final Timer? t = _pendingDeletes.remove(_keyOf(note));
+    if (t == null) return false;
+    t.cancel();
+    notifyListeners();
+    return true;
+  }
+
   @override
   void dispose() {
+    // A swipe is a decision: a delete still waiting when the controller
+    // goes runs now rather than being forgotten.
+    for (final MapEntry<String, Timer> e in _pendingDeletes.entries) {
+      e.value.cancel();
+    }
+    final List<Note> doomed = _notes
+        .where((Note n) => _pendingDeletes.containsKey(_keyOf(n)))
+        .toList();
+    _pendingDeletes.clear();
+    for (final Note n in doomed) {
+      _repo.delete(n);
+    }
     _sub?.cancel();
     super.dispose();
   }

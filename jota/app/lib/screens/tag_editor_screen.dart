@@ -235,16 +235,21 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
             Expanded(
               child: _tags.isEmpty && _readingDevice
                   ? Center(child: Text('Reading Jota…', style: t.label))
-                  : TagList(
-                      tags: _tags,
-                      counts: _counts(notes.notes),
-                      header: _TagsHeader(
-                        onSortByUse: _tags.length > 1 ? _sortByUse : null,
-                      ),
-                      onEdit: _edit,
-                      onReorder: _reorder,
-                      onRemove: _remove,
-                    ),
+                  : _tags.isEmpty
+                      ? const JotaEmpty(
+                          message: 'No tags yet. Add one below, and it shows '
+                              'up on the Jota too.',
+                        )
+                      : TagList(
+                          tags: _tags,
+                          counts: _counts(notes.notes),
+                          header: _TagsHeader(
+                            onSortByUse: _tags.length > 1 ? _sortByUse : null,
+                          ),
+                          onEdit: _edit,
+                          onReorder: _reorder,
+                          onRemove: _remove,
+                        ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(

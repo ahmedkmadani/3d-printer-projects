@@ -56,13 +56,7 @@ class PatternsScreen extends StatelessWidget {
       // chrome on a screen the design gives one.
       rule: false,
       child: week.topics.isEmpty
-          ? Center(
-              child: Text(
-                'Nothing has come back often enough yet.',
-                style: t.prose.copyWith(color: c.inkMuted),
-                textAlign: TextAlign.center,
-              ),
-            )
+          ? const JotaEmpty(message: 'Nothing has come back often enough yet.')
           : ListView(
               padding: const EdgeInsets.only(
                 top: JotaGrid.gapM,

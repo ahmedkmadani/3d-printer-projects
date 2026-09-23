@@ -391,7 +391,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _SettingRow(
                           label: 'Transcribe',
                           value: !kShowCloudTranscription
-                              ? 'ON DEVICE'
+                              ? 'On device'
                               : s.settings.backend == 'device'
                                   ? 'On device →'
                                   : 'Google Cloud →',
@@ -434,7 +434,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         _SettingRow(
                           label: 'Transcribe automatically',
-                          value: s.settings.autoTranscribe ? 'ON' : 'OFF',
+                          value: s.settings.autoTranscribe ? 'On' : 'Off',
                           onTap: () async {
                             await s.settings.setAutoTranscribe(
                               !s.settings.autoTranscribe,
@@ -453,7 +453,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             // shoulder.
                             value: hasKey
                                 ? SettingsStore.maskKey(_apiKey!)
-                                : 'NOT SET →',
+                                : 'Not set →',
                             onTap: () => _editKey(s, hasKey: hasKey),
                           ),
                         const _Caption('Device'),
@@ -461,7 +461,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           label: 'Device',
                           value: device.hasPairedDevice
                               ? device.pairedName
-                              : 'NOT SET UP',
+                              : 'Not set up',
                         ),
                         _SettingRow(
                           label: 'Battery',
@@ -469,7 +469,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           // may simply have no way to measure it, which is a
                           // different thing from a flat pack.
                           value: device.batteryOnDevice == null
-                              ? 'UNKNOWN'
+                              ? 'Unknown'
                               : '${device.batteryOnDevice}%',
                         ),
                         // The four the design names, in its order.
@@ -487,7 +487,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         _SettingRow(
                           label: 'Sync in the background',
-                          value: s.settings.backgroundSync ? 'ON' : 'OFF',
+                          value: s.settings.backgroundSync ? 'On' : 'Off',
                           onTap: () async {
                             await device.setBackgroundSync(
                               !s.settings.backgroundSync,
@@ -549,7 +549,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         _SettingRow(
                           label: 'Unlock with fingerprint',
-                          value: lock.enabled ? 'ON' : 'OFF',
+                          value: lock.enabled ? 'On' : 'Off',
                           onTap: () => _setLock(lock, !lock.enabled),
                         ),
                         const _Caption('About'),
@@ -618,11 +618,11 @@ const List<String?> _languages = <String?>[null, 'ar', 'en'];
 String _languageLabel(String? code) {
   switch (code) {
     case 'ar':
-      return 'ARABIC';
+      return 'Arabic';
     case 'en':
-      return 'ENGLISH';
+      return 'English';
     default:
-      return 'AUTO';
+      return 'Auto';
   }
 }
 

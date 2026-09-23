@@ -115,15 +115,11 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               const SizedBox(width: JotaGrid.gapM),
               // Outlined, the same as on the list and Home: a tag on a note
               // is a label wherever it appears, and inversion is kept for a
-              // choice being made in a sheet. It was inverted here and
-              // outlined there, which read as two different things. Tapping
-              // it opens the chooser, the same as the button below.
-              if (_note.tag != null)
-                GestureDetector(
-                  onTap: () => _editTag(context, notes, services),
-                  behavior: HitTestBehavior.opaque,
-                  child: JotaTagPill(label: _note.tag!),
-                ),
+              // choice being made in a sheet.
+              // A label, not a button: it was tappable here and nowhere
+              // else, which nothing said. The tag button in the footer is
+              // the way to change it.
+              if (_note.tag != null) JotaTagPill(label: _note.tag!),
             ],
           ),
           const SizedBox(height: JotaGrid.gapL),
@@ -402,9 +398,12 @@ class _FactsBlock extends StatelessWidget {
               name: note.transcriptState == TranscriptState.manual
                   ? 'Written by'
                   : 'Read by',
+              // "On this phone", not the model's name: which model is a
+              // Settings fact, and the thing worth knowing here is that
+              // the audio never left.
               value: note.transcriptState == TranscriptState.manual
                   ? 'You'
-                  : model.replaceAll('-', ' ').toUpperCase(),
+                  : 'On this phone',
             ),
           _Fact(name: 'Synced', value: fmtNoteStamp(note.syncedAt)),
           _Fact(name: 'Note', value: note.displayId),
@@ -887,12 +886,15 @@ class _TranscriptBlock extends StatelessWidget {
                 // came back English), and a note read badly once is not a
                 // note to re-record. Runs through whatever model Settings
                 // names now and replaces the words.
-                GestureDetector(
-                  onTap: onTranscribe,
-                  behavior: HitTestBehavior.opaque,
-                  child: Text(
-                    'Transcribe again',
-                    style: t.prose.copyWith(color: c.inkMuted),
+                // A stadium, not muted text: muted text beside "Hold to
+                // edit" read as a second caption, and this is an action.
+                SizedBox(
+                  width: 168,
+                  child: JotaButton(
+                    label: 'Transcribe again',
+                    upcase: false,
+                    height: JotaRows.heightCompact,
+                    onTap: onTranscribe,
                   ),
                 ),
               ],

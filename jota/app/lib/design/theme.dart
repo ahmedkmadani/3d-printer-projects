@@ -212,6 +212,15 @@ abstract final class JotaCards {
 // E-paper cannot animate, so the device has no motion language to inherit. The
 // phone gets the minimum that keeps state changes legible, and nothing that
 // draws attention to itself. No bounces, no scale, no colour transitions.
+/// A stadium's height at the user's font size: 36 at the default, 47 at a
+/// 1.3× system font, and no taller than half again. A fixed height clipped
+/// the word inside at large text; a minimum-only height expanded without
+/// limit inside a row. This is the height, scaled, and still a height.
+double scaledHeight(BuildContext context, double h) {
+  final double scaled = MediaQuery.textScalerOf(context).scale(h);
+  return scaled > h * 1.5 ? h * 1.5 : scaled;
+}
+
 abstract final class JotaMotion {
   static const Duration fast = Duration(milliseconds: 120);
   static const Duration normal = Duration(milliseconds: 220);
@@ -613,7 +622,9 @@ abstract final class JotaTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: c.ink,
-        contentTextStyle: type.reading.copyWith(color: c.bg),
+        // Prose, not mono: a snackbar is a sentence, and the brand keeps
+        // mono for figures and identifiers.
+        contentTextStyle: type.prose.copyWith(color: c.bg),
         behavior: SnackBarBehavior.floating,
         elevation: 0,
         shape: const StadiumBorder(),

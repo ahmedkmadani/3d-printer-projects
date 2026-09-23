@@ -20,6 +20,8 @@
 //  focused view earns the whole screen. That is deliberate; we did not give each
 //  tab its own navigation stack, which a package would be needed for.
 // ============================================================================
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -47,16 +49,28 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   late int _index = widget.initialIndex;
   late final Set<int> _visited = <int>{widget.initialIndex};
+  StreamSubscription<int>? _syncedSub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkRadio());
+    // One line when notes arrive, whichever tab is open and whichever path
+    // fetched them: the answer to "did that just sync?".
+    _syncedSub = context.read<DeviceController>().syncedNotes.listen((int n) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('$n note${n == 1 ? '' : 's'} synced')),
+        );
+    });
   }
 
   @override
   void dispose() {
+    _syncedSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -210,10 +224,11 @@ class HomeNavBar extends StatelessWidget {
             // A compact-row tab with a gap of paper either side: the same two
             // tokens as everywhere else, so the bar and its pills share a
             // scale with the rest of the app instead of a 60 of their own.
-            height: _navHeight,
+            height: scaledHeight(context, _navHeight),
             decoration: BoxDecoration(
               color: c.bg,
-              borderRadius: JotaRows.borderRadiusOf(_navHeight),
+              borderRadius:
+                  JotaRows.borderRadiusOf(scaledHeight(context, _navHeight)),
               border: Border.all(color: c.rule, width: JotaGrid.hairline),
               boxShadow: <BoxShadow>[
                 BoxShadow(
@@ -282,12 +297,14 @@ class _NavItem extends StatelessWidget {
         child: AnimatedContainer(
           duration: JotaMotion.fast,
           curve: JotaMotion.curve,
-          height: JotaRows.heightCompact,
+          height: scaledHeight(context, JotaRows.heightCompact),
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             color: active ? c.ink : Colors.transparent,
-            borderRadius: JotaRows.borderRadiusOf(JotaRows.heightCompact),
+            borderRadius: JotaRows.borderRadiusOf(
+              scaledHeight(context, JotaRows.heightCompact),
+            ),
           ),
           // Mono caps, not the sans label style: the design lock draws the nav
           // in the figure face, and it is the same treatment the device's own
