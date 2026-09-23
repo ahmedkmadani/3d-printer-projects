@@ -127,10 +127,9 @@ void main() {
       find.textContaining('call the dentist about moving the appointment'),
       findsWidgets,
     );
-    // The summary card is the detail screen's first block and is unique to
-    // it, so finding it proves we are actually on it. Delete lives further
-    // down the scroll now that the card is above the transcript.
-    expect(find.text('WHAT IT WAS ABOUT'), findsOneWidget);
+    // The player pill's ratio is unique to the detail screen (the list has no
+    // durations), so finding it proves we are actually on it.
+    expect(find.textContaining('00:00 / '), findsOneWidget);
     // A transcribed note offers the hold-to-edit affordance and, pinned at
     // the foot, Share beside the tag button. No Delete on this screen: that
     // is the swipe on the list, and one route is enough.

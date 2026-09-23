@@ -37,6 +37,12 @@ class NoteDetailScreen extends StatefulWidget {
 }
 
 class _NoteDetailScreenState extends State<NoteDetailScreen> {
+  /// The "what it was about" card is off until there is a summariser to fill
+  /// it. Shown, it was the first block on every note and only ever said it
+  /// could not do anything yet. The widget stays; flip this when Gemma or
+  /// whatever writes the summary is wired up.
+  static const bool _showSummary = false;
+
   late Note _note = widget.note;
 
   Note _refresh(NotesController c) {
@@ -144,8 +150,10 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           // ignores. Gemma fills this in; until it exists the card says so
           // rather than showing invented bullets, because a summary you cannot
           // trust is worse than none.
-          _SummaryCard(note: _note),
-          const SizedBox(height: JotaGrid.gapL),
+          if (_showSummary) ...<Widget>[
+            _SummaryCard(note: _note),
+            const SizedBox(height: JotaGrid.gapL),
+          ],
 
           _PlayerPill(
             key: ValueKey<String>('${_note.deviceId}/${_note.noteId}'),
