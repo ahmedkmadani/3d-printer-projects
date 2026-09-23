@@ -519,24 +519,18 @@ class _FilterSheet extends StatelessWidget {
               const SizedBox(height: JotaGrid.gapM),
               Wrap(
                 spacing: JotaRows.gap,
-                runSpacing: JotaRows.gap,
+                runSpacing: 2,
                 children: <Widget>[
-                  IntrinsicWidth(
-                    child: JotaRow(
-                      label: 'All',
-                      selected: notes.tagFilter == null,
-                      height: JotaRows.heightCompact,
-                      onTap: () => notes.setTagFilter(null),
-                    ),
+                  JotaTagChoice(
+                    label: 'All',
+                    selected: notes.tagFilter == null,
+                    onTap: () => notes.setTagFilter(null),
                   ),
                   for (final String tag in notes.tagsInUse)
-                    IntrinsicWidth(
-                      child: JotaRow(
-                        label: tag,
-                        selected: notes.tagFilter == tag,
-                        height: JotaRows.heightCompact,
-                        onTap: () => notes.setTagFilter(tag),
-                      ),
+                    JotaTagChoice(
+                      label: tag,
+                      selected: notes.tagFilter == tag,
+                      onTap: () => notes.setTagFilter(tag),
                     ),
                 ],
               ),

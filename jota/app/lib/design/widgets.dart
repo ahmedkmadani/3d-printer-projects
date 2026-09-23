@@ -1111,6 +1111,38 @@ class _JotaSearchFieldState extends State<JotaSearchField> {
   }
 }
 
+/// A tag pill you can tap: the same pill as on a note, with a hit area a
+/// finger can find. For choosers — the note's tag sheet, the archive's
+/// filter — so a tag looks the same whether it is a label or a choice.
+class JotaTagChoice extends StatelessWidget {
+  const JotaTagChoice({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: JotaTagPill(label: label, selected: selected),
+        ),
+      ),
+    );
+  }
+}
+
 /// A tag, as a stadium. Outlined when it is simply a label, filled with ink and
 /// knocked out when it is selected — the one selection signal this product has,
 /// on the phone exactly as on the panel.
@@ -1129,7 +1161,7 @@ class JotaTagPill extends StatelessWidget {
     // every other stadium on the screen. Outlined in the ink of its label,
     // not the rule colour, so the shape is as present as the word inside it.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
       decoration: BoxDecoration(
         color: selected ? c.ink : Colors.transparent,
         border: Border.all(
@@ -1141,7 +1173,7 @@ class JotaTagPill extends StatelessWidget {
       child: Text(
         label.toUpperCase(),
         style: t.reading.copyWith(
-          fontSize: 12,
+          fontSize: 11,
           letterSpacing: 1.0,
           height: 1.1,
           color: selected ? c.onInk : c.ink,

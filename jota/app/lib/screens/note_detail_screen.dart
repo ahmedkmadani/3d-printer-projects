@@ -247,35 +247,32 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 ),
                 if (tags.isNotEmpty) ...<Widget>[
                   const SizedBox(height: JotaGrid.gapL),
+                  // The same pill as on the note, so a choice looks like
+                  // what it will become once chosen.
                   Wrap(
                     spacing: JotaRows.gap,
-                    runSpacing: JotaRows.gap,
+                    runSpacing: 2,
                     children: <Widget>[
                       for (final String tag in tags)
-                        IntrinsicWidth(
-                          child: JotaRow(
-                            label: tag,
-                            selected: _note.tag == tag,
-                            height: JotaRows.heightCompact,
-                            onTap: () {
-                              notes.setTag(
-                                _note,
-                                _note.tag == tag ? null : tag,
-                              );
-                              Navigator.of(sheetContext).pop(false);
-                            },
-                          ),
+                        JotaTagChoice(
+                          label: tag,
+                          selected: _note.tag == tag,
+                          onTap: () {
+                            notes.setTag(
+                              _note,
+                              _note.tag == tag ? null : tag,
+                            );
+                            Navigator.of(sheetContext).pop(false);
+                          },
                         ),
                       if (_note.tag != null)
-                        IntrinsicWidth(
-                          child: JotaRow(
-                            label: 'No tag',
-                            height: JotaRows.heightCompact,
-                            onTap: () {
-                              notes.setTag(_note, null);
-                              Navigator.of(sheetContext).pop(false);
-                            },
-                          ),
+                        JotaTagChoice(
+                          label: 'No tag',
+                          selected: false,
+                          onTap: () {
+                            notes.setTag(_note, null);
+                            Navigator.of(sheetContext).pop(false);
+                          },
                         ),
                     ],
                   ),
