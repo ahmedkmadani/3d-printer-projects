@@ -317,9 +317,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                         // Where transcription happens. On device keeps the
                         // audio on the phone, which problem.md treats as a
-                        // functional requirement rather than a feature — but
-                        // it is English only today, so the cloud backend is
-                        // still the one that can read Arabic.
+                        // functional requirement rather than a feature. The
+                        // multilingual `small` model reads Arabic and English;
+                        // the cloud path stays hidden unless it is needed.
                         _SettingRow(
                           label: 'Transcribe',
                           value: !kShowCloudTranscription
@@ -347,8 +347,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         content: Text(
                                           onDevice
                                               ? 'Using Google Cloud'
-                                              : 'On device — English only, and the '
-                                                  'first note downloads a 75 MB model',
+                                              : 'On device — the first note '
+                                                  'downloads a 466 MB model',
                                         ),
                                       ),
                                     );

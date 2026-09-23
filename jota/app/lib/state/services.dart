@@ -98,8 +98,8 @@ class Services {
     Transcriber buildTranscriber() {
       // On device first, because it is the only backend that can promise the
       // audio never leaves the phone — and problem.md calls that a functional
-      // requirement, not a feature. English only for now; Sudanese Arabic
-      // still needs a cloud model until Gemma 3n is wired up.
+      // requirement, not a feature. The multilingual small model reads Arabic
+      // and English; the cloud path stays as a fallback behind a flag.
       if (settings.backend == 'device') return WhisperTranscriber();
       if (settings.backend != 'google') return const UnconfiguredTranscriber();
       return GoogleSttTranscriber(

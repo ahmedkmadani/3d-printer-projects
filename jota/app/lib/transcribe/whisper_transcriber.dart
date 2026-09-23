@@ -7,15 +7,19 @@
 //  thought. This backend is the only one that can make that promise without
 //  qualification.
 //
-//  English only, deliberately. `tiny.en` is trained on English alone, which
-//  makes it both smaller and better at English than the multilingual model of
-//  the same size — and English is what is being tested first. Sudanese Arabic
-//  is the harder problem and it stays with a cloud backend until Gemma 3n is
-//  wired up; see decisions.md.
+//  The multilingual `small` model, language detected per note. It replaced
+//  `tiny.en` on 2026-09-23 after the first real recording: "test test one two
+//  three" came back as "just just just 1 2 3" from tiny.en, while the same WAV
+//  read correctly through base.en, small.en, small and medium on a laptop.
+//  tiny was the whole problem, not the microphone. Sudanese Arabic mixed with
+//  English is what this device actually hears, which rules the .en models out
+//  and makes `small` the smallest one worth running; `medium` is the next
+//  step up if `small` proves too weak on dialect, at three times the size
+//  and time.
 //
 //  The model is downloaded once, on first use, rather than shipped in the APK:
-//  75 MB of weights in the bundle would be paid for by every install including
-//  the ones that never record anything.
+//  466 MB of weights in the bundle would be paid for by every install
+//  including the ones that never record anything.
 // ============================================================================
 import 'dart:io';
 
@@ -26,7 +30,7 @@ import 'package:whisper_ggml/whisper_ggml.dart';
 import 'transcriber.dart';
 
 class WhisperTranscriber implements Transcriber {
-  WhisperTranscriber({WhisperModel model = WhisperModel.tinyEn})
+  WhisperTranscriber({WhisperModel model = WhisperModel.small})
       : _model = model;
 
   final WhisperModel _model;
@@ -78,7 +82,10 @@ class WhisperTranscriber implements Transcriber {
       final out = await _controller.transcribe(
         model: _model,
         audioPath: wav.path,
-        lang: 'en',
+        // whisper.cpp detects the language from the first 30 s when told
+        // 'auto'. A note that switches Arabic->English mid-sentence is still
+        // decoded by one model pass; the detected language only seeds it.
+        lang: 'auto',
         // The note's own context, when the caller has any: names and jargon
         // measurably help on short clips, and short clips are most of what
         // this device records.
@@ -98,7 +105,7 @@ class WhisperTranscriber implements Transcriber {
       return TranscriptionResult(
         text: out.transcription.text.trim(),
         model: id,
-        language: 'en',
+        language: 'auto',
         durationSeconds: out.time.inMilliseconds / 1000.0,
       );
     } finally {
