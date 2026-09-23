@@ -23,6 +23,7 @@ import '../design/script.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/notes_controller.dart';
+import 'widgets/note_actions.dart';
 import '../state/services.dart';
 
 class NoteDetailScreen extends StatefulWidget {
@@ -156,12 +157,27 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           // of the scroll, label-only in the signal colour, so it is reachable
           // without being offered.
           const SizedBox(height: JotaGrid.gapXL),
-          JotaButton(
-            label: 'Delete note',
-            danger: true,
-            upcase: false,
-            height: JotaRows.heightCompact,
-            onTap: () => _confirmDelete(context, notes),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: JotaButton(
+                  label: 'Share',
+                  upcase: false,
+                  height: JotaRows.heightCompact,
+                  onTap: () => shareNote(context, _note),
+                ),
+              ),
+              const SizedBox(width: JotaRows.gap),
+              Expanded(
+                child: JotaButton(
+                  label: 'Delete',
+                  danger: true,
+                  upcase: false,
+                  height: JotaRows.heightCompact,
+                  onTap: () => _confirmDelete(context, notes),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: JotaGrid.gapL),
         ],
@@ -301,36 +317,10 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     BuildContext context,
     NotesController notes,
   ) async {
-    final bool? yes = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Text('Delete this note?', style: context.type.headline),
-          content: Text(
-            'Your Jota has already let go of its copy, so this can’t be undone.',
-            style: context.type.prose,
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text('Cancel', style: context.type.label),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: Text(
-                'Delete',
-                style: context.type.label.copyWith(color: context.ink.signal),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (yes == true && context.mounted) {
-      await notes.delete(_note);
-      if (context.mounted) Navigator.of(context).pop();
-    }
+    if (!await confirmDeleteNote(context)) return;
+    if (!context.mounted) return;
+    await notes.delete(_note);
+    if (context.mounted) Navigator.of(context).pop();
   }
 }
 
@@ -705,6 +695,23 @@ class _TranscriptBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The words fade in when they land. Keyed on the text itself, so an edit
+    // cross-fades too and a rebuild for any other reason does nothing.
+    final bool running =
+        transcribing || note.transcriptState == TranscriptState.running;
+    final String key = running
+        ? 'running'
+        : note.hasTranscript
+            ? 'text:${note.transcript}'
+            : 'none';
+    return AnimatedSwitcher(
+      duration: JotaMotion.normal,
+      switchInCurve: JotaMotion.curve,
+      child: KeyedSubtree(key: ValueKey<String>(key), child: _body(context)),
+    );
+  }
+
+  Widget _body(BuildContext context) {
     final JotaType t = context.type;
     final JotaColors c = context.ink;
 

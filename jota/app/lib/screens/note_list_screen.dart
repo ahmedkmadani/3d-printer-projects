@@ -26,6 +26,7 @@ import '../state/device_controller.dart';
 import '../state/notes_controller.dart';
 import 'note_detail_screen.dart';
 import 'connect_screen.dart';
+import 'widgets/note_actions.dart';
 
 class NoteListScreen extends StatefulWidget {
   const NoteListScreen({super.key});
@@ -36,6 +37,18 @@ class NoteListScreen extends StatefulWidget {
 
 class _NoteListScreenState extends State<NoteListScreen>
     with WidgetsBindingObserver {
+  /// Rows this screen has already shown. A row not in here is new — it just
+  /// arrived from a sync — and gets the entry motion; a row scrolled back into
+  /// view does not, because nothing happened to it.
+  final Set<String> _seen = <String>{};
+
+  /// Rows swiped away but not yet gone from the repository. Filtered out of
+  /// the list the moment the swipe completes, so the dismissed widget leaves
+  /// the tree in the same frame Flutter expects it to.
+  final Set<String> _removed = <String>{};
+
+  static String _keyOf(Note n) => '${n.deviceId}/${n.noteId}';
+
   @override
   void initState() {
     super.initState();
@@ -74,7 +87,12 @@ class _NoteListScreenState extends State<NoteListScreen>
     final DeviceController device = context.watch<DeviceController>();
     final JotaType t = context.type;
     final JotaColors c = context.ink;
-    final List<Note> visible = notes.visible;
+    final List<Note> all = notes.visible;
+    _removed.removeWhere(
+      (String k) => !all.any((Note n) => _keyOf(n) == k),
+    );
+    final List<Note> visible =
+        all.where((Note n) => !_removed.contains(_keyOf(n))).toList();
 
     return JotaScreen(
       // The screen's name is the serif title in the body, as drawn, so the
@@ -147,13 +165,51 @@ class _NoteListScreenState extends State<NoteListScreen>
                             child: JotaRule(),
                           ),
                           itemBuilder: (BuildContext context, int i) {
-                            return _NoteRow(
-                              note: visible[i],
-                              transcribing: notes.isTranscribing(visible[i]),
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) =>
-                                      NoteDetailScreen(note: visible[i]),
+                            final Note note = visible[i];
+                            final String k = _keyOf(note);
+                            final bool fresh = _seen.add(k);
+                            // Swipe right: share. Swipe left: delete, after
+                            // asking. The row slides out and the list closes
+                            // the gap — that motion IS the confirmation that
+                            // it went.
+                            return Dismissible(
+                              key: ValueKey<String>(k),
+                              direction: DismissDirection.horizontal,
+                              dismissThresholds: const <DismissDirection, double>{
+                                DismissDirection.startToEnd: 0.35,
+                                DismissDirection.endToStart: 0.35,
+                              },
+                              background: const _SwipeHint(
+                                label: 'SHARE',
+                                alignment: Alignment.centerLeft,
+                              ),
+                              secondaryBackground: const _SwipeHint(
+                                label: 'DELETE',
+                                alignment: Alignment.centerRight,
+                                danger: true,
+                              ),
+                              confirmDismiss: (DismissDirection d) async {
+                                if (d == DismissDirection.startToEnd) {
+                                  await shareNote(context, note);
+                                  return false; // the row stays
+                                }
+                                return confirmDeleteNote(context);
+                              },
+                              onDismissed: (_) {
+                                setState(() => _removed.add(k));
+                                notes.delete(note);
+                              },
+                              child: _Appear(
+                                animate: fresh,
+                                child: _NoteRow(
+                                  note: note,
+                                  transcribing: notes.isTranscribing(note),
+                                  onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          NoteDetailScreen(note: note),
+                                    ),
+                                  ),
                                 ),
                               ),
                             );
@@ -243,13 +299,24 @@ class _NoteRow extends StatelessWidget {
             // one flips to right-to-left and picks up the Arabic face. The
             // stamp and tag above it deliberately do not — they are chrome and
             // follow the app.
-            NoteText(
-              transcribing ? 'Transcribing…' : note.preview,
-              style: t.prose.copyWith(
-                color: note.hasTranscript ? c.ink : c.inkMuted,
+            // The words cross-fade in when the transcript lands, so you
+            // notice they were not there a second ago.
+            AnimatedSwitcher(
+              duration: JotaMotion.normal,
+              switchInCurve: JotaMotion.curve,
+              child: KeyedSubtree(
+                key: ValueKey<String>(
+                  transcribing ? 'running' : note.preview,
+                ),
+                child: NoteText(
+                  transcribing ? 'Transcribing…' : note.preview,
+                  style: t.prose.copyWith(
+                    color: note.hasTranscript ? c.ink : c.inkMuted,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -281,6 +348,85 @@ class _EmptyArchive extends StatelessWidget {
                 ),
               ),
             ),
+    );
+  }
+}
+
+/// What a swipe uncovers: one word, in the label face, on the field colour.
+/// Not a coloured slab — the design's only colour is the signal, and it is
+/// spent on the destructive word alone.
+class _SwipeHint extends StatelessWidget {
+  const _SwipeHint({
+    required this.label,
+    required this.alignment,
+    this.danger = false,
+  });
+
+  final String label;
+  final Alignment alignment;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    return Container(
+      color: c.field,
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: JotaGrid.margin),
+      child: Text(
+        label,
+        style: context.type.label.copyWith(
+          color: danger ? c.signal : c.inkMuted,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+/// A row that has just arrived fades in and settles down by a few pixels.
+/// Once. Rows that were already there render as they always did.
+class _Appear extends StatefulWidget {
+  const _Appear({required this.animate, required this.child});
+
+  final bool animate;
+  final Widget child;
+
+  @override
+  State<_Appear> createState() => _AppearState();
+}
+
+class _AppearState extends State<_Appear> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: JotaMotion.normal,
+    value: widget.animate ? 0 : 1,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.animate) _c.forward();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final CurvedAnimation a = CurvedAnimation(parent: _c, curve: JotaMotion.curve);
+    return FadeTransition(
+      opacity: a,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, -0.08),
+          end: Offset.zero,
+        ).animate(a),
+        child: widget.child,
+      ),
     );
   }
 }

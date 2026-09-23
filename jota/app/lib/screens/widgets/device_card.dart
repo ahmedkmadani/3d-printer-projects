@@ -13,8 +13,8 @@
 //  about a device drawn like a control: it read as a button that led nowhere,
 //  floated between the content and the nav, and took a row from screens that
 //  had nothing to do with the device. Now it is one of Home's field-coloured
-//  cards, with the charge as a real figure — which is also where the battery
-//  gauge will be read once BATTERY_ADC_PIN stops being -1.
+//  cards, with the charge as a real figure, read from the advertisement the
+//  device sends (GPIO4 on the board, live since 2026-09-23).
 //
 //  Tapping it DOES the thing rather than going somewhere to do it. product.md:
 //  "Sync is never a place you go." With no device yet there is still something
@@ -164,13 +164,10 @@ class _Dot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final JotaColors c = context.ink;
-    if (busy) {
-      return SizedBox(
-        width: 9,
-        height: 9,
-        child: CircularProgressIndicator(strokeWidth: 1.5, color: c.signal),
-      );
-    }
+    // Busy: the dot breathes. A slow fade in and out, nothing spinning — the
+    // device is doing something and the card says so without a spinner
+    // borrowed from a web page.
+    if (busy) return _Breathing(color: c.signal);
     return Container(
       width: 8,
       height: 8,
@@ -178,6 +175,44 @@ class _Dot extends StatelessWidget {
         shape: BoxShape.circle,
         color: present ? c.signal : Colors.transparent,
         border: Border.all(color: present ? c.signal : c.inkMuted, width: 1),
+      ),
+    );
+  }
+}
+
+/// The signal dot, breathing: 0.25 to full and back, about once a second.
+class _Breathing extends StatefulWidget {
+  const _Breathing({required this.color});
+
+  final Color color;
+
+  @override
+  State<_Breathing> createState() => _BreathingState();
+}
+
+class _BreathingState extends State<_Breathing>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.25, end: 1).animate(
+        CurvedAnimation(parent: _c, curve: Curves.easeInOut),
+      ),
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: widget.color),
       ),
     );
   }
@@ -199,10 +234,9 @@ class _DeviceLine {
   /// Right, large: the one figure worth a glance — the charge when the device
   /// is quiet, the count when it is holding notes for you.
   ///
-  /// A dash when the charge is unknown — which it is on every device built so
-  /// far, because BATTERY_ADC_PIN is still -1 and the panel has no figure to
-  /// give. A dash is an honest gap; a number would be an invented one. Null
-  /// only when there is no device to have a figure.
+  /// A dash when the charge is unknown — a device on old firmware, or one not
+  /// heard from yet. A dash is an honest gap; a number would be an invented
+  /// one. Null only when there is no device to have a figure.
   final String? figure;
 
   /// Right, small: HOW it is, in caps.

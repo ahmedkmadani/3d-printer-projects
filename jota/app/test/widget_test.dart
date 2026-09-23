@@ -132,15 +132,18 @@ void main() {
     // it, so finding it proves we are actually on it. Delete lives further
     // down the scroll now that the card is above the transcript.
     expect(find.text('WHAT IT WAS ABOUT'), findsOneWidget);
-    // A transcribed note offers the hold-to-edit affordance and a delete —
-    // both unique to the detail screen, so they prove we're actually on it.
+    // A transcribed note offers the hold-to-edit affordance and, at the foot
+    // of the scroll, Share beside Delete — all unique to the detail screen,
+    // so they prove we're actually on it. The archive's own ListView is still
+    // mounted under this route, so the detail's is the LAST one.
     expect(find.text('Hold to edit'), findsOneWidget);
     await tester.dragUntilVisible(
-      find.text('Delete note'),
-      find.byType(ListView).first,
+      find.text('Delete'),
+      find.byType(ListView).last,
       const Offset(0, -120),
     );
-    expect(find.text('Delete note'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+    expect(find.text('Share'), findsOneWidget);
 
     await quiesce(tester, services);
   });
