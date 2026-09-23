@@ -417,9 +417,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         JotaGrid.gapL,
                       ),
                       children: <Widget>[
+                        // Title, then the first caption at gapL: no rule
+                        // under the title (Notes has none) and no second
+                        // gap. The first row draws the only hairline.
                         Text('Settings', style: t.headline),
-                        const SizedBox(height: JotaGrid.gapL),
-                        const JotaRule(),
 
                         // Four groups, each under a card caption, so the
                         // seventeen rows read as four questions instead of
@@ -877,8 +878,8 @@ String _shortAppId(String appId) => appId.isEmpty
     ? '—'
     : appId.substring(0, appId.length.clamp(0, 8)).toUpperCase();
 
-/// A group's caption: the card label, with air above it so the groups read
-/// as blocks. The first sits close under the title's hairline.
+/// A group's caption: the card label, gapL under the title for the first,
+/// gapXL between groups, and the same gapM down to the rows every time.
 class _Caption extends StatelessWidget {
   const _Caption(this.text, {this.first = false});
 
