@@ -7,8 +7,14 @@ context that chat history is not.
 
 A pocket voice-note device. Press a button, speak, and the transcript lands on
 your phone. Built on a **Waveshare ESP32-S3-ePaper-1.54** board (200×200 1-bit
-e-paper, onboard mic, ES8311 codec, microSD, RTC, LiPo charger) plus a 503035
-LiPo, in a 3D-printed snap-fit case.
+e-paper, onboard mic, ES8311 codec, microSD, PCF85063 RTC, ETA6098 PMIC,
+SHTC3, LiPo charger) plus a 503035 LiPo, in a 3D-printed snap-fit case.
+
+The board in hand is the **Touch variant** — silkscreen
+`ESP32-S3-Touch-ePaper-1.54`, rev **V2**. Same product, same page, same stock
+case, plus an FT6336 touch controller we do not use. Both variants ship from
+<https://www.waveshare.com/esp32-s3-epaper-1.54.htm>. Worth knowing because the
+touch layer may make the display stack thicker than the enclosure assumes.
 
 Inspired by [Pala Note](https://www.youtube.com/watch?v=3t0k7E7WiOQ). That
 project's repo has **no LICENSE file** (= all rights reserved), so it is used
@@ -71,11 +77,17 @@ button HAL and e-paper refresh policy; the ADPCM encoder; the note store with
 byte-range serving, CRC and resume; the whole BLE service; the Flutter app
 (analyses clean, 27 tests pass).
 
-**Built but switched off:** the battery gauge. `BATTERY_ADC_PIN` in
-`jota/firmware/src/hal/battery.h` is `-1` because the verified pin map has no
-battery-sense pin. Everything downstream — the e-paper gauge, the
-advertisement byte, `status.battery`, the app — reports *unknown* rather than a
-figure. Set the pin and the divider and it comes alive; see the firmware README.
+**Built but switched off, and it should not be:** the battery gauge.
+`BATTERY_ADC_PIN` in `jota/firmware/src/hal/battery.h` is `-1`, justified here
+until Aug 2026 by "the verified pin map has no battery-sense pin". **That was
+wrong.** Waveshare's own outline drawing labels the back of the board
+`ADC GP4`, alongside `LED GP3`. The sense pin is **GPIO4**. Everything
+downstream — the e-paper gauge, the advertisement byte, `status.battery`, the
+app — still reports *unknown*. Set the pin, work out the divider ratio against
+a known cell voltage, and it comes alive.
+
+Header pinout from the same drawing: `RXD`/`TXD`, `SDA`=GP20, `SCL`=GP19,
+`GND`, `GP5`, `3V3`, `GP2`, `VSYS`, `GP1`.
 
 Tags are armed on the device (TAGS → select) and spent by the next recording,
 travelling to the phone as a string in `index`. Selecting the armed tag again
@@ -88,8 +100,20 @@ and no mic. Recording and syncing on the device UI are also simulated.
 **Never run against real hardware:** the app's BLE path. It has only ever
 talked to fakes.
 
-The pairing code is the fixed `428 913`, and it is only live while the device
-is showing its PAIR screen (a two-minute window).
+The pairing code is **six random digits from the hardware RNG**, minted when a
+pairing offer opens and dropped when it closes — it is never persisted and
+never appears in source. It is only live while the device is showing its PAIR
+screen (a two-minute window). It was a fixed `428 913` compiled into every
+unit, which is not a secret: anyone who had seen one Jota could pair with any
+other without holding it.
+
+**Forgetting works on both sides.** The app writes `{"app":…,"forget":true}` to
+`auth`, honoured only for the current owner, and Jota clears the bond. The app
+requires the device in range to forget, with an explicit "remove anyway" that
+warns the Jota keeps trusting that phone until it is erased on the device. This
+matters because the app's uuid never changes: a forget that cleared only the
+phone's record let the next connection authenticate silently, so unpairing in
+order to hand the device on changed nothing.
 
 **Identity and the bond.** Each Jota derives a device id from its efuse MAC and
 shows the last four characters (`91C4`) on its splash and PAIR screens; the app
@@ -120,7 +144,22 @@ while notes sat on the device.
   **GPIO6 LOW** powers the panel. **GPIO42** powers the audio rail — the mic is
   dead without it.
 - Pin map is verified against `waveshareteam/ESP32-S3-ePaper-1.54`, not guessed.
-  It is tabulated in `jota/firmware/README.md`.
+  It is tabulated in `jota/firmware/README.md`. It is **not complete**: it
+  missed the `ADC GP4` battery sense that Waveshare prints on the board's own
+  back label.
+- **The stock 2×6 female header must be desoldered before the board will fit
+  any case of ours.** It stands 8.5 mm off the PCB back and the interior floor
+  is 7.5 mm below it, so the board cannot seat. This is not a preference: the
+  first real print was assembled with it fitted, the board sat on the rim, and
+  the case was blamed. `validate.py` now proves it — set
+  `HEADER_FITTED = True` in `params.py` and the build fails with the overlap
+  in mm. Waveshare's own case dodges this by slotting the back so the header
+  pokes out; we will not, because it is a pocket device.
+- The board **does** have four mounting holes and the stock case screws into
+  them — Waveshare dimensions the screw pitch at **28.10 mm**. An earlier
+  comment in `params.py` claiming otherwise has been corrected. We still clamp
+  rather than screw, only because the hole positions relative to the PCB
+  outline are unpublished and unmeasured.
 - ESP32-S3 is **BLE only** — no Bluetooth Classic. NimBLE, not Bluedroid.
 
 ## Conventions
@@ -160,3 +199,5 @@ state the defect and the evidence.
 - `jota/docs/plan-phase1-ui.md` — the approved phase-1 plan (design-first)
 - `jota/docs/decisions.md` — the architecture forks and why they went that way
 - `jota/docs/claude_code_prompt.md` — the original enclosure brief
+- `jota/docs/market-research/` — what else exists (Aug 2026) and where Jota
+  differs; includes a STT bake-off finding that questions the Google choice

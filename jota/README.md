@@ -61,9 +61,21 @@ hand-export, or they drift apart.
 
 ## Assembly order
 
-1. Desolder the board's stock 2×6 female expansion header if fitted — the
-   reference case leaves only ~7.9 mm behind the PCB and the header is ~8.5 mm.
-   (Pala Note firmware doesn't need it.)
+1. **Desolder the board's stock 2×6 female expansion header. This is not
+   optional and it is not last.** The header stands 8.5 mm off the PCB back
+   face; the interior floor is 7.5 mm below it. With the header on, the board
+   does not seat — it rests on the rim and the lid will not close. The first
+   real print was assembled this way and the case took the blame.
+
+   It cannot be designed around, and `validate.py` will show you why rather
+   than asking you to believe it: set `HEADER_FITTED = True` in `params.py`
+   and the run fails with the header 1.00 mm through the floor and 410 mm³
+   inside the battery. The battery is 30.5 mm of the 36.7 mm interior width,
+   so the two overlap in plan and no amount of extra case depth separates
+   them. Waveshare's own case slots the back and lets the header poke out;
+   that is the wrong trade for something that lives in a pocket.
+
+   Firmware does not use the header.
 2. Drop the **503035 battery** into the floor bay (long axis along the case
    length); route its lead toward the board's MX1.25 connector.
 3. Seat the **board** onto the four corner seat-ledges, display facing up. The
@@ -165,9 +177,14 @@ change — flagged here rather than worked around silently:
 1. **Board changed** to the integrated Waveshare ESP32-S3-ePaper-1.54 (what
    Pala Note actually uses). The XIAO/HAT parameter work is preserved on the
    `xiao-hat-variant` git branch.
-2. **No M2 standoffs / screw mounting.** This board (like the XIAO before it)
-   has no usable mounting holes — the stock case *clamps* the PCB. Replaced
-   with corner seat-ledges + side locators + lid-bezel clamp.
+2. **No M2 standoffs / screw mounting** — but not for the reason first given
+   here. The original claim was that the board "has no usable mounting holes".
+   That was **wrong**: it has four, and Waveshare's outline drawing dimensions
+   the stock case's screws at **28.10 mm** apart, screwing into them. What is
+   genuinely missing is the hole positions *relative to the bare PCB outline*,
+   which Waveshare does not publish and we have not measured. Until they are
+   measured we clamp — corner seat-ledges + side locators + lid-bezel clamp —
+   because a screw boss at a guessed position is worse than no screw boss.
 3. **Onboard buttons, not a discrete 6×6 switch.** The board's two side
    tactile switches are actuated by two printed plungers through the right
    wall.

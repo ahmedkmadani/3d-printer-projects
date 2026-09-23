@@ -116,7 +116,7 @@ No Bluetooth, no recordings, no files, no syncing. One line each.
 **First time**
 
 ```
-Turn on Jota  →  no owner, so it shows a code: 428 913
+Turn on Jota  →  no owner, so it shows a fresh code: 019473
 Open the app  →  it finds "JOTA-91C4"
 Tap it, type the code  →  done
 ```

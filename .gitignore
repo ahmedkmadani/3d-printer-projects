@@ -7,3 +7,9 @@ __pycache__/
 # local secrets — never commit
 *.local.sh
 *.local.env
+
+# compiled host-side preview binary — rebuilt by tools/ui_preview/build.sh
+jota/firmware/tools/ui_preview/build/
+
+# reference case STL (Pala, personal-use licence) — local only
+jota/ref/

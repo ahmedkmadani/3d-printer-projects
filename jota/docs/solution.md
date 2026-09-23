@@ -33,7 +33,7 @@ keeps it. This is where I read and search.
 |---|---|---|
 | Record | Device | Hands free, no phone needed |
 | Send audio | BLE to phone | No WiFi on the device, no server |
-| Speech → text | **Google Cloud STT** (for now) | Only thing good enough for Sudanese Arabic |
+| Speech → text | **Google Cloud STT** (for now) | Only thing good enough for Sudanese Arabic — but see [market-research/stt-options.md](market-research/stt-options.md): Deepgram lists `ar-SD`, Speechmatics does code-switching. Bake off all three. |
 | Sort and summarise | **Gemma on the phone** | Stays offline. Runs on any Android, not just Pixel |
 | Store | Phone, local | Nothing in a cloud account |
 
