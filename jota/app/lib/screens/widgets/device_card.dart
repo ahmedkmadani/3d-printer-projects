@@ -181,16 +181,6 @@ class _DeviceCardState extends State<DeviceCard> {
                   ),
                 ],
               ),
-              // What to do about it, when there is something to do. One
-              // sentence in prose under the figures, only for the states
-              // that need one.
-              if (line.hint != null) ...<Widget>[
-                const SizedBox(height: JotaGrid.gapS),
-                Text(
-                  line.hint!,
-                  style: t.prose.copyWith(color: c.inkMuted),
-                ),
-              ],
             ],
           ),
         ),
@@ -276,11 +266,7 @@ class _DeviceLine {
     this.figure,
     this.present = false,
     this.busy = false,
-    this.hint,
   });
-
-  /// A sentence under the figures, for the states that call for one.
-  final String? hint;
 
   /// Left: WHICH Jota. The same id the device prints on its own splash.
   final String name;
@@ -343,14 +329,12 @@ class _DeviceLine {
           figure: charge,
           status: 'LISTENING',
           busy: true,
-          hint: 'Press a button on the Jota to wake it.',
         );
       }
       return _DeviceLine(
         name: name,
         figure: charge,
         status: 'ASLEEP',
-        hint: 'Press a button on the Jota to sync.',
       );
     }
     if (pending == 0) {

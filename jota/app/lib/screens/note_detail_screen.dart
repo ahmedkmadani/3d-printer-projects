@@ -247,14 +247,15 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: JotaGrid.gapS),
-                Text(
-                  tags.isEmpty
-                      ? 'No tags yet. Make some, and they show up on the '
-                          'Jota too.'
-                      : 'Tap the one it belongs to.',
-                  style: t.prose.copyWith(color: c.inkMuted),
-                ),
+                // No sentence under the title: the pills are the
+                // instruction. With no tags, one line says so.
+                if (tags.isEmpty) ...<Widget>[
+                  const SizedBox(height: JotaGrid.gapS),
+                  Text(
+                    'No tags yet',
+                    style: t.prose.copyWith(color: c.inkMuted),
+                  ),
+                ],
                 if (tags.isNotEmpty) ...<Widget>[
                   const SizedBox(height: JotaGrid.gapL),
                   // The same pill as on the note, so a choice looks like
@@ -413,9 +414,9 @@ class _FactsBlock extends StatelessWidget {
           // is a promise the privacy story does not get to make.
           const SizedBox(height: JotaGrid.gapS),
           Align(
-            alignment: Alignment.centerLeft,
+            alignment: Alignment.centerRight,
             child: JotaTextLink(
-              label: 'Delete note',
+              label: 'Delete',
               danger: true,
               onTap: onDelete,
             ),
@@ -911,25 +912,23 @@ class _TranscriptBlock extends StatelessWidget {
             // stays in the app's direction.
             NoteText(note.transcript!, style: t.prose),
             const SizedBox(height: JotaGrid.gapM),
+            // Two actions as two small stadiums, no caption. A long press
+            // on the words still opens the editor; the button is what
+            // makes editing visible without a sentence saying so. The
+            // second pass is worth offering because the model changes and
+            // a note read badly once is not a note to re-record.
             Row(
               children: <Widget>[
                 Expanded(
-                  child: Text(
-                    note.transcriptState == TranscriptState.manual
-                        ? 'Edited by hand'
-                        : 'Hold to edit',
-                    style: t.prose.copyWith(color: c.inkMuted),
+                  child: JotaButton(
+                    label: 'Edit',
+                    upcase: false,
+                    height: JotaRows.heightCompact,
+                    onTap: onEdit,
                   ),
                 ),
-                // A second pass is worth offering: the model changes (the
-                // first Arabic note went through an English-only model and
-                // came back English), and a note read badly once is not a
-                // note to re-record. Runs through whatever model Settings
-                // names now and replaces the words.
-                // A stadium, not muted text: muted text beside "Hold to
-                // edit" read as a second caption, and this is an action.
-                SizedBox(
-                  width: 168,
+                const SizedBox(width: JotaRows.gap),
+                Expanded(
                   child: JotaButton(
                     label: 'Transcribe again',
                     upcase: false,

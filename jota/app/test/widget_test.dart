@@ -135,13 +135,14 @@ void main() {
     // A transcribed note offers the hold-to-edit affordance and, pinned at
     // the foot, Share beside the tag button. No Delete on this screen: that
     // is the swipe on the list, and one route is enough.
-    expect(find.text('Hold to edit'), findsOneWidget);
+    expect(find.text('Edit'), findsOneWidget);
     expect(find.text('Share'), findsOneWidget);
     expect(
       find.textContaining(RegExp('tag', caseSensitive: false)),
       findsWidgets,
     );
-    expect(find.text('Delete'), findsNothing);
+    // One quiet Delete, at the foot of the details card.
+    expect(find.text('Delete'), findsOneWidget);
 
     await quiesce(tester, services);
   });

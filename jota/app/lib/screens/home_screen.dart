@@ -65,11 +65,10 @@ class HomeScreen extends StatelessWidget {
         : running != null
             ? 'Transcribing'
             : 'This week';
-    final String? lead = pending > 0
-        ? 'On your Jota. Bring it close and it syncs.'
-        : running != null
-            ? '${running.displayId} is being read. It lands here when done.'
-            : null;
+    // No sentence under the headline: the headline is the whole news. The
+    // figures get their THIS WEEK caption only when the headline is about
+    // something else.
+    final bool captionFigures = title != 'This week';
 
     // DateTime.now() is read here rather than held in state: the summary is
     // cheap, and a cached "now" is how a screen ends up insisting it is still
@@ -101,16 +100,12 @@ class HomeScreen extends StatelessWidget {
         ),
         children: <Widget>[
           Text(title, style: t.headline),
-          if (lead != null) ...<Widget>[
-            const SizedBox(height: JotaGrid.gapS),
-            Text(lead, style: t.prose.copyWith(color: c.inkMuted)),
-          ],
           const SizedBox(height: JotaGrid.gapL),
           const DeviceCard(),
           const SizedBox(height: JotaGrid.gapL),
           // The two figures sit under the device card now: what is waiting
           // outranks how much was said, and the card is the thing to tap.
-          if (lead != null) ...<Widget>[
+          if (captionFigures) ...<Widget>[
             Text('THIS WEEK', style: _cardLabel(t, c)),
             const SizedBox(height: JotaGrid.gapM),
           ],
@@ -124,8 +119,7 @@ class HomeScreen extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: JotaGrid.gapXL),
               child: JotaEmpty(
-                message: 'Press the button on your Jota and say something. '
-                    'It will be here when you get back.',
+                message: 'Nothing recorded yet',
               ),
             )
           // Hidden until there are enough notes for a count to mean
@@ -325,8 +319,7 @@ class _NothingYet extends StatelessWidget {
     return Text(
       // Said plainly, because "no patterns" reads as a failure otherwise —
       // and the honest reason is simply that there is not enough yet.
-      'Nothing has come back often enough to call a pattern yet. Keep '
-      'talking and it will.',
+      'No patterns yet',
       style: t.prose.copyWith(color: c.inkMuted),
     );
   }

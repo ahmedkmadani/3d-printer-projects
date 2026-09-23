@@ -27,10 +27,8 @@ import '../design/format.dart';
 import '../design/script.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
-import '../data/settings_store.dart';
 import '../state/device_controller.dart';
 import '../state/notes_controller.dart';
-import '../state/services.dart';
 import 'note_detail_screen.dart';
 import 'connect_screen.dart';
 import 'widgets/note_actions.dart';
@@ -61,10 +59,6 @@ class _NoteListScreenState extends State<NoteListScreen>
 
   final TextEditingController _search = TextEditingController();
 
-  /// The swipe hint shows on the first three opens of this tab and then
-  /// never again; a hint that never leaves is a label.
-  bool _showSwipeHint = false;
-
   /// Everything back to plain: words, tag, order, and the keyboard away.
   void _clearAll() {
     _search.clear();
@@ -76,12 +70,6 @@ class _NoteListScreenState extends State<NoteListScreen>
   void initState() {
     super.initState();
     _search.text = context.read<NotesController>().query;
-    final SettingsStore settings = context.read<Services>().settings;
-    final int shown = settings.swipeHintShown;
-    if (shown < 3) {
-      _showSwipeHint = true;
-      settings.setSwipeHintShown(shown + 1);
-    }
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // A scan on open is what makes "put it on the desk and it syncs" true
@@ -190,13 +178,6 @@ class _NoteListScreenState extends State<NoteListScreen>
                       ),
                     ],
                   ),
-                  if (_showSwipeHint) ...<Widget>[
-                    const SizedBox(height: JotaGrid.gapM),
-                    Text(
-                      'Swipe a note left to delete, right to share.',
-                      style: t.prose.copyWith(color: c.inkMuted),
-                    ),
-                  ],
                 ],
                 const SizedBox(height: JotaGrid.gapL),
                 const JotaRule(),
@@ -485,9 +466,9 @@ class _HowItWorks extends StatelessWidget {
               'HOW IT WORKS',
               style: t.cardLabel.copyWith(color: c.inkMuted),
             ),
-            step('01', 'Press the button on the Jota and speak.'),
-            step('02', 'Bring it near this phone. It syncs on its own.'),
-            step('03', 'Read it here. The words are written on this phone.'),
+            step('01', 'Record on the Jota'),
+            step('02', 'Bring it near'),
+            step('03', 'Read it here'),
           ],
         ),
       ),

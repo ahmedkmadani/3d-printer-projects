@@ -133,12 +133,6 @@ class PrefsSettingsStore implements SettingsStore {
   Future<void> setAppearance(String v) => _prefs.setString('appearance', v);
 
   @override
-  int get swipeHintShown => _prefs.getInt('swipe_hint_shown') ?? 0;
-
-  @override
-  Future<void> setSwipeHintShown(int v) => _prefs.setInt('swipe_hint_shown', v);
-
-  @override
   Future<void> setNotesNewestFirst(bool v) => _prefs.setBool(_kNewestFirst, v);
 
   @override

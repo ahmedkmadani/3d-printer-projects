@@ -134,7 +134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
-          content: Text('Removed here. Erase on the Jota to finish.'),
+          content: Text('Jota forgotten'),
         ),
       );
   }
@@ -149,7 +149,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       backgroundColor: context.ink.bg,
       builder: (BuildContext sheetContext) {
         final JotaType t = sheetContext.type;
-        final JotaColors c = sheetContext.ink;
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -163,11 +162,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text('Appearance', style: t.sheetTitle),
-                const SizedBox(height: JotaGrid.gapS),
-                Text(
-                  'Light or dark, or whatever the phone is set to.',
-                  style: t.prose.copyWith(color: c.inkMuted),
-                ),
                 const SizedBox(height: JotaGrid.gapL),
                 Wrap(
                   spacing: JotaRows.gap,
@@ -203,7 +197,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       backgroundColor: context.ink.bg,
       builder: (BuildContext sheetContext) {
         final JotaType t = sheetContext.type;
-        final JotaColors c = sheetContext.ink;
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -216,12 +209,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Notes are in', style: t.sheetTitle),
-                const SizedBox(height: JotaGrid.gapS),
-                Text(
-                  'Tells Whisper what to listen for. Auto guesses per note.',
-                  style: t.prose.copyWith(color: c.inkMuted),
-                ),
+                Text('Language', style: t.sheetTitle),
                 const SizedBox(height: JotaGrid.gapL),
                 Wrap(
                   spacing: JotaRows.gap,
@@ -275,9 +263,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (result == LockSetupResult.unavailable) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Set up Face ID or a passcode in your phone settings first.',
-          ),
+          content: Text('Set a phone lock first'),
         ),
       );
     }
@@ -432,7 +418,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       children: <Widget>[
                         Text('Settings', style: t.headline),
-                        const SizedBox(height: JotaGrid.gapM),
+                        const SizedBox(height: JotaGrid.gapL),
                         const JotaRule(),
 
                         // Four groups, each under a card caption, so the
@@ -484,7 +470,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // settles it. A sheet, not a tap that cycles: three
                         // states behind one tap is a thing nobody discovers.
                         _SettingRow(
-                          label: 'Notes are in',
+                          label: 'Language',
                           value: _languageLabel(s.settings.language),
                           onTap: () => _pickLanguage(s),
                         ),
@@ -861,7 +847,7 @@ Future<void> _shareCorrections(BuildContext context, Services s) async {
   );
   if (zip == null) {
     if (context.mounted) {
-      _say(context, 'No corrections yet — hold a transcript to edit it');
+      _say(context, 'No corrections yet');
     }
     return;
   }
@@ -904,7 +890,7 @@ class _Caption extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(
         top: first ? JotaGrid.gapL : JotaGrid.gapXL,
-        bottom: JotaGrid.gapS,
+        bottom: JotaGrid.gapM,
       ),
       child: Text(
         text.toUpperCase(),

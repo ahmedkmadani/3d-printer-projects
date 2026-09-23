@@ -76,10 +76,8 @@ class BluetoothOffScreen extends StatelessWidget {
                   constraints: const BoxConstraints(maxWidth: 300),
                   child: Text(
                     unauthorized
-                        ? 'Allow Bluetooth in Settings and your notes will '
-                            'come across on their own.'
-                        : 'Jota talks to your phone over Bluetooth. Your '
-                            'notes are still here.',
+                        ? 'Allow Bluetooth in Settings'
+                        : 'Turn on Bluetooth',
                     style: t.prose.copyWith(color: c.inkMuted),
                     textAlign: TextAlign.center,
                   ),

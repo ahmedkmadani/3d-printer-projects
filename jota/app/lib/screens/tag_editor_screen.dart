@@ -102,7 +102,7 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
     // The ceiling is the device's, so it is explained rather than enforced by a
     // button that has quietly gone grey.
     if (_tags.length >= kMaxTags) {
-      _say(context, '$kMaxTags is the most your Jota holds');
+      _say(context, '$kMaxTags tags is the limit');
       return;
     }
     final String? value = await promptForTag(context);
@@ -138,7 +138,7 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
     final List<String> sorted = List<String>.of(_tags)
       ..sort((String a, String b) => (counts[b] ?? 0) - (counts[a] ?? 0));
     if (_listEquals(sorted, _tags)) {
-      _say(context, 'Already in order of use');
+      _say(context, 'Already sorted');
       return;
     }
     setState(() => _tags = sorted);
@@ -237,8 +237,7 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
                   ? Center(child: Text('Reading Jota…', style: t.label))
                   : _tags.isEmpty
                       ? const JotaEmpty(
-                          message: 'No tags yet. Add one below, and it shows '
-                              'up on the Jota too.',
+                          message: 'No tags yet',
                         )
                       : TagList(
                           tags: _tags,
@@ -282,7 +281,6 @@ class _TagsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final JotaType t = context.type;
-    final JotaColors c = context.ink;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -296,13 +294,9 @@ class _TagsHeader extends StatelessWidget {
               JotaTextLink(label: 'Sort by use', onTap: onSortByUse!),
           ],
         ),
-        const SizedBox(height: JotaGrid.gapS),
-        Text(
-          'Drag to reorder, swipe left to remove. '
-          'Only the top five fit on the device.',
-          style: t.prose.copyWith(color: c.inkMuted),
-        ),
-        const SizedBox(height: JotaGrid.gapM),
+        // No sentence: the grip says drag, the cut line says which tags
+        // reach the device, and a swipe is a swipe.
+        const SizedBox(height: JotaGrid.gapL),
         const JotaRule(),
       ],
     );
@@ -361,7 +355,7 @@ Future<void> saveTags(BuildContext context, List<String> tags) async {
       if (ok || !messenger.mounted) return;
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Saved here — Jota gets them at the next sync'),
+          content: Text('Saved. Jota gets them at sync'),
         ),
       );
     }),
@@ -724,7 +718,7 @@ class _DeviceCutLine extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: JotaGrid.gapM),
             child: Text(
-              'ON JOTA ↑',
+              'ON JOTA',
               // Mono: it is a label on a rule, the same voice as every other
               // piece of chrome on this screen.
               style: t.cardLabel.copyWith(color: c.inkMuted),

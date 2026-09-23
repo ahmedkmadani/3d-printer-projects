@@ -18,7 +18,7 @@ Future<void> shareNote(BuildContext context, Note note) async {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        const SnackBar(content: Text('Nothing to share until it is transcribed')),
+        const SnackBar(content: Text('No words to share yet')),
       );
     return;
   }

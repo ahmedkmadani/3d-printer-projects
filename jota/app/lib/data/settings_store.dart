@@ -68,11 +68,6 @@ abstract class SettingsStore {
   String get appearance;
   Future<void> setAppearance(String v);
 
-  /// How many times the archive has shown its "swipe to delete / share" line.
-  /// It stops after three: a hint that never leaves is a label.
-  int get swipeHintShown;
-  Future<void> setSwipeHintShown(int v);
-
   Future<void> setNotesNewestFirst(bool v);
 
   /// Whether the first-run splash → onboarding flow has been completed. False on

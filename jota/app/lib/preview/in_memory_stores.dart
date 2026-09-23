@@ -427,12 +427,6 @@ class InMemorySettingsStore implements SettingsStore {
   @override
   Future<void> setAppearance(String v) async => _appearance = v;
 
-  int _swipeHintShown = 3; // the preview never nags
-  @override
-  int get swipeHintShown => _swipeHintShown;
-  @override
-  Future<void> setSwipeHintShown(int v) async => _swipeHintShown = v;
-
   @override
   Future<void> setNotesNewestFirst(bool v) async => _newestFirst = v;
 

@@ -86,95 +86,100 @@ class _PairScreenState extends State<PairScreen> {
             minHeight: MediaQuery.sizeOf(context).height * 0.60,
           ),
           child: LayoutBuilder(
-        // Scrollable, because the keyboard is up on this screen by definition:
-        // a fixed Column under a Scaffold that resizes for the keyboard has
-        // only its Spacer to give, and a Spacer bottoms out at zero — past
-        // that it overflows.
-        //
-        // LayoutBuilder + IntrinsicHeight rather than a bare scroll view: a
-        // Spacer needs a bounded height to divide, and a scroll view hands its
-        // child infinite height. This floors the column at the viewport, so the
-        // Spacer still centres things when there is room and the whole thing
-        // scrolls once the keyboard takes that room away.
-        builder: (BuildContext context, BoxConstraints viewport) =>
-            SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: viewport.maxHeight),
-            child: IntrinsicHeight(
-              child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          const SizedBox(height: JotaGrid.gapM),
-          Text('Pair with Jota', style: t.headline),
-          const SizedBox(height: JotaGrid.gapS),
-          Text(
-            // The device only accepts a code while its PAIR screen is up, and
-            // nothing else in the app says how to get there.
-            // The device has no PAIR menu item any more — it shows its code
-            // by itself whenever no phone owns it. Telling someone to press a
-            // button that no longer exists is worse than saying nothing.
-            'Jota shows its code whenever no phone owns it.',
-            style: t.prose.copyWith(color: c.inkMuted),
-          ),
-          const SizedBox(height: JotaGrid.gapL),
-          const JotaRule(),
+            // Scrollable, because the keyboard is up on this screen by definition:
+            // a fixed Column under a Scaffold that resizes for the keyboard has
+            // only its Spacer to give, and a Spacer bottoms out at zero — past
+            // that it overflows.
+            //
+            // LayoutBuilder + IntrinsicHeight rather than a bare scroll view: a
+            // Spacer needs a bounded height to divide, and a scroll view hands its
+            // child infinite height. This floors the column at the viewport, so the
+            // Spacer still centres things when there is room and the whole thing
+            // scrolls once the keyboard takes that room away.
+            builder: (BuildContext context, BoxConstraints viewport) =>
+                SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: viewport.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      const SizedBox(height: JotaGrid.gapM),
+                      Text('Pair with Jota', style: t.headline),
+                      const SizedBox(height: JotaGrid.gapS),
+                      Text(
+                        // The device only accepts a code while its PAIR screen is up, and
+                        // nothing else in the app says how to get there.
+                        // The device has no PAIR menu item any more — it shows its code
+                        // by itself whenever no phone owns it. Telling someone to press a
+                        // button that no longer exists is worse than saying nothing.
+                        'Switch on your Jota',
+                        style: t.prose.copyWith(color: c.inkMuted),
+                      ),
+                      const SizedBox(height: JotaGrid.gapL),
+                      const JotaRule(),
 
-          // A fixed gap, not a Spacer. This column lives inside a scroll
-          // view so it can survive the keyboard, and a scroll view hands its
-          // child unbounded height — a flex child cannot divide infinity, so a
-          // Spacer here is a layout error rather than a centred screen.
-          const SizedBox(height: JotaGrid.gapXL * 2),
+                      // A fixed gap, not a Spacer. This column lives inside a scroll
+                      // view so it can survive the keyboard, and a scroll view hands its
+                      // child unbounded height — a flex child cannot divide infinity, so a
+                      // Spacer here is a layout error rather than a centred screen.
+                      const SizedBox(height: JotaGrid.gapXL * 2),
 
-          Text(
-            'Enter the code showing on Jota',
-            style: t.prose.copyWith(color: c.inkMuted),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: JotaGrid.gapM),
-          // The boxes are the visible field; the real one is invisible behind
-          // them, which is how the digits can be mono and evenly spaced without
-          // fighting a text cursor. Tapping anywhere on them takes the keyboard.
-          GestureDetector(
-            onTap: () => _focus.requestFocus(),
-            behavior: HitTestBehavior.opaque,
-            child: Stack(
-              alignment: Alignment.center,
-              children: <Widget>[
-                JotaCodeBoxes(digits: _digits, length: kPairCodeLength),
-                Positioned.fill(
-                  child: Opacity(
-                    opacity: 0,
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focus,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: <TextInputFormatter>[
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(kPairCodeLength),
-                      ],
-                      onSubmitted: (_) => _submit(),
-                    ),
+                      Text(
+                        'Enter the code on the Jota',
+                        style: t.prose.copyWith(color: c.inkMuted),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: JotaGrid.gapM),
+                      // The boxes are the visible field; the real one is invisible behind
+                      // them, which is how the digits can be mono and evenly spaced without
+                      // fighting a text cursor. Tapping anywhere on them takes the keyboard.
+                      GestureDetector(
+                        onTap: () => _focus.requestFocus(),
+                        behavior: HitTestBehavior.opaque,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: <Widget>[
+                            JotaCodeBoxes(
+                              digits: _digits,
+                              length: kPairCodeLength,
+                            ),
+                            Positioned.fill(
+                              child: Opacity(
+                                opacity: 0,
+                                child: TextField(
+                                  controller: _controller,
+                                  focusNode: _focus,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: <TextInputFormatter>[
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(
+                                      kPairCodeLength,
+                                    ),
+                                  ],
+                                  onSubmitted: (_) => _submit(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: JotaGrid.gapL),
+                      JotaButton(
+                        label: 'Pair',
+                        primary: true,
+                        upcase: false,
+                        // Dimmed until six digits exist. A live button on an incomplete
+                        // code invites a press that can only fail.
+                        onTap: _complete ? _submit : null,
+                      ),
+                      const SizedBox(height: JotaGrid.gapM),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-          const SizedBox(height: JotaGrid.gapL),
-          JotaButton(
-            label: 'Pair',
-            primary: true,
-            upcase: false,
-            // Dimmed until six digits exist. A live button on an incomplete
-            // code invites a press that can only fail.
-            onTap: _complete ? _submit : null,
-          ),
-          const SizedBox(height: JotaGrid.gapM),
-        ],
-      ),
-            ),
-          ),
-        ),
-      ),
         ),
       ),
     );

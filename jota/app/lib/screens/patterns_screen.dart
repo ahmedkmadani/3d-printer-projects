@@ -56,7 +56,7 @@ class PatternsScreen extends StatelessWidget {
       // chrome on a screen the design gives one.
       rule: false,
       child: week.topics.isEmpty
-          ? const JotaEmpty(message: 'Nothing has come back often enough yet.')
+          ? const JotaEmpty(message: 'No patterns yet')
           : ListView(
               padding: const EdgeInsets.only(
                 top: JotaGrid.gapM,

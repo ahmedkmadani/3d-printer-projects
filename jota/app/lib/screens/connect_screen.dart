@@ -143,7 +143,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 // The device is not obvious to operate, and nothing else in the
                 // product says this. It shows its code by itself when no phone owns
                 // it, so there is no menu to talk anyone through any more.
-                'Switch it on. It shows a code the first time.',
+                'Switch on your Jota',
                 style: t.prose.copyWith(color: c.inkMuted),
               ),
               const SizedBox(height: JotaGrid.gapL),
@@ -182,7 +182,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
               if (wantsCode) ...<Widget>[
                 Text(
-                  'Enter the code showing on Jota',
+                  'Enter the code on the Jota',
                   style: t.prose.copyWith(color: c.inkMuted),
                   textAlign: TextAlign.center,
                 ),
