@@ -31,7 +31,12 @@ class Link {
 
   // The code the phone must present. Shown on the e-paper — possession of the
   // device is the whole security model.
-  void setPairCode(const char *code);
+  // Mint a FRESH six digits and publish them. The code lives only in RAM and
+  // only while an offer is open: it is what proves the phone can see this
+  // panel, so a code that outlives the offer proves nothing.
+  const char *newPairCode();
+  void        clearPairCode();
+  void        setPairCode(const char *code);
 
   bool connected() const;
   bool authed() const;
@@ -47,6 +52,10 @@ class Link {
   // Drop the stored owner and the current connection's authentication, so the
   // device is a stranger to every phone again. ERASE only.
   void forgetOwner();
+
+  /// Does a phone hold the bond? Read at boot so an already-owned device does
+  /// not offer a pairing code to the room every time it is switched on.
+  bool hasOwner() const;
 };
 
 }  // namespace jota

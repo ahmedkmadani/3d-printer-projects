@@ -3,6 +3,8 @@
 // ============================================================================
 #include "ui/widgets.h"
 
+#include <math.h>
+
 #include <string.h>
 
 #include <Fonts/FreeMono9pt7b.h>
@@ -12,6 +14,9 @@
 #include <Fonts/FreeMonoBold9pt7b.h>
 #include <Fonts/FreeSans9pt7b.h>
 
+#include "ui/font_serif15.h"
+#include "ui/font_serif30.h"
+
 namespace jota {
 
 namespace font {
@@ -20,7 +25,13 @@ const GFXfont *reading() { return &FreeMono9pt7b; }
 const GFXfont *figure() { return &FreeMonoBold12pt7b; }
 const GFXfont *display() { return &FreeMonoBold18pt7b; }
 const GFXfont *prose() { return &FreeSans9pt7b; }
-const GFXfont *wordmark() { return &FreeMonoBold24pt7b; }
+// The APP's headline face, on the panel. The two objects said the product's
+// name in two different voices — Plex Serif on the phone, a typewriter slab
+// here — and no arrangement of dots and hairlines was ever going to make those
+// feel like one product. Generated from the same TTF the app bundles; see
+// tools/fontgen/ttf_to_gfx.py.
+const GFXfont *wordmark() { return &JotaSerif30; }
+const GFXfont *serif() { return &JotaSerif15; }
 }  // namespace font
 
 // ---- Text --------------------------------------------------------------
@@ -204,7 +215,12 @@ void row(Adafruit_GFX &g, int16_t y, const char *label, bool selected) {
 void list(Adafruit_GFX &g, const char *const *items, uint8_t n, uint8_t sel) {
   if (n > ROWS_MAX) n = ROWS_MAX;
   const int16_t blockH = (int16_t)n * ROW_H + (int16_t)(n - 1) * ROW_GAP;
-  const int16_t y0     = CONTENT_MID - blockH / 2;
+  // Centred in the space BELOW the head rule, not on the whole screen. Centring
+  // on the screen put the first pill four pixels under the rule — the list read
+  // as though it were hanging off the heading rather than sitting in its own
+  // space.
+  const int16_t top    = HEAD_RULE_Y + LIST_CLEARANCE;
+  const int16_t y0     = top + (CONTENT_BOTTOM - top - blockH) / 2;
   for (uint8_t i = 0; i < n; ++i) {
     row(g, y0 + i * (ROW_H + ROW_GAP), items[i], i == sel);
   }
@@ -257,6 +273,31 @@ void batteryGauge(Adafruit_GFX &g, int16_t cx, uint8_t pct, bool known) {
 
   progressBar(g, x0, GAUGE_Y, GAUGE_W, GAUGE_H, (float)pct / 100.0f);
   textLeft(g, label, (int16_t)(x0 + GAUGE_W + GAUGE_GAP), GAUGE_BASELINE);
+}
+
+void chargeRing(Adafruit_GFX &g, int16_t cx, int16_t cy, int16_t r,
+                uint8_t pct, bool known) {
+  // The track: a solid annulus, not drawCircle(), for the same reason ring()
+  // is — stacked outlines gap at the diagonals.
+  ring(g, cx, cy, r, OFF_RING_STROKE);
+  if (!known) return;
+  if (pct > 100) pct = 100;
+  // The arc: a solid band, scanned pixel by pixel over the ring's bounding
+  // box rather than stroked as a chain of dots, which beads at this radius.
+  // Angle is measured from 12 o'clock, clockwise, the way a dial is read.
+  const float endDeg = 360.0f * (float)pct / 100.0f;
+  const float rIn    = (float)r - (float)OFF_ARC_STROKE / 2.0f;
+  const float rOut   = (float)r + (float)OFF_ARC_STROKE / 2.0f;
+  const int16_t span = r + OFF_ARC_STROKE;
+  for (int16_t dy = -span; dy <= span; ++dy) {
+    for (int16_t dx = -span; dx <= span; ++dx) {
+      const float d = sqrtf((float)(dx * dx + dy * dy));
+      if (d < rIn || d > rOut) continue;
+      float deg = atan2f((float)dx, (float)-dy) * 180.0f / 3.14159265f;
+      if (deg < 0.0f) deg += 360.0f;
+      if (deg <= endDeg) g.drawPixel((int16_t)(cx + dx), (int16_t)(cy + dy), INK);
+    }
+  }
 }
 
 void dots(Adafruit_GFX &g, int16_t cx, int16_t cy, uint8_t n, uint8_t active) {

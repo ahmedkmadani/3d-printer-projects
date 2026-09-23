@@ -49,7 +49,10 @@ static const int16_t GAP_L = 20;
 // 6 rows is the hard capacity: 6*22 + 5*5 = 157 > CONTENT_H by 1px.
 static const int16_t ROW_H       = 22;
 static const int16_t ROW_GAP     = 5;
-static const uint8_t ROWS_MAX    = 5;
+// Three, not five. The list now sits BELOW the head rule, which leaves 102 px
+// — and four rows need 103. Five used to "fit" only by centring on the whole
+// screen, which put the top row straight through the word Saved.
+static const uint8_t ROWS_MAX    = 3;
 
 // ---- Circle ------------------------------------------------------------
 // Drawn as a filled disc knocked out by a background disc, so the ring is
@@ -66,6 +69,19 @@ static const uint8_t ROWS_MAX    = 5;
 // as much as visually: the transition is then purely additive ink, which is
 // what lets it go out as a partial refresh and land instantly instead of after
 // a two-second full repaint.
+// The app's Home rhythm, in panel pixels: headline, its rule, one figure with
+// a unit beneath, then the state at the foot. Same order the phone uses.
+static const int16_t HEAD_BASELINE   = 52;
+static const int16_t HEAD_RULE_Y     = 66;
+
+// Air between the head rule and whatever sits under it. A heading with content
+// jammed against it reads as one object, not two.
+static const int16_t LIST_CLEARANCE  = 18;
+static const int16_t FIGURE_BASELINE = 122;
+static const int16_t UNIT_BASELINE   = 146;
+static const int16_t FOOT_RULE_Y     = CONTENT_BOTTOM - 26;
+static const int16_t FOOT_BASELINE   = CONTENT_BOTTOM - 6;
+
 static const int16_t WORDMARK_CY          = 104;  // ink centre of "Jota"
 static const int16_t REC_DOT_CY           = 62;   // the record dot, above it
 static const int16_t REC_DOT_R            = 9;
@@ -85,6 +101,26 @@ static const int16_t CIRCLE_STROKE        = 3;
 // the ring; the ring was drawn around the word.
 static const int16_t CIRCLE_INNER_R       = 34;
 static const int16_t DOT_R                = 4;
+
+// ---- RECORDING is the panel inverted ------------------------------------
+// Black panel, white type, same layout as READY. Selection is shown by
+// inversion everywhere else in the product, and while recording the whole
+// device is the selected thing. On e-paper an inverted panel also reads as
+// the device switching ON, which a dot and a timer on a white screen never
+// did. Mechanically it is the cleanest transition there is: every pixel
+// changes, so a whole-screen partial refresh leaves no residue of READY.
+// (Pala Note does the same move; the layout here is ours.)
+
+// ---- The OFF frame's charge ring ----------------------------------------
+// The resting screen wears its charge on the panel's edge: a hairline circle
+// round the wordmark, with a heavier arc from 12 o'clock for the fraction
+// left. The edge is the one part of the panel every other screen leaves
+// empty, and a device found in a drawer answers "can I take this out" from
+// across the room. Radius keeps 18 px clear of the lid crop.
+static const int16_t OFF_RING_R      = 82;
+static const int16_t OFF_RING_STROKE = 1;
+static const int16_t OFF_ARC_STROKE  = 3;
+static const int16_t OFF_PCT_CY      = 150;   // the figure, inside the ring
 
 // ---- Indicators --------------------------------------------------------
 static const int16_t PROGRESS_H = 10;
@@ -113,10 +149,31 @@ static const int16_t GAUGE_Y        = GAUGE_BASELINE - 10;  // centred on the ca
 // Areas that change on their own while a screen is displayed. Refreshing
 // only these keeps the panel quiet: a region update is both faster and
 // visibly cleaner than pushing all 200x200 pixels for five digits.
-// The recording timer, below the word. Baseline 156 clears the wordmark's
-// descenders and stays clear of the gauge line (168).
-static const int16_t TIMER_BASELINE = 156;
-static const int16_t TIMER_X = 40, TIMER_Y = 132, TIMER_W = 120, TIMER_H = 28;
+// The recording timer: where it is DRAWN and, from the same numbers, the
+// window the partial refresh pushes.
+//
+// These used to be independent. The redesign moved the timer up beside the
+// waiting figure and left the dirty rect describing the old centred layout, so
+// every tick repainted a band of pixels the timer was no longer in — the panel
+// was refreshing faithfully, once a second, just not where you could see it.
+// A timer that does not visibly count is a device that looks crashed while
+// recording, which is the worst possible moment to look crashed.
+//
+// Anything that draws the timer must use TIMER_RIGHT and TIMER_BASELINE, so
+// the region below is always the region it lands in.
+static const int16_t TIMER_RIGHT    = SCREEN_W - MARGIN;   // right-aligned to 186
+static const int16_t TIMER_BASELINE = FIGURE_BASELINE;     // 122
+
+// FreeMonoBold12pt7b: ~14 px per glyph, cap height ~17. "00:07" is five
+// glyphs, so 96 px of box is room to spare, and x is byte-aligned because the
+// SSD1681 addresses the window in whole bytes across.
+// The waiting figure and its label. It changes on its own — a note is saved,
+// or the phone acks one — so like the timer it needs a region of its own.
+static const int16_t FIGURE_REGION_Y = FIGURE_BASELINE - 34;   //  88
+static const int16_t FIGURE_REGION_H = UNIT_BASELINE - FIGURE_BASELINE + 42;
+
+static const int16_t TIMER_X = 104, TIMER_W = 96;
+static const int16_t TIMER_Y = TIMER_BASELINE - 30, TIMER_H = 40;
 
 // ---- Prose -------------------------------------------------------------
 static const int16_t META_BASELINE   = 46;  // note time / duration line
@@ -144,7 +201,8 @@ const GFXfont *reading();   // FreeMono9      — status value, metadata
 const GFXfont *figure();    // FreeMonoBold12 — the one live number on a screen
 const GFXfont *display();   // FreeMonoBold18 — terminal confirmation only
 const GFXfont *prose();     // FreeSans9      — transcripts only
-const GFXfont *wordmark();  // FreeMonoBold24 — splash + off frame, not a style
+const GFXfont *wordmark();  // IBM Plex Serif 30 — the app's own headline face
+const GFXfont *serif();     // IBM Plex Serif 15 — the app's own prose face
 }  // namespace font
 
 }  // namespace jota

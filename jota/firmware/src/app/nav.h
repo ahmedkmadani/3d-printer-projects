@@ -81,11 +81,20 @@ class Nav {
     region_    = r;
   }
 
-  // A screen change replaces the whole composition, and a partial update
-  // cannot do that cleanly — the outgoing layout stays as visible residue.
-  // So screen changes are FULL by default; pass full=false only when the
-  // change is provably additive ink (see Ready -> Recording).
-  void go(Screen s, uint32_t nowMs, bool full = true);
+  // REFRESH POLICY. Screen changes go out as a whole-screen PARTIAL refresh:
+  // instant, no black-white flash. Ghosting is paid off by the de-ghosting
+  // full refresh main.cpp schedules on the next quiet screen, and by the
+  // full refresh every wake (begin()). This is how Pala Note's panel feels
+  // "lit": one full clear at boot, partials for everything after.
+  //
+  // It used to be FULL by default, on the observation that a partial left
+  // the outgoing layout as residue. Two things changed: RECORDING is now the
+  // panel inverted, so both of its transitions change every pixel, and the
+  // rest of the screens share one layout grid, so what carries over between
+  // them is mostly identical ink. If real hardware still shows residue, flip
+  // this ONE constant back and every go() is full again.
+  static const bool kScreenChangeFull = false;
+  void go(Screen s, uint32_t nowMs, bool full = kScreenChangeFull);
 
   // Called once the panel has finished showing the current screen. Timed
   // screens measure their dwell from here, not from when go() was called: a

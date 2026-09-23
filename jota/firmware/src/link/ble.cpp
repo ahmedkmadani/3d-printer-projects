@@ -5,6 +5,7 @@
 #include "link/ble.h"
 
 #include <NimBLEDevice.h>
+#include <esp_random.h>
 #include <Preferences.h>
 
 #include <stdio.h>
@@ -105,6 +106,19 @@ static bool jsonStr(const char *s, const char *key, char *out, size_t n) {
   while (*p && *p != '"' && w + 1 < n) out[w++] = *p++;
   out[w] = '\0';
   return w > 0;
+}
+
+// `"forget":true` — a bare literal, not a quoted string, so jsonStr cannot
+// find it. Deliberately strict: only the exact literal counts, because the
+// thing on the other end of a loose match is the destruction of the bond.
+static bool jsonBool(const char *s, const char *key) {
+  const char *p = strstr(s, key);
+  if (!p) return false;
+  p = strchr(p + strlen(key), ':');
+  if (!p) return false;
+  ++p;
+  while (*p == ' ') ++p;
+  return strncmp(p, "true", 4) == 0;
 }
 
 static void buildStatus(char *out, size_t n) {
@@ -214,6 +228,27 @@ class AuthCB : public NimBLECharacteristicCallbacks {
     // whole point of the bond, and what stops every single sync from
     // demanding six digits off a device that may be in another room.
     if (isOwner(appId)) {
+      // "Forget this phone", asked for by the phone that IS the owner. That is
+      // the only party entitled to ask, which is why it rides on `auth` rather
+      // than a characteristic anyone could write.
+      //
+      // Without this, forgetting a Jota in the app forgot nothing on the Jota:
+      // the app id it minted at install never changes, so the very next
+      // connection matched the stored owner and authenticated silently. A
+      // person who "unpaired" in order to hand the device on had done nothing
+      // at all.
+      if (jsonBool(v.c_str(), "\"forget\"")) {
+        Serial.println("[ble] owner asked to be forgotten — bond cleared");
+        clearOwner();
+        g_authed = false;
+        if (g_model) {
+          g_model->paired = false;
+          g_model->authed = false;
+        }
+        pushStatus();
+        refreshAdvert();
+        return;
+      }
       grantAuth();
       return;
     }
@@ -253,9 +288,17 @@ class AuthCB : public NimBLECharacteristicCallbacks {
       return;
     }
 
-    // A wrong code from a phone that cannot see the panel is the same
-    // situation: show it, so the next attempt can succeed.
-    if (g_model && !want[0]) g_model->pairAsked = true;
+    // A code offered while the device has published none is not a wrong
+    // guess — there was nothing to guess. Ask for the offer to open and let
+    // the phone try again against a real code. Counting this burned attempts
+    // on the ONE path a legitimate user takes: type the digits a moment before
+    // the panel has published them and three tries later the device stops
+    // advertising for thirty seconds.
+    if (!want[0]) {
+      if (g_model) g_model->pairAsked = true;
+      statusError("nocode");
+      return;
+    }
     Serial.printf("[ble] auth REFUSED (%u/%u)\n",
                   (unsigned)(g_authFails + 1), (unsigned)MAX_AUTH_FAIL);
     if (++g_authFails >= MAX_AUTH_FAIL) {
@@ -484,6 +527,24 @@ void Link::setBattery(uint8_t pct) {
   g_battery = (pct > 100 && pct != 0xFF) ? 100 : pct;
 }
 
+// Six random digits, from the hardware RNG.
+//
+// This replaces a constant that was compiled into every Jota ever built:
+// "428 913", the same on every unit, sitting in nav.cpp where anyone reading
+// the source could find it. A code every device shares is not a secret, and it
+// made the entire security model a decoration — the whole premise is that
+// holding the device is what proves you may pair with it, and a shared
+// constant means you never need to hold anything.
+const char *Link::newPairCode() {
+  uint32_t n = esp_random() % 1000000u;
+  snprintf(g_pairCode, sizeof(g_pairCode), "%06u", (unsigned)n);
+  return g_pairCode;
+}
+
+void Link::clearPairCode() { g_pairCode[0] = '\0'; }
+
+bool Link::hasOwner() const { return ::jota::hasOwner(); }
+
 void Link::setPairCode(const char *code) {
   if (!code) {
     g_pairCode[0] = '\0';
@@ -597,11 +658,31 @@ void Link::loop(uint32_t nowMs) {
       uint8_t buf[244];
       const size_t n = g_store->read(g_xfer.id, g_xfer.offset, buf, chunk);
       if (n == 0) {                       // reached the end
+        Serial.printf("[ble] fetch done: id=%u sent=%u bytes\n",
+                      (unsigned)g_xfer.id, (unsigned)g_xfer.offset);
         g_xfer.active = false;
         break;
       }
-      g_data->setValue(buf, n);
-      g_data->notify();                   // 1.x returns void; the stack queues
+
+      // Notify by hand rather than through NimBLECharacteristic::notify().
+      //
+      // That helper returns void and DISCARDS the result of both steps below:
+      // when the host's mbuf pool runs dry it hands ble_gattc_notify_custom a
+      // null buffer and the chunk simply disappears. Nothing tells the app,
+      // which then waits for bytes that were never sent. That is exactly what
+      // this looked like from the other end — a note arriving 90% complete and
+      // the transfer stopping dead.
+      //
+      // The loop is thousands of times faster than the radio, which drains
+      // only a handful of packets per connection interval, so the pool WILL
+      // run dry on every transfer. It is a normal condition, not an error.
+      // The fix is to notice it: leave the offset where it is and try the same
+      // chunk on the next pass, once the radio has made room.
+      os_mbuf *om = ble_hs_mbuf_from_flat(buf, n);
+      if (om == nullptr) break;           // pool empty — same chunk, next pass
+      if (ble_gattc_notify_custom(g_conn, g_data->getHandle(), om) != 0) {
+        break;                            // the stack owns om either way
+      }
       g_xfer.offset += n;
     }
   }

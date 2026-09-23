@@ -36,6 +36,9 @@ struct AppModel {
   // Phone link. Jota has no WiFi: the phone pulls notes over BLE and does the
   // transcription, so there are no credentials and no API key on the device.
   const char *pairCode;  // shown while pairing, nullptr otherwise
+  // nav asks for a code; main mints one from the hardware RNG and fills
+  // pairCode in. Kept apart so nav stays free of the radio.
+  bool needPairCode;
   bool        paired;    // a phone holds the bond
   bool        authed;    // a phone is connected AND authenticated right now
   uint8_t     pending;   // notes recorded but not yet handed to the phone

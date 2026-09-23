@@ -45,11 +45,16 @@ static const uint32_t PAIR_OK_MS = 1800;
 // How long the ERASE question stands before it answers itself with "no".
 static const uint32_t ERASE_WINDOW_MS = 10000;
 
-static const char *SIM_PAIR_CODE = "428 913";
-
 // Element regions, so a tick pushes only the pixels that actually change.
 static const Rect kTimerRect = {TIMER_X, TIMER_Y, TIMER_W, TIMER_H};
 static const Rect kListRect  = {MARGIN, CONTENT_TOP, CONTENT_W, CONTENT_H};
+
+// The foot: the link dot, the word beside it, and the charge. It changes
+// without anyone touching a button, so it needs a region of its own.
+static const Rect kFigureRect = {0, FIGURE_REGION_Y, SCREEN_W,
+                                 FIGURE_REGION_H};
+static const Rect kFootRect = {0, FOOT_RULE_Y - 2, SCREEN_W,
+                               SCREEN_H - (FOOT_RULE_Y - 2)};
 
 void renderScreen(Adafruit_GFX &g, Screen s, const AppModel &m) {
   switch (s) {
@@ -134,10 +139,11 @@ void Nav::handle(BtnEvent e, AppModel &m, uint32_t nowMs) {
       // allowed to fail silently.
       if (select) {
         m.recSecs = 0;
-        // The ONE transition that stays partial: the ring's outer edge does
-        // not move and the state mark appears inside it, so this is purely
-        // additive ink with nothing to erase. Record lands instantly.
-        go(Screen::Recording, nowMs, /*full=*/false);
+        // Whole-screen partial, like every screen change now (see nav.h).
+        // RECORDING inverts the panel, so every pixel flips and there is no
+        // READY left underneath to read as a failed redraw — which is what the
+        // 1.3 s full refresh here used to be paying for.
+        go(Screen::Recording, nowMs);
       }
       // PWR short deliberately does nothing here. Every destination it used to
       // reach is gone: notes and sync live on the phone, tags are chosen on
@@ -199,7 +205,9 @@ void Nav::tick(uint32_t nowMs, AppModel &m) {
   if (m.pairAsked && s_ != Screen::Recording && s_ != Screen::Erase) {
     m.pairAsked = false;
     if (s_ != Screen::Pair) {
-      m.pairCode = SIM_PAIR_CODE;
+      // main mints the digits: nav owns no radio, which is what keeps it
+      // renderable on the host preview.
+      m.needPairCode = true;
       go(Screen::Pair, nowMs);
       return;
     }
@@ -210,7 +218,7 @@ void Nav::tick(uint32_t nowMs, AppModel &m) {
   // device at the single highest-friction moment in the product.
   if (!m.paired && s_ != Screen::Pair && s_ != Screen::Recording &&
       s_ != Screen::Saved && s_ != Screen::Erase) {
-    m.pairCode = SIM_PAIR_CODE;
+    m.needPairCode = true;
     go(Screen::Pair, nowMs);
     return;
   }
@@ -237,6 +245,20 @@ void Nav::tick(uint32_t nowMs, AppModel &m) {
       go(Screen::Ready, nowMs);
     }
   } else if (!m.authed) {
+    if (wasAuthed_) {
+      // The phone went away. Repaint the foot so the panel stops claiming a
+      // link it no longer has.
+      //
+      // E-paper holds its last frame for ever, so a status line that is only
+      // written when something CONNECTS is a status line that says LINKED
+      // until the next full repaint — which on a device that mostly sits
+      // still could be hours. It read as connected while the app, correctly,
+      // reported the Jota as out of range.
+      //
+      // A region, not a full refresh: a full one blocks this core for ~1.29 s
+      // and that is exactly what starves the BLE host mid-sync.
+      markDirtyRegion(kFootRect);
+    }
     wasAuthed_ = false;
   }
 
@@ -245,7 +267,7 @@ void Nav::tick(uint32_t nowMs, AppModel &m) {
       if (nowMs - lastTickMs_ >= 1000) {
         lastTickMs_ += 1000;
         m.recSecs++;
-        markDirtyRegion(kTimerRect);
+        markDirtyRegion(kFigureRect);
       }
       break;
 

@@ -162,7 +162,14 @@ void setup() {
   nav.begin(millis());
   paint();
 
-  Serial.println("[jota] ready.");
+    // Restore the bond into the model. Without this, `paired` was false on every
+  // boot even when a phone owned the device — and nav's "an unowned device
+  // shows PAIR by itself" rule then put a pairing code on the panel every time
+  // the device was switched on, owned or not. A Jota power-cycled in a cafe
+  // was advertising its code to the room.
+  model.paired = bleLink.hasOwner();
+
+Serial.println("[jota] ready.");
 }
 
 void loop() {
@@ -173,8 +180,20 @@ void loop() {
   nav.tick(now, model);
   updateClock(now);
 
-  // The pairing code the phone must present is whatever the panel is showing.
-  bleLink.setPairCode(model.pairCode);
+  // Mint the digits when nav opens an offer, and drop them the moment it
+  // closes. The code is the proof that a phone can SEE this panel, so it must
+  // live exactly as long as the panel is showing it — no longer.
+  if (model.needPairCode) {
+    model.needPairCode = false;
+    model.pairCode     = bleLink.newPairCode();
+    // Echoed to serial on purpose. Reading it needs a USB cable in your hand,
+    // and physical possession is already the entire security model — the panel
+    // gives the same digits to anyone who can see it. It is what makes the
+    // pairing flow testable without a camera pointed at the e-paper.
+    Serial.printf("[jota] pair offer open, code %s\n", model.pairCode);
+  } else if (model.pairCode == nullptr) {
+    bleLink.clearPairCode();
+  }
 
   // `pending` is what the advertisement broadcasts, so it must reflect the
   // real note store rather than the recording simulation.
@@ -185,6 +204,20 @@ void loop() {
   // Advertise fast for a minute whenever there is a fresh reason for the
   // phone to notice: a note appeared, or the user asked for a sync.
   if (model.pending != lastPending && model.pending > 0) bleLink.nudge(now);
+
+  // Repaint the count when it changes, which it does WITHOUT anyone touching
+  // a button — a note is saved, or the phone acks one and it falls.
+  //
+  // Nothing did this before, and e-paper holds its last frame for ever: after
+  // a sync took all three notes the panel went on saying "3 WAITING"
+  // indefinitely, while the advertisement it was sending out at that very
+  // moment correctly said zero. The one question this device exists to
+  // answer — is my thought safe? — was being answered wrongly by the only
+  // part of it the user actually looks at.
+  if (model.pending != lastPending && nav.screen() == Screen::Ready) {
+    nav.markDirtyRegion(
+        Rect{0, FIGURE_REGION_Y, SCREEN_W, FIGURE_REGION_H});
+  }
   // Landing on READY after saving is the moment a phone should be looking:
   // there is a fresh note and the user has stopped touching the device. The
   // old trigger was opening the SYNC screen, which no longer exists — syncing

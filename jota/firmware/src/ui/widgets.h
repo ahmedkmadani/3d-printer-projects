@@ -80,6 +80,12 @@ void progressBar(Adafruit_GFX &g, int16_t x, int16_t y, int16_t w, int16_t h,
 // an empty battery, which reads as "flat" rather than "not measured".
 void batteryGauge(Adafruit_GFX &g, int16_t cx, uint8_t pct, bool known);
 
+// A hairline circle with a heavier arc clockwise from 12 o'clock for pct/100.
+// Draws only the hairline when [known] is false, so an unmeasured battery and
+// a flat one never look the same.
+void chargeRing(Adafruit_GFX &g, int16_t cx, int16_t cy, int16_t r,
+                uint8_t pct, bool known);
+
 // `n` dots centred on cx; the first `active` are filled, the rest outlined.
 void dots(Adafruit_GFX &g, int16_t cx, int16_t cy, uint8_t n, uint8_t active);
 

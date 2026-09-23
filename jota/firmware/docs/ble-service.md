@@ -51,7 +51,7 @@ All share the service base; only the last field changes.
 
 | Name | UUID suffix | Access | Payload |
 |---|---|---|---|
-| `auth` | `...0001` | write | JSON `{"app":"<uuid>","code":"428913"}` |
+| `auth` | `...0001` | write | JSON `{"app":"<uuid>","code":"019473"}` |
 | `status` | `...0002` | read, notify | JSON, see below |
 | `index` | `...0003` | read | JSON array of pending notes |
 | `fetch` | `...0004` | write | JSON `{"id":12,"offset":0}` |
@@ -69,11 +69,12 @@ read means anything**; the app used to infer the bond from the read succeeding,
 so it never sent a code, and every sync then read an empty `index` and reported
 "all caught up" while notes sat on the device.
 
-Two ways in:
+Three things this characteristic does:
 
 ```json
 {"app":"9f2c…"}                    // the owner reconnecting: silent, no code
-{"app":"9f2c…","code":"428913"}    // a new phone: the digits on the e-paper
+{"app":"9f2c…","code":"019473"}    // a new phone: the digits on the e-paper
+{"app":"9f2c…","forget":true}      // the owner asking to be forgotten
 ```
 
 `app` is a UUID the phone generates once, on first run, and never changes. The
@@ -87,8 +88,29 @@ possession of the device outranks the stored bond, deliberately: the security
 model is possession, and a device that could lock out the person holding it
 would be worse, not better.
 
+**The code is six random digits from the hardware RNG**, minted when a pairing
+offer opens and dropped the moment it closes. It is never persisted and never
+appears in source. It used to be the constant `428 913`, compiled into every
+Jota ever built — which is not a secret at all: anyone who had seen one unit
+could pair with any other without ever holding it, and that empties the whole
+possession-is-the-security-model premise.
+
+A code is offered when the device is unowned, and when an unrecognised phone
+knocks. Each offer mints a fresh code.
+
+`{"forget":true}` is honoured **only for the current owner** — that is why it
+rides on `auth`, the one characteristic that already establishes who is asking.
+Jota clears the stored bond and drops to unowned, so the next pairing needs six
+fresh digits off the panel. Without this, forgetting a Jota in the app forgot
+nothing on the Jota: the app's uuid never changes, so the next connection
+matched the stored owner and authenticated silently, and someone who unpaired
+in order to hand the device on had changed nothing.
+
 Wrong code three times → Jota drops the connection and stops advertising for
-30 s.
+30 s. A code offered while Jota has **published none** is answered with
+`{"error":"nocode"}` and does *not* count as an attempt — otherwise typing the
+right digits a moment before the panel published them burned the budget on the
+one path a legitimate user takes.
 
 ### status
 

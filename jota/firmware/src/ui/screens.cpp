@@ -48,99 +48,143 @@ static void fmtShortId(char *out, size_t n, const char *deviceId) {
   out[w] = '\0';
 }
 
+// Every screen opens the same way: a serif word on the left, a hairline under
+// it. It is the app's Home header, on the panel — which is the whole reason
+// the two objects read as one product.
+static void head(Adafruit_GFX &g, const char *word) {
+  g.setTextColor(INK);
+  g.setFont(font::wordmark());
+  textLeft(g, word, MARGIN, HEAD_BASELINE);
+  rule(g, MARGIN, HEAD_RULE_Y, CONTENT_W);
+}
+
+// The foot line: the same two facts the app's device chip carries, in the same
+// order. A dot rather than a word for the link — filled while a phone is
+// connected, hollow when one is bonded but away, absent when none ever paired.
+// `ink` is INK on every screen but RECORDING, which is the panel inverted.
+static void footState(Adafruit_GFX &g, const AppModel &m, uint16_t ink = INK) {
+  g.drawFastHLine(MARGIN, FOOT_RULE_Y, CONTENT_W, ink);
+  if (m.paired || m.authed) {
+    if (m.authed) {
+      g.fillCircle(MARGIN + 4, FOOT_BASELINE - 4, 3, ink);
+    } else {
+      g.drawCircle(MARGIN + 4, FOOT_BASELINE - 4, 3, ink);
+    }
+  }
+  g.setTextColor(ink);
+  g.setFont(font::reading());
+  // PAIRED, not AWAY.
+  //
+  // BLE does not hold the link open — the phone connects, takes what is
+  // waiting, and drops it again, because keeping a connection alive would
+  // drain both batteries to say nothing. So "no phone connected right now" is
+  // the state this device is in more than 99% of the time, and calling that
+  // AWAY made the normal case read as a fault: it sounds like the phone has
+  // wandered off, when what is true is "we are paired and there is nothing to
+  // do". A status line that spends its whole life in the alarming state is not
+  // reporting, it is nagging.
+  //
+  // The filled dot still marks the moment a phone is actually talking to us,
+  // which is the only part worth distinguishing.
+  textLeft(g, m.authed ? "SYNCING" : (m.paired ? "PAIRED" : "NOT PAIRED"),
+           MARGIN + 14, FOOT_BASELINE);
+  if (m.batteryKnown) {
+    char b[8];
+    snprintf(b, sizeof(b), "%u%%", (unsigned)m.batteryPct);
+    textRight(g, b, SCREEN_W - MARGIN, FOOT_BASELINE);
+  }
+}
+
 // ---- Screens -----------------------------------------------------------
 
 void screenReady(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
+  g.setTextColor(INK);
 
-  // Left slot is this device's own four characters — the same ones the app
-  // shows beside it in a list, and the answer to "which of these is mine".
-  char id[8];
-  fmtShortId(id, sizeof(id), m.deviceId);
+  // The app's own layout, and now its own typeface: a serif headline, a
+  // hairline under it, one figure with a mono caps label, and the state on a
+  // quiet line at the foot. Same bones as the phone's Home screen — which is
+  // what makes the two objects read as one product rather than two.
+  g.setFont(font::wordmark());
+  textLeft(g, "Jota", MARGIN, HEAD_BASELINE);
+  rule(g, MARGIN, HEAD_RULE_Y, CONTENT_W);
 
   // WAITING, not the lifetime count. The old figure only ever went up, so a
-  // note that had just been handed to the phone still showed on the panel and
-  // the device could never answer the one question it exists to answer: is my
-  // thought safe? Pending falling to zero IS that answer.
-  char count[8];
-  fmtCount(count, sizeof(count), m.pending);
-  statusBar(g, id, count);
-  linkDot(g, id, m.paired, m.authed);
+  // note already handed to the phone still showed on the panel and the device
+  // could never answer the one question it exists to answer: is my thought
+  // safe? Pending falling to zero IS that answer.
+  char c[8];
+  snprintf(c, sizeof(c), "%u", (unsigned)m.pending);
+  g.setFont(font::display());
+  textLeft(g, c, MARGIN, FIGURE_BASELINE);
+  g.setFont(font::label());
+  textLeft(g, m.pending ? "WAITING" : "ALL SYNCED", MARGIN, UNIT_BASELINE);
 
-  // The word IS the screen. No ring, no label: there is nothing else this
-  // device does while sitting still, and a mark around the name only repeated
-  // it.
-  g.setTextColor(INK);
-  g.setFont(font::wordmark());
-  textCenteredAt(g, "Jota", CENTER_X, WORDMARK_CY);
-
-  batteryGauge(g, CENTER_X, m.batteryPct, m.batteryKnown);
+  footState(g, m);
 }
 
 void screenRecording(Adafruit_GFX &g, const AppModel &m) {
-  clear(g);
+  // The panel INVERTED: ink everywhere, the layout knocked out of it. Same
+  // head, same figure slot, same foot as READY — the object does not change
+  // identity because it is listening — but it is black while it does, which
+  // on e-paper reads as the device switching on. See theme.h.
+  //
+  // Every pixel changes on the way in and again on the way out, so neither
+  // transition can leave READY or SAVED showing through a partial refresh —
+  // the residue problem that used to force a 1.3 s full repaint here.
+  g.fillRect(0, 0, SCREEN_W, SCREEN_H, INK);
+  g.setTextColor(BG);
 
-  // EVERY pixel of READY is redrawn identically — status line, wordmark,
-  // gauge. Only the dot and the timer are new. That is what makes this
-  // transition safe as a partial refresh: partial updates lay ink down cleanly
-  // but leave residue where ink is REMOVED, so the rule is that RECORDING may
-  // only add to READY, never take away. It is also why the word does not move.
-  char id[8];
-  fmtShortId(id, sizeof(id), m.deviceId);
-  char count[8];
-  fmtCount(count, sizeof(count), m.pending);
-  statusBar(g, id, count);
-  linkDot(g, id, m.paired, m.authed);
-
-  // The one mark everybody already reads as "recording", and the only filled
-  // shape on the device.
-  g.fillCircle(CENTER_X, REC_DOT_CY, REC_DOT_R, INK);
-
-  g.setTextColor(INK);
   g.setFont(font::wordmark());
-  textCenteredAt(g, "Jota", CENTER_X, WORDMARK_CY);
+  textLeft(g, "Jota", MARGIN, HEAD_BASELINE);
+  g.drawFastHLine(MARGIN, HEAD_RULE_Y, CONTENT_W, BG);
 
+  // The timer replaces the waiting count. Everything that ticks lives inside
+  // FIGURE_REGION, and nav pushes exactly that window — the --check test
+  // enforces it.
   char t[12];
   fmtDuration(t, sizeof(t), m.recSecs);
-  g.setFont(font::figure());
-  textCentered(g, t, CENTER_X, TIMER_BASELINE);
+  g.setFont(font::display());
+  textLeft(g, t, MARGIN, FIGURE_BASELINE);
+  g.setFont(font::label());
+  textLeft(g, "RECORDING", MARGIN, UNIT_BASELINE);
 
-  batteryGauge(g, CENTER_X, m.batteryPct, m.batteryKnown);
+  footState(g, m, BG);
+  g.setTextColor(INK);  // leave the context clean for the next screen
 }
 
 void screenSaved(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
+  g.setTextColor(INK);
+  g.setFont(font::wordmark());
+  textLeft(g, "Saved", MARGIN, HEAD_BASELINE);
+  rule(g, MARGIN, HEAD_RULE_Y, CONTENT_W);
 
-  char id[16];
-  snprintf(id, sizeof(id), "N-%03u", (unsigned)m.note.id);
   char t[12];
   fmtDuration(t, sizeof(t), m.note.secs);
-  statusBar(g, id, t);
 
   if (m.tags.count == 0) {
-    // Nothing to offer, so this is purely a confirmation. The duration is set
-    // in the same face the user was watching under the ring a second ago.
-    bigFigure(g, font::display(), CAP_DISPLAY, "SAVED", t);
+    // Nothing to offer, so this is purely a confirmation: the length, in the
+    // same face the user was watching a second ago.
+    g.setFont(font::display());
+    textLeft(g, t, MARGIN, FIGURE_BASELINE);
+    g.setFont(font::label());
+    textLeft(g, "KEPT", MARGIN, UNIT_BASELINE);
     return;
   }
 
-  g.setTextColor(INK);
-  g.setFont(font::label());
-  textCenteredAt(g, "SAVED", CENTER_X, CONTENT_TOP + 10);
-
   // Tagging happens HERE, after the fact, because this is the only moment you
-  // know what you just said. It is optional and it times out: see nav.cpp.
-  //
-  // Eight tags, five rows. Scroll the window rather than truncate, or the last
-  // three would be selectable but invisible.
+  // know what you just said. Optional, and it times out — see nav.cpp.
+  g.setFont(font::reading());
+  textRight(g, t, SCREEN_W - MARGIN, HEAD_BASELINE);
+
   uint8_t first = 0, selInWindow = 0;
   const uint8_t rows =
       tagsWindow(m.tags, m.tagSel, ROWS_MAX, &first, &selInWindow);
 
-  // The tag already on this note is marked with a leading asterisk, so the
-  // cursor (inversion) and the choice (the mark) are two different things you
-  // can see at once. ASCII only: the bundled GFX fonts carry 32..126 and
-  // nothing else, so a prettier bullet renders as blank space on the panel.
+  // The tag already on this note carries a leading asterisk, so the cursor
+  // (inversion) and the choice (the mark) are two different things you can see
+  // at once. ASCII only: the bundled fonts carry 32..126 and nothing else.
   char        marked[ROWS_MAX][TAG_LEN_MAX + 3];
   const char *window[ROWS_MAX];
   for (uint8_t i = 0; i < rows; ++i) {
@@ -155,6 +199,7 @@ void screenSaved(Adafruit_GFX &g, const AppModel &m) {
 
 void screenPair(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
+  head(g, "Pair");
 
   // The right slot carries this device's own four characters — the same ones
   // the app shows beside it in a list. That is the whole answer to "which of
@@ -162,54 +207,75 @@ void screenPair(Adafruit_GFX &g, const AppModel &m) {
   // which is exactly when the question gets asked.
   char id[8];
   fmtShortId(id, sizeof(id), m.deviceId);
-  statusBar(g, "PAIR", id);
+  g.setFont(font::reading());
+  textRight(g, id, SCREEN_W - MARGIN, HEAD_BASELINE);
 
   if (!m.pairCode) {
-    // The phone answered. Same big-figure rhythm as SAVED, so a pair confirms
-    // the way a saved note does.
-    bigFigure(g, font::display(), CAP_DISPLAY, "PAIRED", "PHONE CONNECTED");
+    // The phone answered. Same rhythm as every other screen, so a pair
+    // confirms the way a saved note does.
+    g.setFont(font::display());
+    textLeft(g, "OK", MARGIN, FIGURE_BASELINE);
+    g.setFont(font::label());
+    textLeft(g, "PHONE CONNECTED", MARGIN, UNIT_BASELINE);
     return;
   }
 
-  // A code is a figure, so it gets the display face.
-  bigFigure(g, font::display(), CAP_DISPLAY, m.pairCode, "ENTER ON PHONE");
+  // The code is the screen. Centred and in the display face because it is
+  // being read off a panel at arm's length and typed into a phone — the one
+  // moment on this device where legibility beats layout.
+  g.setFont(font::display());
+  textCenteredAt(g, m.pairCode, CENTER_X, FIGURE_BASELINE + 8);
+  rule(g, MARGIN, FOOT_RULE_Y, CONTENT_W);
+  g.setFont(font::label());
+  textLeft(g, "ENTER ON PHONE", MARGIN, FOOT_BASELINE);
 }
 
 void screenErase(Adafruit_GFX &g, const AppModel &m) {
   clear(g);
-  statusBar(g, "ERASE", "");
+  head(g, "Erase");
 
-  g.setTextColor(INK);
-  g.setFont(font::label());
-  textCenteredAt(g, "ERASE ALL?", CENTER_X, CONTENT_TOP + 26);
-
-  // Say the size of it in figures. "Erase everything" is abstract; "13 notes"
+  // Say the size of it in figures. "Erase everything" is abstract; "12 notes"
   // is the thing you are about to lose, and it is the only number that could
   // change someone's mind at this point.
-  char line[32];
-  snprintf(line, sizeof(line), "%u NOTES", (unsigned)m.noteCount);
-  g.setFont(font::reading());
-  textCenteredAt(g, line, CENTER_X, CONTENT_MID - 6);
-  textCenteredAt(g, "AND YOUR PHONE", CENTER_X, CONTENT_MID + 16);
+  char c[8];
+  snprintf(c, sizeof(c), "%u", (unsigned)m.noteCount);
+  g.setTextColor(INK);
+  g.setFont(font::display());
+  textLeft(g, c, MARGIN, FIGURE_BASELINE);
+  g.setFont(font::label());
+  textLeft(g, "NOTES AND PHONE", MARGIN, UNIT_BASELINE);
 
   // The way out is stated, because there is no cancel button to find and
   // doing nothing is the safe answer.
-  textCenteredAt(g, "HOLD BOTH AGAIN", CENTER_X, CONTENT_BOTTOM - 30);
-  textCenteredAt(g, "OR WAIT", CENTER_X, CONTENT_BOTTOM - 12);
+  rule(g, MARGIN, FOOT_RULE_Y, CONTENT_W);
+  g.setFont(font::reading());
+  textLeft(g, "HOLD BOTH AGAIN", MARGIN, FOOT_BASELINE);
 }
 
 void screenOff(Adafruit_GFX &g, const AppModel &m) {
   // E-paper retains its last image forever. Without this the device would sit
   // in a drawer showing whatever menu it happened to be on, with a frozen
-  // clock. This is the object at rest.
+  // clock. This is the object at rest — the wordmark alone, centred, the one
+  // screen that is allowed to be nothing but the name.
   clear(g);
   g.setTextColor(INK);
-  g.setFont(font::wordmark());
-  textCenteredAt(g, "JOTA", CENTER_X, SCREEN_H / 2 - 12);
 
-  // The charge it went to sleep with. A device found in a drawer answering
-  // "can I take this out with me" without being switched on is worth the ink.
-  batteryGauge(g, CENTER_X, m.batteryPct, m.batteryKnown);
+  // The charge it went to sleep with, worn on the panel's edge: a hairline
+  // ring round the name with the fraction left as a heavier arc. A device
+  // found in a drawer answers "can I take this out with me" from across the
+  // room, without being switched on. The figure sits inside the ring because
+  // figures are how this product says everything else. See theme.h.
+  chargeRing(g, CENTER_X, SCREEN_H / 2, OFF_RING_R, m.batteryPct, m.batteryKnown);
+
+  g.setFont(font::wordmark());
+  textCenteredAt(g, "Jota", CENTER_X, SCREEN_H / 2 + 6);
+
+  if (m.batteryKnown) {
+    char b[8];
+    snprintf(b, sizeof(b), "%u%%", (unsigned)m.batteryPct);
+    g.setFont(font::label());
+    textCenteredAt(g, b, CENTER_X, OFF_PCT_CY);
+  }
 }
 
 }  // namespace jota
