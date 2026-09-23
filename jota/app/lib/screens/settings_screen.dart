@@ -18,12 +18,17 @@
 //  all, which is the one thing that makes a note become words.
 // ============================================================================
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../data/note.dart';
 import '../data/settings_store.dart';
+import '../export/backup.dart';
 import '../design/format.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
@@ -449,6 +454,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           label: 'Notes',
                           value: fmtBytes(_archiveBytes),
                         ),
+                        // The archive is on this phone and nowhere else. One
+                        // file of every note's words, to the share sheet, is
+                        // the whole backup story for now.
+                        _SettingRow(
+                          label: 'Share all notes',
+                          value: '→',
+                          onTap: () => _shareBackup(s),
+                        ),
                         _SettingRow(
                           label: 'Playback cache',
                           value: '${fmtBytes(_cacheBytes)} →',
@@ -681,6 +694,26 @@ class _LeavesCard extends StatelessWidget {
 }
 
 /// One-line feedback. Settings has no error region and does not need one.
+/// Every note's words as one JSON file, handed to the system share sheet.
+/// Written to the cache directory: the share target copies what it wants,
+/// and a stale backup in the cache is the OS's to clean.
+Future<void> _shareBackup(Services s) async {
+  final List<Note> notes = await s.notes.all();
+  final String json = notesBackupJson(notes);
+  final Directory dir = await getTemporaryDirectory();
+  final DateTime now = DateTime.now();
+  final String stamp = '${now.year}${now.month.toString().padLeft(2, '0')}'
+      '${now.day.toString().padLeft(2, '0')}';
+  final File f = File('${dir.path}/jota-notes-$stamp.json');
+  await f.writeAsString(json, flush: true);
+  await SharePlus.instance.share(
+    ShareParams(
+      files: <XFile>[XFile(f.path, mimeType: 'application/json')],
+      subject: 'Jota notes $stamp',
+    ),
+  );
+}
+
 void _say(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
