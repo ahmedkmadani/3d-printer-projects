@@ -13,6 +13,7 @@
 
 #include "app/identity.h"
 #include "app/tags.h"
+#include "util/clock.h"
 
 namespace jota {
 
@@ -462,7 +463,10 @@ class ClockCB : public NimBLECharacteristicCallbacks {
     if (!g_authed || !g_store) return;
     // Jota has no network, so the phone is its only time source.
     const uint32_t t = (uint32_t)strtoul(c->getValue().c_str(), nullptr, 10);
-    if (t > 1600000000UL) g_store->setClock(t);
+    if (t > CLOCK_SANE_AFTER) {
+      clockSet(t);           // from now on notes are stamped as they are made
+      g_store->setClock(t);  // and the ones made before this connect get now
+    }
   }
 };
 

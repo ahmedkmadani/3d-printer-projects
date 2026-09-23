@@ -26,6 +26,8 @@
 #include "hal/buttons.h"
 #include "hal/mic.h"
 #include "hal/sdcard.h"
+#include "util/clock.h"
+#include <esp_system.h>
 #include "link/ble.h"
 #include "ui/screens.h"
 #include "ui/theme.h"
@@ -71,6 +73,27 @@ static Link      bleLink;   // not `link`: collides with POSIX link()
 
 static uint32_t lastActivityMs = 0;
 static bool     wakeToRecord   = false;
+static uint32_t lastPaintMs    = 0;
+
+// ---- Battery log ---------------------------------------------------------
+// One line per event on the card, so a day off the charger can be read back:
+//   <unix seconds or 0> <uptime s> <event> <mV> <pct>
+// Sleep entries and wakes bracket the standby current; "awake" every ten
+// minutes shows the running drain. This is the instrument for the soak.
+static const uint32_t BAT_LOG_EVERY_MS = 10UL * 60UL * 1000UL;
+static uint32_t       nextBatLogMs     = 0;
+
+static void logBattery(const char *event) {
+  Serial.printf("[bat] %s %u mV %u%%\n", event, (unsigned)battery.millivolts(),
+                (unsigned)battery.percent());
+  if (!sdcard.mounted()) return;
+  FILE *f = fopen("/sdcard/jota/battery.log", "a");
+  if (!f) return;
+  fprintf(f, "%lu %lu %s %u %u\n", (unsigned long)clockNow(),
+          (unsigned long)(millis() / 1000UL), event,
+          (unsigned)battery.millivolts(), (unsigned)battery.percent());
+  fclose(f);
+}
 
 // Full refresh clears e-paper ghosting; partial is fast but accumulates it.
 static uint16_t       partialsSinceFull = 0;
@@ -120,6 +143,7 @@ static void restingFrame() {
 
 static void enterDeepSleep() {
   Serial.println("[jota] idle: deep sleep. BOOT records, PWR wakes.");
+  logBattery("sleep");
   restingFrame();
   sdcard.end();
   mic.powerOff();
@@ -169,7 +193,8 @@ static void paint() {
   nav.clearDirty();
   // The draw above blocks for up to ~2s on a full refresh. Timed screens must
   // start counting from now — when the user can actually see them.
-  nav.paintDone(millis());
+  lastPaintMs = millis();
+  nav.paintDone(lastPaintMs);
 }
 
 void setup() {
@@ -225,8 +250,8 @@ void setup() {
   battery.begin();
   model.batteryKnown = battery.known();
   model.batteryPct   = battery.percent();
-  Serial.printf("[bat] %s %u mV -> %u%%\n", battery.known() ? "pack" : "unknown",
-                (unsigned)battery.millivolts(), (unsigned)battery.percent());
+  logBattery(fromSleep ? "wake" : "boot");
+  nextBatLogMs = millis() + BAT_LOG_EVERY_MS;
 
   bleLink.begin(notes, model);
   Serial.printf("[jota] BLE up, %u notes pending\n", (unsigned)notes.pending());
@@ -353,8 +378,15 @@ void loop() {
     model.batteryKnown = true;
     model.batteryPct   = battery.percent();
     // Only the idle screen carries the gauge as a live figure; anywhere else
-    // it will be right the next time that screen is drawn.
-    if (nav.screen() == Screen::Ready) nav.markDirty();
+    // it will be right the next time that screen is drawn. The figure lives
+    // on the status line, so only that band is pushed: a whole-screen
+    // partial for a percent tick left READY in partial-refresh grey — which
+    // on this panel reads as a disabled device — until something else
+    // happened to draw it in full.
+    if (nav.screen() == Screen::Ready) {
+      nav.markDirtyRegion(Rect{0, (int16_t)(FOOT_RULE_Y - 2), SCREEN_W,
+                               (int16_t)(SCREEN_H - (FOOT_RULE_Y - 2))});
+    }
   }
   bleLink.setBattery(battery.advByte());
 
@@ -389,6 +421,7 @@ void loop() {
 
   if (nav.powerOff()) {
     Serial.println("[jota] powering off");
+    logBattery("off");
     // A power press while recording saves first (nav committed the note);
     // give the task time to close its files before the latch drops.
     if (recorder.busy()) {
@@ -401,6 +434,28 @@ void loop() {
     sdcard.end();
     digitalWrite(PWR_LATCH, LOW);  // release the latch: board cuts power
     while (true) delay(100);       // reached only while USB keeps us alive
+  }
+
+  // A quiet screen that was last drawn by a partial gets one full refresh a
+  // few seconds after it settled. Partials on this panel come out grey and
+  // the full is what makes READY read as ON; the flash lands after the user
+  // has stopped touching the device, never mid-gesture.
+  if (!nav.dirty() && partialsSinceFull > 0 && quietScreen(nav.screen()) &&
+      now - lastPaintMs >= 3000 && !recorder.busy()) {
+    nav.markDirty(/*full=*/true);
+  }
+
+  if (now >= nextBatLogMs) {
+    nextBatLogMs = now + BAT_LOG_EVERY_MS;
+    logBattery("awake");
+  }
+
+  // Test hook: '!' on serial is a power cut. esp_restart() closes no file,
+  // which is exactly what a flat battery does mid-note, and it is the only
+  // way to make an orphan without opening the case. Unreachable off USB.
+  if (Serial.available() && Serial.read() == '!') {
+    Serial.println("[jota] serial '!': simulating a power cut");
+    esp_restart();
   }
 
   if (nav.dirty()) paint();

@@ -78,8 +78,15 @@ class NoteStore {
   // first connected.
   void setClock(uint32_t unixSeconds);
 
-  // Destroy every note, files included. ERASE is the only caller.
+  // Destroy every note, files included — indexed or not. ERASE is the only
+  // caller.
   void eraseAll();
+
+  // Files on the card that the index does not know about: a recording the
+  // power died under, or one whose index write never landed. Rebuilt from
+  // the WAV and indexed, so nothing spoken is lost to a flat battery.
+  // Returns how many were recovered.
+  uint8_t recoverOrphans();
 
  private:
   static const uint8_t MAX_NOTES = 32;

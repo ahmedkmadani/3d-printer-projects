@@ -158,6 +158,15 @@ void Recorder::run() {
       break;
     }
     samples += n;
+    // Every ~4 s, push the WAV through to the card and update its directory
+    // entry. Without this a power cut mid-note leaves a zero-length file:
+    // FAT only learns a file's size when it is closed or synced. With it the
+    // orphan on the card is everything up to the last sync, and the store
+    // rebuilds the note from it at the next boot.
+    if ((samples % (MIC_SAMPLE_RATE * 4)) < CHUNK) {
+      fflush(wav);
+      fsync(fileno(wav));
+    }
     for (size_t k = 0; k < n; ++k) {
       const int32_t v = mono[k];
       sumSq += (uint64_t)(v * v);

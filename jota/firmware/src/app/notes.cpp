@@ -4,8 +4,14 @@
 #include "app/notes.h"
 
 #include <Arduino.h>
+#include <dirent.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
+
+#include "audio/adpcm.h"
+#include "util/clock.h"
+#include "util/crc32.h"
 
 namespace jota {
 
@@ -88,8 +94,10 @@ void NoteStore::begin(bool sdMounted) {
     return;
   }
   load();
-  Serial.printf("[notes] %u indexed, %u pending, last id %u\n",
-                (unsigned)count_, (unsigned)pending(), (unsigned)lastId_);
+  const uint8_t recovered = recoverOrphans();
+  Serial.printf("[notes] %u indexed, %u pending, last id %u%s\n",
+                (unsigned)count_, (unsigned)pending(), (unsigned)lastId_,
+                recovered ? " (after recovery)" : "");
 }
 
 NoteRec *NoteStore::find(uint16_t id) {
@@ -128,7 +136,7 @@ bool NoteStore::add(uint16_t id, uint16_t secs, uint32_t bytes, uint32_t crc,
   r.secs   = secs;
   r.bytes  = bytes;
   r.crc    = crc;
-  r.time   = 0;
+  r.time   = clockNow();  // 0 until the phone has set the clock; see setClock
   r.synced = false;
   if (tag) {
     strncpy(r.tag, tag, TAG_LEN_MAX);
@@ -231,16 +239,138 @@ void NoteStore::setClock(uint32_t unixSeconds) {
 
 void NoteStore::eraseAll() {
   closeReader();
-  char path[48];
-  for (uint8_t i = 0; i < count_; ++i) {
-    notePath(notes_[i].id, "wav", path, sizeof(path));
-    unlink(path);
-    notePath(notes_[i].id, "ima", path, sizeof(path));
-    unlink(path);
-  }
   count_ = 0;
+  // Sweep the directory rather than the index: an orphan the index never
+  // met is still a recording, and ERASE promises there are none left.
+  DIR *d = opendir(NOTES_DIR);
+  if (d) {
+    struct dirent *e;
+    char path[64];
+    while ((e = readdir(d)) != nullptr) {
+      const size_t n = strlen(e->d_name);
+      if (n < 5) continue;
+      const char *ext = e->d_name + n - 4;
+      if (strcasecmp(ext, ".wav") != 0 && strcasecmp(ext, ".ima") != 0) continue;
+      snprintf(path, sizeof(path), "%s/%s", NOTES_DIR, e->d_name);
+      unlink(path);
+    }
+    closedir(d);
+  }
   // lastId_ survives on purpose: see the header.
   save();
+}
+
+// ---- Orphans -------------------------------------------------------------
+
+// Rebuild NNNN.ima from NNNN.wav and index the note. The WAV is the master:
+// the recorder syncs it to the card every few seconds while recording, so a
+// power cut leaves a valid file with a zero-length header, and the ADPCM copy
+// is cheaper to remake than to trust.
+static void putLE32(uint8_t *p, uint32_t v) {
+  p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
+}
+
+static bool rebuildFromWav(uint16_t id, uint32_t *secsOut, uint32_t *bytesOut,
+                           uint32_t *crcOut) {
+  char wavPath[48], imaPath[48];
+  notePath(id, "wav", wavPath, sizeof(wavPath));
+  notePath(id, "ima", imaPath, sizeof(imaPath));
+
+  struct stat st;
+  if (stat(wavPath, &st) != 0 || st.st_size < 44) return false;
+  const uint32_t dataBytes = (uint32_t)(st.st_size - 44) & ~1u;
+  const uint32_t samples   = dataBytes / 2;
+
+  FILE *wav = fopen(wavPath, "r+b");
+  if (!wav) return false;
+
+  // Patch the header from the file's real length. The recorder writes it
+  // only at a clean stop, so an orphan's says zero.
+  uint8_t h[44];
+  memcpy(h, "RIFF", 4);           putLE32(h + 4, 36 + dataBytes);
+  memcpy(h + 8, "WAVEfmt ", 8);   putLE32(h + 16, 16);
+  h[20] = 1; h[21] = 0; h[22] = 1; h[23] = 0;
+  putLE32(h + 24, 16000);         putLE32(h + 28, 32000);
+  h[32] = 2; h[33] = 0; h[34] = 16; h[35] = 0;
+  memcpy(h + 36, "data", 4);      putLE32(h + 40, dataBytes);
+  bool ok = fseek(wav, 0, SEEK_SET) == 0 && fwrite(h, 1, 44, wav) == 44;
+
+  FILE *ima = ok ? fopen(imaPath, "wb") : nullptr;
+  ok = ok && ima;
+
+  uint32_t crc = 0, blocks = 0;
+  if (ok) {
+    int16_t pcm[ADPCM_BLOCK_SAMPLES];
+    uint8_t blk[ADPCM_BLOCK_BYTES];
+    uint32_t done = 0;
+    while (ok && done < samples) {
+      uint32_t take = samples - done;
+      if (take > ADPCM_BLOCK_SAMPLES) take = ADPCM_BLOCK_SAMPLES;
+      if (fread(pcm, sizeof(int16_t), take, wav) != take) { ok = false; break; }
+      if (take < ADPCM_BLOCK_SAMPLES)
+        memset(pcm + take, 0, (ADPCM_BLOCK_SAMPLES - take) * sizeof(int16_t));
+      adpcmEncodeBlock(pcm, blk);
+      if (fwrite(blk, 1, ADPCM_BLOCK_BYTES, ima) != ADPCM_BLOCK_BYTES) { ok = false; break; }
+      crc = crc32Update(crc, blk, ADPCM_BLOCK_BYTES);
+      blocks++;
+      done += take;
+    }
+  }
+  if (ima) fclose(ima);
+  fclose(wav);
+  if (!ok) {
+    unlink(imaPath);
+    return false;
+  }
+  *secsOut  = (samples + 8000) / 16000;
+  *bytesOut = blocks * (uint32_t)ADPCM_BLOCK_BYTES;
+  *crcOut   = crc;
+  return true;
+}
+
+uint8_t NoteStore::recoverOrphans() {
+  if (!sd_) return 0;
+  DIR *d = opendir(NOTES_DIR);
+  if (!d) return 0;
+
+  uint8_t recovered = 0;
+  struct dirent *e;
+  while ((e = readdir(d)) != nullptr) {
+    unsigned id = 0;
+    char ext[8] = {0};
+    if (sscanf(e->d_name, "%4u.%7s", &id, ext) != 2) continue;
+    if (strcasecmp(ext, "wav") != 0 || id == 0 || id > 0xFFFF) continue;
+    if (find((uint16_t)id)) continue;  // indexed: not an orphan
+
+    char path[48];
+    notePath((uint16_t)id, "wav", path, sizeof(path));
+    struct stat st;
+    if (stat(path, &st) != 0) continue;
+    if (st.st_size < 44 + 2 * 8000) {
+      // Under half a second: the power went before anything was said. Not
+      // worth keeping to be rediscovered on every boot.
+      unlink(path);
+      notePath((uint16_t)id, "ima", path, sizeof(path));
+      unlink(path);
+      Serial.printf("[notes] dropped %s: too short to be a note\n", e->d_name);
+      continue;
+    }
+
+    uint32_t secs = 0, bytes = 0, crc = 0;
+    if (!rebuildFromWav((uint16_t)id, &secs, &bytes, &crc)) {
+      // Could not read or re-encode it. The WAV is someone's words, so it
+      // stays on the card for the next boot, or for a card reader.
+      Serial.printf("[notes] could not recover %s; left on card\n", e->d_name);
+      continue;
+    }
+    if (add((uint16_t)id, (uint16_t)secs, bytes, crc, nullptr)) {
+      recovered++;
+      Serial.printf("[notes] recovered N-%03u: %lu s, %lu B adpcm\n", id,
+                    (unsigned long)secs, (unsigned long)bytes);
+    }
+  }
+  closedir(d);
+  return recovered;
 }
 
 }  // namespace jota
