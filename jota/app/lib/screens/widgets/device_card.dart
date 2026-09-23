@@ -20,6 +20,8 @@
 //  "Sync is never a place you go." With no device yet there is still something
 //  to go TO, so that case pushes Connect.
 // ============================================================================
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -29,8 +31,24 @@ import '../../design/theme.dart';
 import '../../state/device_controller.dart';
 import '../connect_screen.dart';
 
-class DeviceCard extends StatelessWidget {
+class DeviceCard extends StatefulWidget {
   const DeviceCard({super.key});
+
+  @override
+  State<DeviceCard> createState() => _DeviceCardState();
+}
+
+class _DeviceCardState extends State<DeviceCard> {
+  /// True for a few seconds after a tap on a sleeping Jota: the card says
+  /// LISTENING while the scan runs, then goes back to saying it is asleep.
+  bool _listening = false;
+  Timer? _listenTimer;
+
+  @override
+  void dispose() {
+    _listenTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _tapped(BuildContext context) async {
     final DeviceController device = context.read<DeviceController>();
@@ -41,6 +59,22 @@ class DeviceCard extends StatelessWidget {
       return;
     }
     if (device.isSyncing) return;
+
+    // A Jota that is not advertising is asleep, not lost. Connecting to it
+    // used to run for 25 seconds and end in a "timed out" toast, which read
+    // as a fault. The honest thing is to listen for it and say so; the
+    // moment it wakes and advertises with notes, the auto-sync takes over.
+    if (device.pendingOnDevice == null && device.bluetoothReady) {
+      await device.startScan(timeout: null);
+      _listenTimer?.cancel();
+      if (!mounted) return;
+      setState(() => _listening = true);
+      _listenTimer = Timer(const Duration(seconds: 8), () {
+        if (mounted) setState(() => _listening = false);
+      });
+      return;
+    }
+
     final SyncResult? r = await device.syncNow();
     if (!context.mounted) return;
 
@@ -73,7 +107,7 @@ class DeviceCard extends StatelessWidget {
     final JotaColors c = context.ink;
     final JotaType t = context.type;
 
-    final _DeviceLine line = _DeviceLine.of(device);
+    final _DeviceLine line = _DeviceLine.of(device, listening: _listening);
 
     // Mono, small, tracked and muted: every figure in the card (the id, the
     // charge, the count) is one the device itself prints in the same face.
@@ -102,44 +136,60 @@ class DeviceCard extends StatelessWidget {
               Radius.circular(JotaCards.radius),
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              // WHICH Jota. Yields first: the state is the half you are
-              // reading the card for, so it never gets truncated.
-              Expanded(
-                child: Row(
-                  children: <Widget>[
-                    _Dot(present: line.present, busy: line.busy),
-                    const SizedBox(width: JotaGrid.gapS + 2),
-                    Flexible(
-                      child: Text(
-                        line.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: small,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: JotaGrid.gapM),
-              // HOW it is: one figure, and the state under it.
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              Row(
                 children: <Widget>[
-                  if (line.figure != null) ...<Widget>[
-                    Text(
-                      line.figure!,
-                      // The display role is the big mono figure; only the
-                      // leading is tightened so the status line can sit
-                      // right under it.
-                      style: t.display.copyWith(height: 1),
+                  // WHICH Jota. Yields first: the state is the half you are
+                  // reading the card for, so it never gets truncated.
+                  Expanded(
+                    child: Row(
+                      children: <Widget>[
+                        _Dot(present: line.present, busy: line.busy),
+                        const SizedBox(width: JotaGrid.gapS + 2),
+                        Flexible(
+                          child: Text(
+                            line.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: small,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: JotaGrid.unit),
-                  ],
-                  Text(line.status, maxLines: 1, style: small),
+                  ),
+                  const SizedBox(width: JotaGrid.gapM),
+                  // HOW it is: one figure, and the state under it.
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: <Widget>[
+                      if (line.figure != null) ...<Widget>[
+                        Text(
+                          line.figure!,
+                          // The display role is the big mono figure; only the
+                          // leading is tightened so the status line can sit
+                          // right under it.
+                          style: t.display.copyWith(height: 1),
+                        ),
+                        const SizedBox(height: JotaGrid.unit),
+                      ],
+                      Text(line.status, maxLines: 1, style: small),
+                    ],
+                  ),
                 ],
               ),
+              // What to do about it, when there is something to do. One
+              // sentence in prose under the figures, only for the states
+              // that need one.
+              if (line.hint != null) ...<Widget>[
+                const SizedBox(height: JotaGrid.gapS),
+                Text(
+                  line.hint!,
+                  style: t.prose.copyWith(color: c.inkMuted),
+                ),
+              ],
             ],
           ),
         ),
@@ -225,7 +275,11 @@ class _DeviceLine {
     this.figure,
     this.present = false,
     this.busy = false,
+    this.hint,
   });
+
+  /// A sentence under the figures, for the states that call for one.
+  final String? hint;
 
   /// Left: WHICH Jota. The same id the device prints on its own splash.
   final String name;
@@ -249,7 +303,7 @@ class _DeviceLine {
     return pct == null ? '—' : '$pct%';
   }
 
-  static _DeviceLine of(DeviceController device) {
+  static _DeviceLine of(DeviceController device, {bool listening = false}) {
     if (!device.hasPairedDevice) {
       return const _DeviceLine(name: 'NO JOTA', status: 'TAP TO CONNECT');
     }
@@ -278,9 +332,25 @@ class _DeviceLine {
 
     final int? pending = device.pendingOnDevice;
     if (pending == null) {
-      // Out of range is NOT the same as "nothing waiting", and saying "up to
-      // date" for a device we cannot see would be a lie the app told for weeks.
-      return _DeviceLine(name: name, figure: charge, status: 'NOT IN RANGE');
+      // Not advertising is NOT the same as "nothing waiting", and saying "up
+      // to date" for a device we cannot see would be a lie the app told for
+      // weeks. It is also not "not in range": the Jota sleeps two minutes
+      // after it was last touched, and asleep is where it spends its day.
+      if (listening) {
+        return _DeviceLine(
+          name: name,
+          figure: charge,
+          status: 'LISTENING',
+          busy: true,
+          hint: 'Press a button on the Jota to wake it.',
+        );
+      }
+      return _DeviceLine(
+        name: name,
+        figure: charge,
+        status: 'ASLEEP',
+        hint: 'Press a button on the Jota to sync.',
+      );
     }
     if (pending == 0) {
       return _DeviceLine(

@@ -185,12 +185,27 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           // that were nowhere, and they fill the page with figures rather
           // than air.
           const SizedBox(height: JotaGrid.gapXL),
-          _FactsBlock(note: _note),
+          _FactsBlock(
+            note: _note,
+            onDelete: () => _confirmDelete(context, notes),
+          ),
 
           const SizedBox(height: JotaGrid.gapL),
         ],
       ),
     );
+  }
+
+  /// Delete, from the foot of the details card. The swipe on the list is
+  /// the quick way; this is the one you can find.
+  Future<void> _confirmDelete(
+    BuildContext context,
+    NotesController notes,
+  ) async {
+    if (!await confirmDeleteNote(context)) return;
+    if (!context.mounted) return;
+    await notes.delete(_note);
+    if (context.mounted) Navigator.of(context).pop();
   }
 
   /// The tag chooser, on a sheet.
@@ -229,13 +244,9 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                     Expanded(
                       child: Text('Tag', style: t.sheetTitle),
                     ),
-                    GestureDetector(
+                    JotaTextLink(
+                      label: 'Edit tags',
                       onTap: () => Navigator.of(sheetContext).pop(true),
-                      behavior: HitTestBehavior.opaque,
-                      child: Text(
-                        'Edit tags',
-                        style: t.prose.copyWith(color: c.inkMuted),
-                      ),
                     ),
                   ],
                 ),
@@ -355,9 +366,10 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
 /// shape as the cards on Home. Only what is known: a note without words has
 /// no word count and no model.
 class _FactsBlock extends StatelessWidget {
-  const _FactsBlock({required this.note});
+  const _FactsBlock({required this.note, required this.onDelete});
 
   final Note note;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -396,6 +408,18 @@ class _FactsBlock extends StatelessWidget {
             ),
           _Fact(name: 'Synced', value: fmtNoteStamp(note.syncedAt)),
           _Fact(name: 'Note', value: note.displayId),
+          // The one destructive thing, last, in the signal colour, with a
+          // dialog in front of it. A note with no visible way to delete it
+          // is a promise the privacy story does not get to make.
+          const SizedBox(height: JotaGrid.gapS),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: JotaTextLink(
+              label: 'Delete note',
+              danger: true,
+              onTap: onDelete,
+            ),
+          ),
         ],
       ),
     );
@@ -669,35 +693,42 @@ class _PlayerPillState extends State<_PlayerPill> {
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: _toggle,
+                  // The circle is drawn at 28; the target is the pill's
+                  // full height, which is the platform minimum.
                   child: Container(
-                    width: _circle,
-                    height: _circle,
+                    width: JotaRows.height - 4,
+                    height: JotaRows.height - 4,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: c.ink,
-                      shape: BoxShape.circle,
+                    child: Container(
+                      width: _circle,
+                      height: _circle,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: c.ink,
+                        shape: BoxShape.circle,
+                      ),
+                      child: _loading
+                          ? SizedBox(
+                              width: 13,
+                              height: 13,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(c.onInk),
+                              ),
+                            )
+                          // Drawn, not an icon: these were the only Material
+                          // glyphs left in the app, and a set whose weight and
+                          // corner treatment are not ours has no business inside
+                          // the one circle the design draws bare.
+                          : CustomPaint(
+                              size: const Size(14, 14),
+                              painter: _TransportMark(
+                                playing: _player.playing,
+                                color: c.onInk,
+                              ),
+                            ),
                     ),
-                    child: _loading
-                        ? SizedBox(
-                            width: 13,
-                            height: 13,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.5,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(c.onInk),
-                            ),
-                          )
-                        // Drawn, not an icon: these were the only Material
-                        // glyphs left in the app, and a set whose weight and
-                        // corner treatment are not ours has no business inside
-                        // the one circle the design draws bare.
-                        : CustomPaint(
-                            size: const Size(14, 14),
-                            painter: _TransportMark(
-                              playing: _player.playing,
-                              color: c.onInk,
-                            ),
-                          ),
                   ),
                 ),
               ),

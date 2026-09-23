@@ -288,17 +288,7 @@ class _TagsHeader extends StatelessWidget {
             if (onSortByUse != null)
               // The same quiet text link as "Edit tags" on the note's tag
               // sheet: an action, not a mode, so it is not a stadium.
-              GestureDetector(
-                onTap: onSortByUse,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    'Sort by use',
-                    style: t.prose.copyWith(color: c.inkMuted),
-                  ),
-                ),
-              ),
+              JotaTextLink(label: 'Sort by use', onTap: onSortByUse!),
           ],
         ),
         const SizedBox(height: JotaGrid.gapS),

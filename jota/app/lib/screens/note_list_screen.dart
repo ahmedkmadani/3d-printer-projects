@@ -27,8 +27,10 @@ import '../design/format.dart';
 import '../design/script.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
+import '../data/settings_store.dart';
 import '../state/device_controller.dart';
 import '../state/notes_controller.dart';
+import '../state/services.dart';
 import 'note_detail_screen.dart';
 import 'connect_screen.dart';
 import 'widgets/note_actions.dart';
@@ -56,10 +58,27 @@ class _NoteListScreenState extends State<NoteListScreen>
 
   final TextEditingController _search = TextEditingController();
 
+  /// The swipe hint shows on the first three opens of this tab and then
+  /// never again; a hint that never leaves is a label.
+  bool _showSwipeHint = false;
+
+  /// Everything back to plain: words, tag, order, and the keyboard away.
+  void _clearAll() {
+    _search.clear();
+    context.read<NotesController>().clearFilters();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   @override
   void initState() {
     super.initState();
     _search.text = context.read<NotesController>().query;
+    final SettingsStore settings = context.read<Services>().settings;
+    final int shown = settings.swipeHintShown;
+    if (shown < 3) {
+      _showSwipeHint = true;
+      settings.setSwipeHintShown(shown + 1);
+    }
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // A scan on open is what makes "put it on the desk and it syncs" true
@@ -94,7 +113,7 @@ class _NoteListScreenState extends State<NoteListScreen>
     return showModalBottomSheet<void>(
       context: context,
       backgroundColor: context.ink.bg,
-      builder: (_) => const _FilterSheet(),
+      builder: (_) => _FilterSheet(onClear: _clearAll),
     );
   }
 
@@ -168,6 +187,13 @@ class _NoteListScreenState extends State<NoteListScreen>
                       ),
                     ],
                   ),
+                  if (_showSwipeHint) ...<Widget>[
+                    const SizedBox(height: JotaGrid.gapM),
+                    Text(
+                      'Swipe a note left to delete, right to share.',
+                      style: t.prose.copyWith(color: c.inkMuted),
+                    ),
+                  ],
                 ],
                 const SizedBox(height: JotaGrid.gapL),
                 const JotaRule(),
@@ -179,15 +205,10 @@ class _NoteListScreenState extends State<NoteListScreen>
           // says so there — see the "what leaves your phone" card.
           Expanded(
             child: notes.loading
-                ? const SizedBox.shrink()
+                ? const _Placeholders()
                 : visible.isEmpty
                     ? notes.filtering
-                        ? _NoMatch(
-                            onClear: () {
-                              _search.clear();
-                              notes.clearFilters();
-                            },
-                          )
+                        ? _NoMatch(onClear: _clearAll)
                         : _EmptyArchive(hasDevice: device.hasPairedDevice)
                     : RefreshIndicator(
                         color: c.ink,
@@ -437,14 +458,17 @@ class _FilterButton extends StatelessWidget {
 /// tapped, so the list behind the sheet is already right when it closes.
 /// "Clear" in the corner puts everything back; "Done" just closes.
 class _FilterSheet extends StatelessWidget {
-  const _FilterSheet();
+  const _FilterSheet({required this.onClear});
+
+  /// Clears the search words too, and drops the keyboard: "Clear" means
+  /// everything, not just what this sheet happens to show.
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
     final NotesController notes = context.watch<NotesController>();
     final JotaType t = context.type;
-    final JotaColors c = context.ink;
-    final bool anything = notes.tagFilter != null || !notes.newestFirst;
+    final bool anything = notes.filtering || !notes.newestFirst;
 
     return SafeArea(
       child: Padding(
@@ -464,16 +488,12 @@ class _FilterSheet extends StatelessWidget {
                   child: Text('Filter', style: t.sheetTitle),
                 ),
                 if (anything)
-                  GestureDetector(
+                  JotaTextLink(
+                    label: 'Clear',
                     onTap: () {
-                      notes.setTagFilter(null);
                       notes.setNewestFirst(true);
+                      onClear();
                     },
-                    behavior: HitTestBehavior.opaque,
-                    child: Text(
-                      'Clear',
-                      style: t.prose.copyWith(color: c.inkMuted),
-                    ),
                   ),
               ],
             ),
@@ -549,6 +569,50 @@ class _SheetLabel extends StatelessWidget {
     return Text(
       text,
       style: context.type.cardLabel.copyWith(color: context.ink.inkMuted),
+    );
+  }
+}
+
+/// Three faint rows while the archive is first read from disk: the shape of
+/// what is coming, so the screen never opens onto nothing. After the first
+/// load the last list stays on screen through every refresh.
+class _Placeholders extends StatelessWidget {
+  const _Placeholders();
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    Widget bar(double width, double height) => Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: c.field,
+            borderRadius: JotaRows.borderRadiusOf(height),
+          ),
+        );
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      children: <Widget>[
+        for (int i = 0; i < 3; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: JotaGrid.margin,
+              vertical: JotaGrid.gapM,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                bar(150, 12),
+                const SizedBox(height: JotaGrid.gapM),
+                bar(double.infinity, 16),
+                const SizedBox(height: JotaGrid.gapS),
+                bar(220, 16),
+                const SizedBox(height: JotaGrid.gapM),
+                const JotaRule(),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

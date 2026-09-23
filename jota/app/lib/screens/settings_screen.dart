@@ -379,6 +379,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const SizedBox(height: JotaGrid.gapM),
                         const JotaRule(),
 
+                        // Four groups, each under a card caption, so the
+                        // seventeen rows read as four questions instead of
+                        // one long wall.
+                        const _Caption('Transcription', first: true),
                         // Where transcription happens. On device keeps the
                         // audio on the phone, which problem.md treats as a
                         // functional requirement rather than a feature. The
@@ -418,7 +422,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     );
                                 },
                         ),
-
                         // Which language the notes are in. Auto lets
                         // whisper.cpp guess from the first thirty seconds,
                         // which on a short mixed clip is a coin toss; a hint
@@ -429,20 +432,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           value: _languageLabel(s.settings.language),
                           onTap: () => _pickLanguage(s),
                         ),
-
-                        // The four the design names, in its order.
                         _SettingRow(
-                          label: 'Tags',
-                          value: '${s.settings.tags.length} →',
+                          label: 'Transcribe automatically',
+                          value: s.settings.autoTranscribe ? 'ON' : 'OFF',
                           onTap: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const TagEditorScreen(),
-                              ),
+                            await s.settings.setAutoTranscribe(
+                              !s.settings.autoTranscribe,
                             );
-                            if (mounted) setState(() {});
+                            setState(() {});
                           },
                         ),
+                        // Everything below is a real behaviour the design's
+                        // four rows do not cover. Same shape, so the list stays
+                        // one list rather than growing sections again.
+                        if (kShowCloudTranscription)
+                          _SettingRow(
+                            label: 'Transcription key',
+                            // Masked, never shown whole: enough to tell two keys
+                            // apart, not enough to use one over someone's
+                            // shoulder.
+                            value: hasKey
+                                ? SettingsStore.maskKey(_apiKey!)
+                                : 'NOT SET →',
+                            onTap: () => _editKey(s, hasKey: hasKey),
+                          ),
+                        const _Caption('Device'),
                         _SettingRow(
                           label: 'Device',
                           value: device.hasPairedDevice
@@ -458,34 +472,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ? 'UNKNOWN'
                               : '${device.batteryOnDevice}%',
                         ),
+                        // The four the design names, in its order.
                         _SettingRow(
-                          label: 'Unlock with fingerprint',
-                          value: lock.enabled ? 'ON' : 'OFF',
-                          onTap: () => _setLock(lock, !lock.enabled),
-                        ),
-
-                        // Everything below is a real behaviour the design's
-                        // four rows do not cover. Same shape, so the list stays
-                        // one list rather than growing sections again.
-                        if (kShowCloudTranscription)
-                          _SettingRow(
-                            label: 'Transcription key',
-                            // Masked, never shown whole: enough to tell two keys
-                            // apart, not enough to use one over someone's
-                            // shoulder.
-                            value: hasKey
-                                ? SettingsStore.maskKey(_apiKey!)
-                                : 'NOT SET →',
-                            onTap: () => _editKey(s, hasKey: hasKey),
-                          ),
-                        _SettingRow(
-                          label: 'Transcribe automatically',
-                          value: s.settings.autoTranscribe ? 'ON' : 'OFF',
+                          label: 'Tags',
+                          value: '${s.settings.tags.length} →',
                           onTap: () async {
-                            await s.settings.setAutoTranscribe(
-                              !s.settings.autoTranscribe,
+                            await Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const TagEditorScreen(),
+                              ),
                             );
-                            setState(() {});
+                            if (mounted) setState(() {});
                           },
                         ),
                         _SettingRow(
@@ -498,15 +495,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             setState(() {});
                           },
                         ),
-                        // Kept next to Device because the question the pair
-                        // answers is a comparison: which Jota is this, and
-                        // which phone owns it.
+                        if (device.hasPairedDevice)
+                          _SettingRow(
+                            label: 'Forget this Jota',
+                            value: '→',
+                            onTap: () => _forget(device),
+                          ),
+                        // Erase, as a row with the rest of the device's
+                        // settings rather than a button pinned under every
+                        // group. PLACEHOLDER still: the firmware can erase
+                        // itself — both buttons, held twice — but there is
+                        // no BLE command for it yet, so this says what it
+                        // cannot do rather than pretending.
+                        if (device.hasPairedDevice)
+                          _SettingRow(
+                            label: 'Erase device',
+                            value: '→',
+                            danger: true,
+                            onTap: () => _say(
+                              context,
+                              'Not yet — hold both buttons on the Jota for '
+                              'five seconds',
+                            ),
+                          ),
+                        const _Caption('Your data'),
                         _SettingRow(
-                          label: 'This phone',
-                          value: _shortAppId(device.appId),
-                        ),
-                        _SettingRow(
-                          label: 'Notes',
+                          label: 'Storage',
                           value: fmtBytes(_archiveBytes),
                         ),
                         // The archive is on this phone and nowhere else. One
@@ -534,6 +548,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           },
                         ),
                         _SettingRow(
+                          label: 'Unlock with fingerprint',
+                          value: lock.enabled ? 'ON' : 'OFF',
+                          onTap: () => _setLock(lock, !lock.enabled),
+                        ),
+                        const _Caption('About'),
+                        // Kept next to Device because the question the pair
+                        // answers is a comparison: which Jota is this, and
+                        // which phone owns it.
+                        _SettingRow(
+                          label: 'This phone',
+                          value: _shortAppId(device.appId),
+                        ),
+                        const _SettingRow(
+                          label: 'Version',
+                          value: kVersionLabel,
+                        ),
+                        _SettingRow(
                           label: 'Replay onboarding',
                           value: '→',
                           onTap: () async {
@@ -546,16 +577,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               (Route<dynamic> route) => false,
                             );
                           },
-                        ),
-                        if (device.hasPairedDevice)
-                          _SettingRow(
-                            label: 'Forget this Jota',
-                            value: '→',
-                            onTap: () => _forget(device),
-                          ),
-                        const _SettingRow(
-                          label: 'Version',
-                          value: kVersionLabel,
                         ),
 
                         const SizedBox(height: JotaGrid.gapL),
@@ -575,30 +596,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ],
                     ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                JotaGrid.margin,
-                JotaGrid.gapM,
-                JotaGrid.margin,
-                JotaGrid.gapM,
-              ),
-              child: JotaButton(
-                label: 'Erase device',
-                danger: true,
-                upcase: false,
-                // PLACEHOLDER. The firmware can erase itself — both buttons,
-                // held twice — but there is no BLE command for it, so the app
-                // cannot ask. Wiring it means a new characteristic on both
-                // sides of docs/ble-service.md. Until then this says what it
-                // cannot do rather than pretending to do it, because a
-                // destructive button that silently does nothing is the worst
-                // possible thing to be wrong about.
-                onTap: () => _say(
-                  context,
-                  'Not yet — hold both buttons on the Jota for five seconds',
-                ),
-              ),
             ),
           ],
         ),
@@ -630,11 +627,19 @@ String _languageLabel(String? code) {
 }
 
 class _SettingRow extends StatelessWidget {
-  const _SettingRow({required this.label, required this.value, this.onTap});
+  const _SettingRow({
+    required this.label,
+    required this.value,
+    this.onTap,
+    this.danger = false,
+  });
 
   final String label;
   final String value;
   final VoidCallback? onTap;
+
+  /// The signal colour on the label: the one destructive row.
+  final bool danger;
 
   @override
   Widget build(BuildContext context) {
@@ -655,7 +660,12 @@ class _SettingRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: <Widget>[
-                  Expanded(child: Text(label, style: t.prose)),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: t.prose.copyWith(color: danger ? c.signal : null),
+                    ),
+                  ),
                   const SizedBox(width: JotaGrid.gapM),
                   Text(
                     value,
@@ -808,3 +818,26 @@ void _say(BuildContext context, String message) {
 String _shortAppId(String appId) => appId.isEmpty
     ? '—'
     : appId.substring(0, appId.length.clamp(0, 8)).toUpperCase();
+
+/// A group's caption: the card label, with air above it so the groups read
+/// as blocks. The first sits close under the title's hairline.
+class _Caption extends StatelessWidget {
+  const _Caption(this.text, {this.first = false});
+
+  final String text;
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        top: first ? JotaGrid.gapL : JotaGrid.gapXL,
+        bottom: JotaGrid.gapS,
+      ),
+      child: Text(
+        text.toUpperCase(),
+        style: context.type.cardLabel.copyWith(color: context.ink.inkMuted),
+      ),
+    );
+  }
+}

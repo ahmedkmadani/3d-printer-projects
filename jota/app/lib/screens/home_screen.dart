@@ -82,7 +82,9 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: JotaGrid.gapL),
           const DeviceCard(),
           const SizedBox(height: JotaGrid.gapL),
-          if (week.topics.isEmpty)
+          // Hidden until there are enough notes for a count to mean
+          // something: see kMinNotesForPatterns.
+          if (!enoughForPatterns(notes.notes) || week.topics.isEmpty)
             _NothingYet(hasNotes: notes.notes.isNotEmpty)
           else
             _TopicsCard(

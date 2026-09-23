@@ -108,6 +108,14 @@ final RegExp _wordBreak = RegExp(r'[^\p{L}]+', unicode: true);
 /// Words shorter than this are almost always function words in both scripts.
 const int _minWordLength = 4;
 
+/// Below this many transcribed notes the patterns card stays hidden. With
+/// four notes the "topics" were the words "Test", "Three" and a greeting —
+/// true counts, and noise. Enough notes is what turns a count into a finding.
+const int kMinNotesForPatterns = 8;
+
+bool enoughForPatterns(List<Note> notes) =>
+    notes.where((Note n) => n.hasTranscript).length >= kMinNotesForPatterns;
+
 /// A topic has to appear in at least this many separate notes.
 ///
 /// Three, not two: two notes mentioning the same word inside one week is a
@@ -147,21 +155,37 @@ WeekSummary summarise(
     // A word counts ONCE per note however often it was said, so one long rant
     // cannot manufacture a pattern on its own.
     final Set<String> seen = <String>{};
-    for (final String raw in n.transcript!.split(_wordBreak)) {
-      if (raw.length < _minWordLength) continue;
-      final String key = raw.toLowerCase();
-      if (_stopwords.contains(key)) continue;
-      if (!seen.add(key)) continue;
-
+    void count(String key, String display) {
+      if (!seen.add(key)) return;
       notesByWord.putIfAbsent(key, () => <int>{}).add(n.noteId);
-      displayByWord.putIfAbsent(key, () => _titleCase(raw));
+      displayByWord.putIfAbsent(key, () => display);
       final List<int> byWeek =
           weeklyByWord.putIfAbsent(key, () => List<int>.filled(weeks, 0));
       byWeek[bucket]++;
     }
+
+    // Single words, and two-word phrases made of two words that each pass
+    // on their own. "Dentist appointment" across three notes says more than
+    // "dentist" and "appointment" as two separate findings.
+    final List<String> words = n.transcript!.split(_wordBreak);
+    String? previous;
+    for (final String raw in words) {
+      final bool keeps = raw.length >= _minWordLength &&
+          !_stopwords.contains(raw.toLowerCase());
+      if (!keeps) {
+        previous = null;
+        continue;
+      }
+      final String key = raw.toLowerCase();
+      count(key, _titleCase(raw));
+      if (previous != null) {
+        count('$previous $key', '${_titleCase(previous)} ${raw.toLowerCase()}');
+      }
+      previous = key;
+    }
   }
 
-  final List<Topic> topics = <Topic>[
+  final List<Topic> all = <Topic>[
     for (final MapEntry<String, Set<int>> e in notesByWord.entries)
       if (e.value.length >= _minNotes)
         Topic(
@@ -175,6 +199,20 @@ WeekSummary summarise(
       // between two rebuilds that have identical data.
       return byCount != 0 ? byCount : a.label.compareTo(b.label);
     });
+
+  // A phrase that made the cut swallows its own two words: "Dentist
+  // appointment" beside "Dentist" and "Appointment" is one finding said
+  // three times.
+  final Set<String> inPhrases = <String>{};
+  for (final Topic t in all) {
+    final List<String> parts = t.label.toLowerCase().split(' ');
+    if (parts.length == 2) inPhrases.addAll(parts);
+  }
+  final List<Topic> topics = <Topic>[
+    for (final Topic t in all)
+      if (t.label.contains(' ') || !inPhrases.contains(t.label.toLowerCase()))
+        t,
+  ];
 
   return WeekSummary(
     noteCount: thisWeek.length,

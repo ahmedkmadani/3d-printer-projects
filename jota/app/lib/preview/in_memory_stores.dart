@@ -420,6 +420,13 @@ class InMemorySettingsStore implements SettingsStore {
   bool _newestFirst = true;
   @override
   bool get notesNewestFirst => _newestFirst;
+
+  int _swipeHintShown = 3; // the preview never nags
+  @override
+  int get swipeHintShown => _swipeHintShown;
+  @override
+  Future<void> setSwipeHintShown(int v) async => _swipeHintShown = v;
+
   @override
   Future<void> setNotesNewestFirst(bool v) async => _newestFirst = v;
 

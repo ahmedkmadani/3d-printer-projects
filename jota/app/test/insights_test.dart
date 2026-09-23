@@ -66,6 +66,35 @@ void main() {
     expect(s.latest?.noteId, 1);
   });
 
+  test('a two-word phrase across three notes is one finding, not three', () {
+    final WeekSummary s = summarise(
+      <Note>[
+        note(1, daysAgo: 1, text: 'dentist appointment moved again'),
+        note(2, daysAgo: 8, text: 'call about the dentist appointment'),
+        note(3, daysAgo: 16, text: 'dentist appointment on friday'),
+      ],
+      now: now,
+    );
+    final List<String> labels = s.topics.map((Topic t) => t.label).toList();
+    expect(labels, contains('Dentist appointment'));
+    // The phrase swallows its own words.
+    expect(labels, isNot(contains('Dentist')));
+    expect(labels, isNot(contains('Appointment')));
+  });
+
+  test('the patterns card waits for enough transcribed notes', () {
+    final List<Note> few = <Note>[
+      for (int i = 1; i <= 7; i++) note(i, daysAgo: i, text: 'words $i'),
+    ];
+    expect(enoughForPatterns(few), isFalse);
+    final List<Note> enough = <Note>[
+      ...few,
+      note(8, daysAgo: 8, text: 'words 8'),
+      note(9, daysAgo: 9), // no transcript: does not count
+    ];
+    expect(enoughForPatterns(enough), isTrue);
+  });
+
   test('a word in three separate notes is a topic', () {
     final WeekSummary s = summarise(
       <Note>[

@@ -1034,7 +1034,7 @@ class _JotaSearchFieldState extends State<JotaSearchField> {
       duration: JotaMotion.fast,
       curve: JotaMotion.curve,
       height: widget.height,
-      padding: const EdgeInsets.only(left: 14, right: 8),
+      padding: const EdgeInsets.only(left: 14, right: 0),
       decoration: BoxDecoration(
         borderRadius: JotaRows.borderRadiusOf(widget.height),
         border: Border.all(
@@ -1090,15 +1090,25 @@ class _JotaSearchFieldState extends State<JotaSearchField> {
                   child: GestureDetector(
                     onTap: has ? _clear : null,
                     behavior: HitTestBehavior.opaque,
-                    child: Container(
-                      width: 22,
-                      height: 22,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: c.ink,
-                        shape: BoxShape.circle,
+                    // The drawn circle is 22; the target is the field's
+                    // whole height. A 22pt target is missed one tap in
+                    // three.
+                    child: SizedBox(
+                      width: widget.height,
+                      height: widget.height,
+                      child: Center(
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: c.ink,
+                            shape: BoxShape.circle,
+                          ),
+                          child:
+                              Icon(LucideIcons.x, size: 12, color: c.onInk),
+                        ),
                       ),
-                      child: Icon(LucideIcons.x, size: 12, color: c.onInk),
                     ),
                   ),
                 ),
@@ -1106,6 +1116,54 @@ class _JotaSearchFieldState extends State<JotaSearchField> {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A quiet text action — "Edit tags", "Sort by use", "Clear" — drawn as
+/// muted prose, with a hit area a finger can find. The drawn text is small;
+/// the target is not. Without this every link in the app was as tall as
+/// its letters.
+class JotaTextLink extends StatelessWidget {
+  const JotaTextLink({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.danger = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  /// The signal colour, for the one destructive link a screen may carry.
+  final bool danger;
+
+  /// The minimum hit area for anything tappable, from the platform guides.
+  static const double hitSize = 44;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    return Semantics(
+      button: true,
+      child: JotaPressable(
+        onTap: onTap,
+        scale: 0.96,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: hitSize, minWidth: hitSize),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: JotaGrid.gapS),
+            child: Center(
+              widthFactor: 1,
+              child: Text(
+                label,
+                style: context.type.prose
+                    .copyWith(color: danger ? c.signal : c.inkMuted),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

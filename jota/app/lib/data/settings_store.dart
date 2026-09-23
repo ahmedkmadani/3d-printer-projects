@@ -62,6 +62,12 @@ abstract class SettingsStore {
   /// The archive's order. Newest first by default; the link beside the
   /// Notes title flips it and it stays flipped.
   bool get notesNewestFirst;
+
+  /// How many times the archive has shown its "swipe to delete / share" line.
+  /// It stops after three: a hint that never leaves is a label.
+  int get swipeHintShown;
+  Future<void> setSwipeHintShown(int v);
+
   Future<void> setNotesNewestFirst(bool v);
 
   /// Whether the first-run splash → onboarding flow has been completed. False on

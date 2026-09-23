@@ -5,9 +5,8 @@
 //  occasionally, and a destination you visit occasionally should not spend a
 //  third of the bottom bar.
 //
-//  Each topic gets its count and a bar per week, so "this is getting worse" and
-//  "this was a bad month, once" look different at a glance — which is the only
-//  reason to draw the weeks at all.
+//  Each topic gets its count, and how many of those were this week, so "this
+//  is getting worse" and "this was a bad month, once" can be told apart.
 //
 //  Laid out against the design lock: the serif title in the body under the
 //  status line, the window said in words, one hairline, then the topics. The
@@ -102,61 +101,34 @@ class _TopicRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final JotaType t = context.type;
     final JotaColors c = context.ink;
-    final int peak =
-        topic.weeklyCounts.fold(1, (int m, int v) => v > m ? v : m);
+    final int thisWeek =
+        topic.weeklyCounts.isEmpty ? 0 : topic.weeklyCounts.last;
+    final String figures = thisWeek > 0
+        ? '${topic.noteCount} NOTES · $thisWeek THIS WEEK'
+        : '${topic.noteCount} NOTES';
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: <Widget>[
-            Expanded(
-              child: NoteText(
-                topic.label,
-                style: t.prose.copyWith(fontWeight: FontWeight.w600),
-              ),
+    // The bars per week are gone: with a handful of notes they were three
+    // flat dashes and one block, which reads as broken, and an Arabic label
+    // sat on the right while its bars sat on the left. Two plain figures
+    // say the same thing. The whole row follows the label's script, so the
+    // figures sit at the trailing edge in either direction.
+    return Directionality(
+      textDirection:
+          isRtlText(topic.label) ? TextDirection.rtl : TextDirection.ltr,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: <Widget>[
+          Expanded(
+            child: NoteText(
+              topic.label,
+              style: t.prose.copyWith(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(width: JotaGrid.gapM),
-            Text(
-              '${topic.noteCount} NOTES',
-              style: t.meta.copyWith(color: c.inkMuted),
-            ),
-          ],
-        ),
-        const SizedBox(height: JotaGrid.gapS),
-        // Bars, oldest week on the left. Scaled to this topic's own peak
-        // rather than a shared maximum: the shape of one thread over time is
-        // the question, not how it ranks against the others.
-        SizedBox(
-          height: _barMax,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: <Widget>[
-              for (final int v in topic.weeklyCounts) ...<Widget>[
-                Container(
-                  width: 16,
-                  // A week with nothing in it is drawn as a hairline rather
-                  // than left blank: an absent bar and a bar of height zero
-                  // look identical, and only one of them is a week you were
-                  // quiet.
-                  height: v == 0 ? JotaGrid.hairline : _barMax * (v / peak),
-                  decoration: BoxDecoration(
-                    color: v == 0 ? c.rule : c.ink,
-                    borderRadius: const BorderRadius.all(Radius.circular(1)),
-                  ),
-                ),
-                const SizedBox(width: JotaGrid.unit),
-              ],
-            ],
           ),
-        ),
-      ],
+          const SizedBox(width: JotaGrid.gapM),
+          Text(figures, style: t.meta.copyWith(color: c.inkMuted)),
+        ],
+      ),
     );
   }
-
-  /// The tallest a bar gets — the peak week for this topic. Everything else in
-  /// the row is scaled against it.
-  static const double _barMax = 30;
 }
