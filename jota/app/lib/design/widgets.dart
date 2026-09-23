@@ -1232,13 +1232,17 @@ class JotaCodeBoxes extends StatelessWidget {
       children: <Widget>[
         for (int i = 0; i < length; i++) ...<Widget>[
           if (i > 0) const SizedBox(width: 7),
+          // A stadium like every other shape in the product: the radius is
+          // half the height, so a box taller than it is wide becomes a
+          // standing pill. It was a radius-8 rectangle, the one rounded
+          // rectangle the app had.
           Container(
             width: 32,
-            height: 44,
+            height: JotaRows.height,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: c.field,
-              borderRadius: const BorderRadius.all(Radius.circular(8)),
+              borderRadius: JotaRows.borderRadiusOf(JotaRows.height),
               border: Border.all(
                 color: (focused && i == cursor && digits.length < length)
                     ? c.ink
