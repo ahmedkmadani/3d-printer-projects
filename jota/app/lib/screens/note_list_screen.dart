@@ -269,19 +269,15 @@ class _NoteListScreenState extends State<NoteListScreen>
 /// STATUS RIGHT SLOT RULE: exactly one figure, and it is the most urgent one
 /// this screen has.
 ///
-///   syncing            SYNC   — something is happening right now
 ///   notes waiting      2 NEW  — the device is holding something for you
 ///   otherwise          empty
 ///
-/// The archive count used to sit here when nothing was pending. It is gone: a
-/// number that never changes is not news, and the design's slot only ever holds
-/// something worth acting on. The count is not zero-padded here because it is
-/// read as words — "two new" — not as a measurement.
-/// SYNC while it is running, `2 NEW` when the device is holding notes, and
-/// nothing at all otherwise — the status slot carries only something worth
-/// acting on.
+/// No SYNC word while a sync runs: the pull-to-refresh spinner is already
+/// saying so, and the same news twice on one screen is chrome. The archive
+/// count used to sit here when nothing was pending and is gone for the same
+/// reason: a number that never changes is not news. The count is not
+/// zero-padded because it is read as words — "two new" — not as a measurement.
 String? _pendingLabel(DeviceController device) {
-  if (device.isSyncing) return 'SYNC';
   final int? pending = device.pendingOnDevice;
   if (pending != null && pending > 0) return '$pending NEW';
   return null;
