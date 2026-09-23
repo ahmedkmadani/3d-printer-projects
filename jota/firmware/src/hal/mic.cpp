@@ -25,15 +25,23 @@ static const int PIN_I2S_DOUT  = 45;
 static const i2c_port_t I2C_PORT = I2C_NUM_0;
 static const i2s_port_t I2S_PORT = I2S_NUM_0;
 
-// What both references record with. The ES8311's analogue mic gain steps in
-// 6 dB, so this lands on the 42 dB / 48 dB boundary; tune by ear once real
-// speech has been listened to.
-static const float MIC_GAIN_DB = 45.0f;
+// One step under what both references use (45 dB). At 45 the meter showed
+// full-scale clipping on loud syllables spread through every note (N-008:
+// 37 clipped samples from 0.9 s to 9.9 s, rms -21 dBFS). The ES8311's mic
+// gain steps in 6 dB; 36 keeps speech around -27 dBFS rms with headroom for
+// plosives, which Whisper reads as well as -21 and without the flat tops.
+static const float MIC_GAIN_DB = 36.0f;
 
 bool Mic::begin() {
   ready_ = false;
 
-  // The codec is on a switched rail. Nothing on I2C answers until it is up.
+  // GPIO42 is NOT the microphone's supply. Tested 2026-09-23: the ES8311
+  // answers on I2C and records speech at the same level with this pin high
+  // (N-001, rms -24 dBFS) and low (N-006, rms -26 dBFS). Waveshare's power
+  // BSP calls it the audio power pin and drives it LOW for on, HIGH for off,
+  // with a pull-up — so it gates the speaker side, and HIGH is the off state
+  // we want until this device plays anything. The old README claim that the
+  // mic was dead without it was never true.
   pinMode(PIN_AUDIO_PWR, OUTPUT);
   digitalWrite(PIN_AUDIO_PWR, HIGH);
   // Nothing plays through the speaker, and an enabled amplifier hisses.
@@ -149,7 +157,7 @@ bool Mic::open() {
 
 void Mic::powerOff() {
   close();
-  digitalWrite(PIN_AUDIO_PWR, LOW);
+  digitalWrite(PIN_AUDIO_PWR, HIGH);  // Waveshare's OFF level; see begin()
   ready_ = false;
 }
 

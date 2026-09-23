@@ -91,8 +91,8 @@ charge as a solid arc). Either button wakes it via `ext1`; if BOOT is the
 button still held at boot, the recording starts before the panel has redrawn
 (Pala Note does the same). A button held at boot is swallowed by the button
 HAL so the wake press cannot also stop the note. The latch on GPIO17 is
-`gpio_hold`-ed through sleep — verified on USB only so far, so the first
-battery-only overnight is still owed. PWR long is still a true power-off.
+`gpio_hold`-ed through sleep — verified on battery 2026-09-23: unplugged,
+slept, woke on BOOT, recorded, synced. PWR long is still a true power-off.
 
 Header pinout from the same drawing: `RXD`/`TXD`, `SDA`=GP20, `SCL`=GP19,
 `GND`, `GP5`, `3V3`, `GP2`, `VSYS`, `GP1`.
@@ -154,8 +154,10 @@ while notes sat on the device.
   exists while firmware brings up USB CDC or the ROM bootloader runs. A sketch
   that crashes before `setup()` makes the port vanish.
 - **GPIO17 must be HIGH at boot** or the board powers itself off on battery.
-  **GPIO6 LOW** powers the panel. **GPIO42** powers the audio rail — the mic is
-  dead without it.
+  **GPIO6 LOW** powers the panel. **GPIO42 is NOT the mic's supply**: the
+  ES8311 answers and records at the same level with it high or low (tested
+  2026-09-23). Waveshare's BSP drives it LOW for "audio on", HIGH for off, so
+  it gates the speaker side; we hold it HIGH until the device plays sound.
 - Pin map is verified against `waveshareteam/ESP32-S3-ePaper-1.54`, not guessed.
   It is tabulated in `jota/firmware/README.md`. It is **not complete**: it
   missed the `ADC GP4` battery sense that Waveshare prints on the board's own

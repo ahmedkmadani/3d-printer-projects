@@ -1,6 +1,7 @@
 #include "app/recorder.h"
 
 #include <Arduino.h>
+#include <math.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -94,13 +95,24 @@ void Recorder::run() {
   notePath(r.id, "wav", wavPath, sizeof(wavPath));
   notePath(r.id, "ima", imaPath, sizeof(imaPath));
 
-  int16_t *mono  = (int16_t *)heap_caps_malloc(CHUNK * sizeof(int16_t), MALLOC_CAP_8BIT);
+  // Three chunk buffers in rotation: the newest is READ into, the oldest is
+  // WRITTEN out. The two in between are the tail that gets dropped when the
+  // stop press lands — every note so far ended with the button's own click
+  // at full scale, 50-150 ms before the task saw the stop. 128 ms of held
+  // audio covers it.
+  static const uint8_t HOLD = 2;
+  int16_t *ring[HOLD + 1] = {nullptr, nullptr, nullptr};
+  for (uint8_t i = 0; i <= HOLD; ++i)
+    ring[i] = (int16_t *)heap_caps_malloc(CHUNK * sizeof(int16_t), MALLOC_CAP_8BIT);
+  uint8_t  head = 0;      // slot the next read lands in
+  uint8_t  held = 0;      // chunks read but not yet written
+  int16_t *mono  = ring[0];
   int16_t *carry = (int16_t *)heap_caps_malloc(ADPCM_BLOCK_SAMPLES * sizeof(int16_t), MALLOC_CAP_8BIT);
   uint8_t  blk[ADPCM_BLOCK_BYTES];
   size_t   carryN = 0;
 
   FILE *wav = nullptr, *ima = nullptr;
-  bool  ok  = mono && carry && mic_->open();
+  bool  ok  = ring[0] && ring[1] && ring[2] && carry && mic_->open();
   if (ok) {
     wav = fopen(wavPath, "wb");
     ima = fopen(imaPath, "wb");
@@ -119,17 +131,44 @@ void Recorder::run() {
   static const uint8_t SKIP_CHUNKS = 3;
   uint8_t skipped = 0;
 
+  // Level metering, printed with the result: the one number that says
+  // whether the mic was alive without taking the card out. Peak and RMS in
+  // dBFS; a dead mic reads under -60, speech peaks around -20.
+  uint64_t sumSq = 0;
+  int32_t  peak  = 0;
+  // Where the clipping is, not just that it exists: count, first and last
+  // sample index at or near full scale. A click is a few samples in one
+  // place; a hot mic clips on every loud syllable, spread through the note.
+  uint32_t clipped = 0, clipFirst = 0, clipLast = 0;
+
   uint32_t crc = 0, samples = 0, blocks = 0;
   while (ok && !stopReq_) {
-    const size_t n = mic_->read(mono, CHUNK);
+    int16_t *in = ring[head];
+    const size_t n = mic_->read(in, CHUNK);
     if (n == 0) { Serial.println("[rec] mic read failed"); ok = false; break; }
     if (skipped < SKIP_CHUNKS) { skipped++; continue; }
+    if (n != CHUNK) { ok = false; break; }   // every chunk is whole by construction
+    head = (uint8_t)((head + 1) % (HOLD + 1));
+    if (held < HOLD) { held++; continue; }   // fill the hold before writing
+    // The oldest held chunk is the one now HOLD slots behind head.
+    mono = ring[head];
     if (fwrite(mono, sizeof(int16_t), n, wav) != n) {
       Serial.println("[rec] card write failed");
       ok = false;
       break;
     }
     samples += n;
+    for (size_t k = 0; k < n; ++k) {
+      const int32_t v = mono[k];
+      sumSq += (uint64_t)(v * v);
+      if (v > peak) peak = v;
+      if (-v > peak) peak = -v;
+      if (v >= 32700 || v <= -32700) {
+        if (clipped == 0) clipFirst = samples + (uint32_t)k;
+        clipLast = samples + (uint32_t)k;
+        clipped++;
+      }
+    }
 
     // The same samples into the ADPCM copy, one full block at a time.
     size_t i = 0;
@@ -179,7 +218,8 @@ void Recorder::run() {
     unlink(imaPath);
   }
 
-  if (mono) heap_caps_free(mono);
+  for (uint8_t i = 0; i <= HOLD; ++i)
+    if (ring[i]) heap_caps_free(ring[i]);
   if (carry) heap_caps_free(carry);
 
   r.samples = samples;
@@ -187,9 +227,16 @@ void Recorder::run() {
   r.bytes   = blocks * (uint32_t)ADPCM_BLOCK_BYTES;
   r.crc     = crc;
   r.ok      = ok;
-  Serial.printf("[rec] %s N-%03u: %lu samples, %u s, %lu B adpcm, crc %08lx\n",
+  const float rms    = samples ? sqrtf((float)sumSq / (float)samples) : 0.0f;
+  const float rmsDb  = rms > 0.5f ? 20.0f * log10f(rms / 32768.0f) : -99.0f;
+  const float peakDb = peak > 0 ? 20.0f * log10f((float)peak / 32768.0f) : -99.0f;
+  Serial.printf("[rec] %s N-%03u: %lu samples, %u s, %lu B adpcm, crc %08lx, "
+                "peak %.1f dBFS, rms %.1f dBFS, clipped %lu (%.2f s .. %.2f s)\n",
                 ok ? "saved" : "FAILED", (unsigned)r.id, (unsigned long)samples,
-                (unsigned)r.secs, (unsigned long)r.bytes, (unsigned long)crc);
+                (unsigned)r.secs, (unsigned long)r.bytes, (unsigned long)crc,
+                (double)peakDb, (double)rmsDb, (unsigned long)clipped,
+                (double)clipFirst / (double)MIC_SAMPLE_RATE,
+                (double)clipLast / (double)MIC_SAMPLE_RATE);
 
   result_ = r;
   state_  = Done;

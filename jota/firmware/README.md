@@ -108,9 +108,11 @@ Verified against Waveshare's official examples
 | Mic in (DIN) | 16 | | microSD (SDMMC 1-bit) | CLK 39 / CMD 41 / D0 40 |
 | Speaker out (DOUT) | 45 | | RTC PCF85063 | I2C 47/48 |
 
-> ⚠️ **Three pins make or break it.** GPIO17 must be **HIGH** at boot or the
+> ⚠️ **Two pins make or break it.** GPIO17 must be **HIGH** at boot or the
 > board powers itself off on battery. GPIO6 must be **LOW** to power the panel.
-> GPIO42 must be driven before the microphone will do anything at all.
+> GPIO42 ("audio power") is **not** the microphone's supply — the mic records
+> with it at either level. Waveshare drives it LOW for on, HIGH for off; it
+> gates the speaker side, and it stays HIGH until Jota plays sound.
 
 ### Battery sense — GPIO4
 
@@ -125,8 +127,8 @@ divider is wrong, not the pin.
 Two minutes idle on READY — no recording, no phone connected — and the device
 deep-sleeps behind its OFF frame. `ext1` on GPIO0 and GPIO18 wakes it; BOOT
 still held at boot means "record", and the capture starts before the first
-paint. GPIO17 is held through sleep so the latch does not drop. Verified on
-USB; battery-only still to be run.
+paint. GPIO17 is held through sleep so the latch does not drop — verified on
+battery 2026-09-23.
 
 ## What is real, and what is not
 
@@ -167,8 +169,5 @@ wakes.
 1. Listen to a real note on the phone end to end: fetch over BLE, decode,
    transcribe. The app's BLE path has still never touched hardware.
 2. Mic gain: 45 dB is what both references use; tune by ear.
-3. Battery-only soak: confirm the latch holds through deep sleep off USB and
-   measure how long a charge lasts with the two-minute standby.
+3. Battery soak: measure how long a charge lasts with the two-minute standby.
 4. Orphan files: a WAV left by a power cut mid-recording is not indexed.
-5. GPIO42 polarity: Waveshare's power BSP drives the audio rail LOW for ON;
-   we drive it HIGH and the mic works. Find out which level is truly off.
