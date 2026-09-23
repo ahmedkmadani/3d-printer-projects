@@ -145,13 +145,10 @@ class _NoteListScreenState extends State<NoteListScreen>
                 ),
                 if (notes.count > 0) ...<Widget>[
                   const SizedBox(height: JotaGrid.gapL),
-                  _SearchField(
+                  JotaSearchField(
                     controller: _search,
+                    hint: 'Search notes',
                     onChanged: notes.setQuery,
-                    onClear: () {
-                      _search.clear();
-                      notes.setQuery('');
-                    },
                   ),
                   if (notes.tagsInUse.isNotEmpty) ...<Widget>[
                     const SizedBox(height: JotaGrid.gapM),
@@ -187,6 +184,10 @@ class _NoteListScreenState extends State<NoteListScreen>
                         backgroundColor: c.bg,
                         onRefresh: () => device.syncNow().then((_) {}),
                         child: ListView.separated(
+                          // Scrolling the results is reading them; the
+                          // keyboard should get out of the way.
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
                           padding: const EdgeInsets.only(bottom: JotaGrid.gapL),
                           itemCount: visible.length,
                           separatorBuilder: (_, __) => const Padding(
@@ -382,81 +383,6 @@ class _EmptyArchive extends StatelessWidget {
                 ),
               ),
             ),
-    );
-  }
-}
-
-/// The search field as one stadium: hairline, the label face for the hint,
-/// and a clear mark on the right only while there is something to clear.
-class _SearchField extends StatelessWidget {
-  const _SearchField({
-    required this.controller,
-    required this.onChanged,
-    required this.onClear,
-  });
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final JotaType t = context.type;
-    final JotaColors c = context.ink;
-    return Container(
-      height: JotaRows.heightCompact,
-      padding: const EdgeInsets.symmetric(horizontal: JotaGrid.gapM),
-      decoration: BoxDecoration(
-        borderRadius: JotaRows.borderRadiusOf(JotaRows.heightCompact),
-        border: Border.all(color: c.rule, width: JotaGrid.hairline),
-      ),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              textInputAction: TextInputAction.search,
-              textAlignVertical: TextAlignVertical.center,
-              style: t.prose.copyWith(fontSize: 15),
-              cursorColor: c.ink,
-              decoration: InputDecoration(
-                isCollapsed: true,
-                // The app's field theme fills text fields; inside a stadium
-                // that fill is a second, darker stadium.
-                filled: false,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                hintText: 'Search notes',
-                hintStyle: t.prose.copyWith(color: c.inkMuted, fontSize: 15),
-              ),
-            ),
-          ),
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (BuildContext context, TextEditingValue v, _) {
-              if (v.text.isEmpty) return const SizedBox.shrink();
-              return GestureDetector(
-                onTap: onClear,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: JotaGrid.gapM),
-                  child: Text(
-                    'CLEAR',
-                    style: t.label.copyWith(
-                      color: c.inkMuted,
-                      fontSize: 10,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
     );
   }
 }

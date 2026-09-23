@@ -173,7 +173,10 @@ class JotaStatusBar extends StatelessWidget {
                     if (trailing != null)
                       trailing!
                     else if (value != null)
-                      Text(value!, style: t.reading.copyWith(color: c.inkMuted)),
+                      Text(
+                        value!,
+                        style: t.reading.copyWith(color: c.inkMuted),
+                      ),
                   ],
                 ),
               ),
@@ -964,6 +967,144 @@ class JotaEmpty extends StatelessWidget {
             const SizedBox(height: JotaGrid.gapL),
             action!,
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A search field as one stadium, in the product's own vocabulary rather than
+/// Material's: a hairline that turns to ink while it has focus, the glyph on
+/// the left in the same muted ink as the hint, and — only while there is
+/// something to clear — a small ink circle with a cross on the right, the same
+/// shape as the player's transport circle. No fill, no elevation, no label
+/// that floats: the field is a place to type, and reads as one.
+class JotaSearchField extends StatefulWidget {
+  const JotaSearchField({
+    super.key,
+    required this.controller,
+    required this.onChanged,
+    this.hint = 'Search',
+    this.height = JotaRows.heightCompact,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final String hint;
+  final double height;
+
+  @override
+  State<JotaSearchField> createState() => _JotaSearchFieldState();
+}
+
+class _JotaSearchFieldState extends State<JotaSearchField> {
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_onFocus);
+  }
+
+  void _onFocus() => setState(() {});
+
+  @override
+  void dispose() {
+    _focus
+      ..removeListener(_onFocus)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _clear() {
+    widget.controller.clear();
+    widget.onChanged('');
+    // Clearing is usually "I'm done", not "let me try another word".
+    _focus.unfocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+    final bool focused = _focus.hasFocus;
+    const double glyph = 16;
+
+    return AnimatedContainer(
+      duration: JotaMotion.fast,
+      curve: JotaMotion.curve,
+      height: widget.height,
+      padding: const EdgeInsets.only(left: 14, right: 8),
+      decoration: BoxDecoration(
+        borderRadius: JotaRows.borderRadiusOf(widget.height),
+        border: Border.all(
+          color: focused ? c.ink : c.rule,
+          width: JotaGrid.hairline,
+        ),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            LucideIcons.search,
+            size: glyph,
+            color: focused ? c.ink : c.inkMuted,
+          ),
+          const SizedBox(width: JotaGrid.gapS + 2),
+          Expanded(
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focus,
+              onChanged: widget.onChanged,
+              textInputAction: TextInputAction.search,
+              textAlignVertical: TextAlignVertical.center,
+              style: t.prose.copyWith(fontSize: 15, color: c.ink),
+              cursorColor: c.ink,
+              cursorWidth: 1.5,
+              decoration: InputDecoration(
+                isCollapsed: true,
+                // The app's field theme fills and outlines every TextField;
+                // inside a stadium that is a second, darker stadium.
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                hintText: widget.hint,
+                hintStyle: t.prose.copyWith(color: c.inkMuted, fontSize: 15),
+              ),
+            ),
+          ),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: widget.controller,
+            builder: (BuildContext context, TextEditingValue v, _) {
+              final bool has = v.text.isNotEmpty;
+              // Scales in from nothing rather than popping: the circle is
+              // the only filled shape on the row, so its arrival is felt.
+              return AnimatedScale(
+                scale: has ? 1 : 0,
+                duration: JotaMotion.fast,
+                curve: JotaMotion.curve,
+                child: Semantics(
+                  button: true,
+                  label: 'Clear search',
+                  child: GestureDetector(
+                    onTap: has ? _clear : null,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: c.ink,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(LucideIcons.x, size: 12, color: c.onInk),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
