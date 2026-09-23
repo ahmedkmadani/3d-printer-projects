@@ -14,6 +14,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../audio/note_player.dart';
@@ -731,7 +732,40 @@ class _PlayerPillState extends State<_PlayerPill> {
                   ),
                 ),
               ),
-              const SizedBox(width: JotaGrid.gapM),
+              const SizedBox(width: JotaGrid.gapS),
+              // Fifteen seconds back, outlined, the play circle's size: the
+              // one other transport control worth its room when the point
+              // of listening is to hear a phrase again.
+              Semantics(
+                button: true,
+                label: 'Back fifteen seconds',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () async {
+                    final Duration back =
+                        _position - const Duration(seconds: 15);
+                    await _player.seek(back.isNegative ? Duration.zero : back);
+                  },
+                  child: Container(
+                    width: JotaRows.height - 4,
+                    height: JotaRows.height - 4,
+                    alignment: Alignment.center,
+                    child: Container(
+                      width: _circle,
+                      height: _circle,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border:
+                            Border.all(color: c.ink, width: JotaGrid.hairline),
+                      ),
+                      child:
+                          Icon(LucideIcons.rotateCcw, size: 13, color: c.ink),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: JotaGrid.gapS),
               Expanded(
                 child: _Scrubber(
                   fraction: fraction,
@@ -778,12 +812,18 @@ class _Scrubber extends StatelessWidget {
     final JotaColors c = context.ink;
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints box) {
+        void seekTo(double dx) {
+          if (box.maxWidth <= 0) return;
+          onSeek((dx / box.maxWidth).clamp(0.0, 1.0));
+        }
+
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapDown: (TapDownDetails d) {
-            if (box.maxWidth <= 0) return;
-            onSeek((d.localPosition.dx / box.maxWidth).clamp(0.0, 1.0));
-          },
+          onTapDown: (TapDownDetails d) => seekTo(d.localPosition.dx),
+          // Drag along the line and the position follows the finger: a
+          // note listened to for corrections is scrubbed, not just tapped.
+          onHorizontalDragUpdate: (DragUpdateDetails d) =>
+              seekTo(d.localPosition.dx),
           // A tall transparent box around a 4pt line: the line is the design,
           // but a 4pt tap target is not a tap target.
           child: SizedBox(

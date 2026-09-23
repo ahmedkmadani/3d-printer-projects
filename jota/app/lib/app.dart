@@ -55,31 +55,35 @@ class JotaApp extends StatelessWidget {
           ),
         ),
       ],
-      child: MaterialApp(
-        title: 'Jota',
-        debugShowCheckedModeBanner: false,
-        theme: JotaTheme.light(),
-        darkTheme: JotaTheme.dark(),
-        // Follows the system. E-paper has one appearance; a phone has two, and
-        // fighting the user's choice is not a design decision worth making.
-        themeMode: ThemeMode.system,
-        // The app lock overlays every screen from above the Navigator, so it
-        // covers the notes, a modal, anything. The preview chrome (if any) sits
-        // under it. Always present now, not just for the preview.
-        builder: (BuildContext context, Widget? child) {
-          Widget content = child ?? const SizedBox.shrink();
-          if (services.isPreview) content = _PreviewChrome(child: content);
-          return _LockGate(child: content);
-        },
-        // First run shows splash → onboarding → pair; every launch after that,
-        // the splash reads the flag and goes straight to the notes.
-        // Straight in. The splash (mark, wordmark, 2.6 s hold) is switched
-        // off for now: it stood between you and your notes on every open and
-        // said nothing the shell does not. SplashScreen still exists; put it
-        // back here when there is a reason to.
-        home: !kForceOnboarding && services.settings.hasSeenOnboarding
-            ? const HomeShell()
-            : const OnboardingScreen(),
+      child: ValueListenableBuilder<ThemeMode>(
+        valueListenable: services.themeMode,
+        builder: (BuildContext context, ThemeMode mode, _) => MaterialApp(
+          title: 'Jota',
+          debugShowCheckedModeBanner: false,
+          theme: JotaTheme.light(),
+          darkTheme: JotaTheme.dark(),
+          // Follows the system unless Settings says otherwise. E-paper has one
+          // appearance; a phone has two, and the dark theme was built and
+          // never reachable on a phone set to light.
+          themeMode: mode,
+          // The app lock overlays every screen from above the Navigator, so it
+          // covers the notes, a modal, anything. The preview chrome (if any) sits
+          // under it. Always present now, not just for the preview.
+          builder: (BuildContext context, Widget? child) {
+            Widget content = child ?? const SizedBox.shrink();
+            if (services.isPreview) content = _PreviewChrome(child: content);
+            return _LockGate(child: content);
+          },
+          // First run shows splash → onboarding → pair; every launch after that,
+          // the splash reads the flag and goes straight to the notes.
+          // Straight in. The splash (mark, wordmark, 2.6 s hold) is switched
+          // off for now: it stood between you and your notes on every open and
+          // said nothing the shell does not. SplashScreen still exists; put it
+          // back here when there is a reason to.
+          home: !kForceOnboarding && services.settings.hasSeenOnboarding
+              ? const HomeShell()
+              : const OnboardingScreen(),
+        ),
       ),
     );
   }

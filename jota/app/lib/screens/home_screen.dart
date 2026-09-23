@@ -28,6 +28,7 @@ import '../design/script.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../insights/insights.dart';
+import '../state/device_controller.dart';
 import '../state/notes_controller.dart';
 import 'note_detail_screen.dart';
 import 'patterns_screen.dart';
@@ -43,7 +44,32 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final NotesController notes = context.watch<NotesController>();
+    final DeviceController device = context.watch<DeviceController>();
     final JotaType t = context.type;
+    final JotaColors c = context.ink;
+
+    // What is waiting, most urgent first: notes still on the device, a
+    // transcription running, then nothing. The headline is the thing to do
+    // next, and "This week" only when there is nothing to do.
+    final int pending = device.pendingOnDevice ?? 0;
+    Note? running;
+    for (final Note n in notes.notes) {
+      if (n.transcriptState == TranscriptState.running ||
+          notes.isTranscribing(n)) {
+        running = n;
+        break;
+      }
+    }
+    final String title = pending > 0
+        ? '$pending note${pending == 1 ? '' : 's'} waiting'
+        : running != null
+            ? 'Transcribing'
+            : 'This week';
+    final String? lead = pending > 0
+        ? 'On your Jota. Bring it close and it syncs.'
+        : running != null
+            ? '${running.displayId} is being read. It lands here when done.'
+            : null;
 
     // DateTime.now() is read here rather than held in state: the summary is
     // cheap, and a cached "now" is how a screen ends up insisting it is still
@@ -74,13 +100,23 @@ class HomeScreen extends StatelessWidget {
           bottom: JotaGrid.gapXL,
         ),
         children: <Widget>[
-          Text('This week', style: t.headline),
+          Text(title, style: t.headline),
+          if (lead != null) ...<Widget>[
+            const SizedBox(height: JotaGrid.gapS),
+            Text(lead, style: t.prose.copyWith(color: c.inkMuted)),
+          ],
           const SizedBox(height: JotaGrid.gapL),
+          const DeviceCard(),
+          const SizedBox(height: JotaGrid.gapL),
+          // The two figures sit under the device card now: what is waiting
+          // outranks how much was said, and the card is the thing to tap.
+          if (lead != null) ...<Widget>[
+            Text('THIS WEEK', style: _cardLabel(t, c)),
+            const SizedBox(height: JotaGrid.gapM),
+          ],
           _Figures(week: week),
           const SizedBox(height: JotaGrid.gapL),
           const JotaRule(),
-          const SizedBox(height: JotaGrid.gapL),
-          const DeviceCard(),
           const SizedBox(height: JotaGrid.gapL),
           // Nothing recorded yet: one sentence about what to do, in place
           // of two cards about nothing.

@@ -141,6 +141,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// The language hint, on a sheet shaped like the note's tag sheet: title,
   /// one line, the choices as stadiums with the current one inverted.
+  /// Light, dark or the phone's choice. Takes effect as it is tapped: the
+  /// app's theme listens to Services.themeMode.
+  Future<void> _pickAppearance(Services s) async {
+    final String? picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: context.ink.bg,
+      builder: (BuildContext sheetContext) {
+        final JotaType t = sheetContext.type;
+        final JotaColors c = sheetContext.ink;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              JotaGrid.margin,
+              JotaGrid.gapL,
+              JotaGrid.margin,
+              JotaGrid.gapL,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('Appearance', style: t.sheetTitle),
+                const SizedBox(height: JotaGrid.gapS),
+                Text(
+                  'Light or dark, or whatever the phone is set to.',
+                  style: t.prose.copyWith(color: c.inkMuted),
+                ),
+                const SizedBox(height: JotaGrid.gapL),
+                Wrap(
+                  spacing: JotaRows.gap,
+                  runSpacing: JotaRows.gap,
+                  children: <Widget>[
+                    for (final String v in const <String>[
+                      'system',
+                      'light',
+                      'dark',
+                    ])
+                      JotaTagChoice(
+                        label: _appearanceLabel(v),
+                        selected: s.settings.appearance == v,
+                        onTap: () => Navigator.of(sheetContext).pop(v),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    await s.settings.setAppearance(picked);
+    s.themeMode.value = Services.themeModeOf(picked);
+    if (mounted) setState(() {});
+  }
+
   Future<void> _pickLanguage(Services s) async {
     final String? picked = await showModalBottomSheet<String?>(
       context: context,
@@ -553,6 +609,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onTap: () => _setLock(lock, !lock.enabled),
                         ),
                         const _Caption('About'),
+                        _SettingRow(
+                          label: 'Appearance',
+                          value: _appearanceLabel(s.settings.appearance),
+                          onTap: () => _pickAppearance(s),
+                        ),
                         // Kept next to Device because the question the pair
                         // answers is a comparison: which Jota is this, and
                         // which phone owns it.
@@ -614,6 +675,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 /// The language hint's three states, cycled in this order. Null is Whisper's
 /// own detection.
 const List<String?> _languages = <String?>[null, 'ar', 'en'];
+
+String _appearanceLabel(String v) {
+  switch (v) {
+    case 'light':
+      return 'Light';
+    case 'dark':
+      return 'Dark';
+    default:
+      return 'System';
+  }
+}
 
 String _languageLabel(String? code) {
   switch (code) {

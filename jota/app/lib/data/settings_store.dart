@@ -63,6 +63,11 @@ abstract class SettingsStore {
   /// Notes title flips it and it stays flipped.
   bool get notesNewestFirst;
 
+  /// 'system', 'light' or 'dark'. The phone has two appearances; this is
+  /// the one place the user can decide not to follow it.
+  String get appearance;
+  Future<void> setAppearance(String v);
+
   /// How many times the archive has shown its "swipe to delete / share" line.
   /// It stops after three: a hint that never leaves is a label.
   int get swipeHintShown;

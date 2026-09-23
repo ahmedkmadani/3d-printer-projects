@@ -127,6 +127,12 @@ class PrefsSettingsStore implements SettingsStore {
   bool get notesNewestFirst => _prefs.getBool(_kNewestFirst) ?? true;
 
   @override
+  String get appearance => _prefs.getString('appearance') ?? 'system';
+
+  @override
+  Future<void> setAppearance(String v) => _prefs.setString('appearance', v);
+
+  @override
   int get swipeHintShown => _prefs.getInt('swipe_hint_shown') ?? 0;
 
   @override

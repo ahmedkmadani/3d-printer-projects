@@ -56,6 +56,9 @@ class _NoteListScreenState extends State<NoteListScreen>
 
   static String _keyOf(Note n) => '${n.deviceId}/${n.noteId}';
 
+  static bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
   final TextEditingController _search = TextEditingController();
 
   /// The swipe hint shows on the first three opens of this tab and then
@@ -214,28 +217,44 @@ class _NoteListScreenState extends State<NoteListScreen>
                         color: c.ink,
                         backgroundColor: c.bg,
                         onRefresh: () => device.syncNow().then((_) {}),
-                        child: ListView.separated(
+                        child: ListView.builder(
                           // Scrolling the results is reading them; the
                           // keyboard should get out of the way.
                           keyboardDismissBehavior:
                               ScrollViewKeyboardDismissBehavior.onDrag,
                           padding: const EdgeInsets.only(bottom: JotaGrid.gapL),
                           itemCount: visible.length,
-                          separatorBuilder: (_, __) => const Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: JotaGrid.margin,
-                            ),
-                            child: JotaRule(),
-                          ),
                           itemBuilder: (BuildContext context, int i) {
                             final Note note = visible[i];
                             final String k = _keyOf(note);
                             final bool fresh = _seen.add(k);
+                            // The day above its first note, and a hairline
+                            // between notes of one day. Every row used to
+                            // repeat WED 23 SEP; the day is said once and
+                            // the rows keep the time.
+                            final bool newDay = i == 0 ||
+                                !_sameDay(
+                                  visible[i - 1].recordedAt,
+                                  note.recordedAt,
+                                );
+                            final Widget row = _Appear(
+                              animate: fresh,
+                              child: _NoteRow(
+                                note: note,
+                                transcribing: notes.isTranscribing(note),
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        NoteDetailScreen(note: note),
+                                  ),
+                                ),
+                              ),
+                            );
                             // Swipe right: share. Swipe left: delete, after
                             // asking. The row slides out and the list closes
                             // the gap — that motion IS the confirmation that
                             // it went.
-                            return Dismissible(
+                            final Widget dismissible = Dismissible(
                               key: ValueKey<String>(k),
                               direction: DismissDirection.horizontal,
                               dismissThresholds: const <DismissDirection,
@@ -280,19 +299,25 @@ class _NoteListScreenState extends State<NoteListScreen>
                                     ),
                                   );
                               },
-                              child: _Appear(
-                                animate: fresh,
-                                child: _NoteRow(
-                                  note: note,
-                                  transcribing: notes.isTranscribing(note),
-                                  onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          NoteDetailScreen(note: note),
+                              child: row,
+                            );
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: <Widget>[
+                                if (newDay)
+                                  _DayHeader(
+                                    day: note.recordedAt,
+                                    first: i == 0,
+                                  )
+                                else
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: JotaGrid.margin,
                                     ),
+                                    child: JotaRule(),
                                   ),
-                                ),
-                              ),
+                                dismissible,
+                              ],
                             );
                           },
                         ),
@@ -356,7 +381,7 @@ class _NoteRow extends StatelessWidget {
             Row(
               children: <Widget>[
                 Text(
-                  fmtNoteStamp(note.recordedAt),
+                  fmtClock(note.recordedAt),
                   style: t.meta.copyWith(color: c.inkMuted),
                 ),
                 const SizedBox(width: JotaGrid.gapM),
@@ -397,6 +422,79 @@ class _NoteRow extends StatelessWidget {
   }
 }
 
+/// The day, once, above its notes: TODAY, YESTERDAY, then the date. The
+/// card caption style, so it reads as a heading over the rows and not as
+/// another row.
+class _DayHeader extends StatelessWidget {
+  const _DayHeader({required this.day, required this.first});
+
+  final DateTime day;
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        JotaGrid.margin,
+        first ? JotaGrid.gapM : JotaGrid.gapXL,
+        JotaGrid.margin,
+        JotaGrid.unit,
+      ),
+      child: Text(
+        fmtDayHeading(day),
+        style: context.type.cardLabel.copyWith(color: context.ink.inkMuted),
+      ),
+    );
+  }
+}
+
+/// Record, bring it close, read. One card, three numbered lines, on the
+/// same field colour as Home's cards.
+class _HowItWorks extends StatelessWidget {
+  const _HowItWorks();
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+    Widget step(String n, String text) => Padding(
+          padding: const EdgeInsets.only(top: JotaGrid.gapM),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: <Widget>[
+              Text(n, style: t.meta.copyWith(color: c.inkMuted)),
+              const SizedBox(width: JotaGrid.gapM),
+              Expanded(child: Text(text, style: t.prose)),
+            ],
+          ),
+        );
+    return Padding(
+      padding: const EdgeInsets.all(JotaGrid.margin),
+      child: Container(
+        padding: const EdgeInsets.all(JotaGrid.gapL),
+        decoration: BoxDecoration(
+          color: c.field,
+          borderRadius:
+              const BorderRadius.all(Radius.circular(JotaCards.radius)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'HOW IT WORKS',
+              style: t.cardLabel.copyWith(color: c.inkMuted),
+            ),
+            step('01', 'Press the button on the Jota and speak.'),
+            step('02', 'Bring it near this phone. It syncs on its own.'),
+            step('03', 'Read it here. The words are written on this phone.'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyArchive extends StatelessWidget {
   const _EmptyArchive({required this.hasDevice});
 
@@ -404,24 +502,26 @@ class _EmptyArchive extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // With a device and no notes yet, the three steps rather than a bare
+    // "no notes": the first empty screen is where the product explains
+    // itself or does not.
+    if (hasDevice) return const _HowItWorks();
     return JotaEmpty(
-      message: hasDevice ? 'No notes yet' : 'No device paired',
-      action: hasDevice
-          ? null
-          : SizedBox(
-              width: 200,
-              child: JotaButton(
-                label: 'Pair a device',
-                primary: true,
-                upcase: false,
-                height: JotaRows.heightTall,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const ConnectScreen(),
-                  ),
-                ),
-              ),
+      message: 'No device paired',
+      action: SizedBox(
+        width: 200,
+        child: JotaButton(
+          label: 'Pair a device',
+          primary: true,
+          upcase: false,
+          height: JotaRows.heightTall,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const ConnectScreen(),
             ),
+          ),
+        ),
+      ),
     );
   }
 }

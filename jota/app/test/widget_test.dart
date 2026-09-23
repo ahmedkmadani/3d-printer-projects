@@ -80,9 +80,11 @@ void main() {
     // exist on the note itself.
     // The seed is relative to today, so the month is whatever month it is:
     // matching ' AUG · ' made this test expire on 1 September.
+    // Rows carry the time; the day is said once, in a heading above them.
+    expect(find.textContaining(RegExp(r'^\d{2}:\d{2}$')), findsWidgets);
     expect(
       find.textContaining(RegExp(r'^[A-Z]{3} \d{1,2} [A-Z]{3} · \d{2}:\d{2}')),
-      findsWidgets,
+      findsNothing,
     );
     expect(find.byType(JotaTagPill), findsWidgets);
 

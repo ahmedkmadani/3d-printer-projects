@@ -421,6 +421,12 @@ class InMemorySettingsStore implements SettingsStore {
   @override
   bool get notesNewestFirst => _newestFirst;
 
+  String _appearance = 'system';
+  @override
+  String get appearance => _appearance;
+  @override
+  Future<void> setAppearance(String v) async => _appearance = v;
+
   int _swipeHintShown = 3; // the preview never nags
   @override
   int get swipeHintShown => _swipeHintShown;

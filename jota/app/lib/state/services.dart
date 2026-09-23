@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show ThemeMode, ValueNotifier;
 // ============================================================================
 //  Jota — service container
 //
@@ -74,6 +75,23 @@ class Services {
   /// banner that says so — no other behaviour branches on it.
   final bool isPreview;
 
+  /// Light, dark or the system's, live: the app rebuilds its theme when this
+  /// changes, so the Settings row takes effect without a restart. Seeded
+  /// from the settings store at boot.
+  final ValueNotifier<ThemeMode> themeMode =
+      ValueNotifier<ThemeMode>(ThemeMode.system);
+
+  static ThemeMode themeModeOf(String appearance) {
+    switch (appearance) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
+
   /// The real graph: BLE, sqflite, the filesystem, the Keychain.
   static Future<Services> boot() async {
     // iOS state restoration must be requested before any other BLE call.
@@ -114,7 +132,7 @@ class Services {
       );
     }
 
-    return Services(
+    final Services built = Services(
       settings: settings,
       notes: notes,
       audio: audio,
@@ -138,6 +156,8 @@ class Services {
       auth: LocalAuthenticator(),
       newPlayer: () => DecodedNotePlayer(audio),
     );
+    built.themeMode.value = themeModeOf(settings.appearance);
+    return built;
   }
 
   Future<void> dispose() async {
