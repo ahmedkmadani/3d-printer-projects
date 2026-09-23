@@ -110,6 +110,14 @@ Pala and Waveshare use; their `codec_board` wrapper is not used because it
 needs IDF 5. The synthetic notes are gone. The card must be FAT32: this
 core's FAT driver has exFAT off, and a card over 32 GB ships exFAT.
 
+**Power cut mid-note is survivable, verified 2026-09-23.** The recorder
+fsyncs the WAV every ~4 s; at boot the note store rebuilds any un-indexed
+`NNNN.wav` (header patched, `.ima` re-encoded) and indexes it as pending.
+Test: `!` on serial calls `esp_restart()` with no files closed. Six seconds
+into N-010 the reset gave back a 4 s note on the next boot. The card also
+carries `battery.log` (time, uptime, event, mV, %) for the soak; the phone's
+clock write now sets the system clock, so notes are stamped as they are made.
+
 **Never run against real hardware:** the app's BLE path. It has only ever
 talked to fakes.
 
