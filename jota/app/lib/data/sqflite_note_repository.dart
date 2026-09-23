@@ -65,10 +65,14 @@ class SqfliteNoteRepository implements NoteRepository {
   Future<List<Note>> awaitingTranscription({int limit = 20}) async {
     final List<Map<String, Object?>> rows = await _db.query(
       JotaDatabase.notes,
-      where: 'transcript_state IN (?, ?)',
+      // `running` too: a note the previous process died under stays marked
+      // running forever otherwise, showing "Transcribing…" with nothing
+      // transcribing. The queue skips the ones it really has in flight.
+      where: 'transcript_state IN (?, ?, ?)',
       whereArgs: <Object?>[
         TranscriptState.pending.name,
         TranscriptState.failed.name,
+        TranscriptState.running.name,
       ],
       orderBy: 'recorded_at ASC',
       limit: limit,

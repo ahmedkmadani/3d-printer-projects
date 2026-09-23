@@ -45,6 +45,7 @@ class LocalTranscriptionNotifier
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _state = state;
+    debugPrint('jota/notify  lifecycle $state');
   }
 
   bool get _inForeground => _state == AppLifecycleState.resumed;
@@ -61,6 +62,7 @@ class LocalTranscriptionNotifier
         ),
       );
       _ready = true;
+      debugPrint('jota/notify  plugin initialised');
     }
     if (_asked) return;
     _asked = true;
@@ -79,6 +81,8 @@ class LocalTranscriptionNotifier
 
   @override
   Future<void> transcribed(Note note) async {
+    debugPrint('jota/notify  ${note.displayId} done; ready=$_ready '
+        'state=$_state');
     if (!_ready || _inForeground) return;
     await _plugin.show(
       // One id per note, so a re-run replaces its own notification instead

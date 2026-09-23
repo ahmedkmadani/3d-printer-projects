@@ -68,7 +68,8 @@ class InMemoryNoteRepository implements NoteRepository {
         .where(
           (Note n) =>
               n.transcriptState == TranscriptState.pending ||
-              n.transcriptState == TranscriptState.failed,
+              n.transcriptState == TranscriptState.failed ||
+              n.transcriptState == TranscriptState.running,
         )
         .toList()
       ..sort((Note a, Note b) => a.recordedAt.compareTo(b.recordedAt));

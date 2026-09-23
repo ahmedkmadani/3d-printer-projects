@@ -11,10 +11,13 @@
 // ============================================================================
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../data/audio_store.dart';
 import '../data/note.dart';
 import '../data/note_repository.dart';
 import '../data/settings_store.dart';
+import '../ble/background_sync.dart';
 import 'done_notifier.dart';
 import 'transcriber.dart';
 
@@ -25,11 +28,13 @@ class TranscriptionQueue {
     required SettingsStore settings,
     required Transcriber Function() transcriber,
     TranscriptionNotifier? notifier,
+    BackgroundSyncController? keepAlive,
   })  : _notes = notes,
         _audio = audio,
         _settings = settings,
         _transcriber = transcriber,
-        _notifier = notifier;
+        _notifier = notifier,
+        _keepAlive = keepAlive;
 
   final NoteRepository _notes;
   final AudioStore _audio;
@@ -38,6 +43,40 @@ class TranscriptionQueue {
   /// Tells the user when a note's words land while the app is not on screen.
   /// Null in the preview and in tests.
   final TranscriptionNotifier? _notifier;
+
+  /// The foreground service, held for as long as a job runs. Whisper takes
+  /// minutes per note on this phone and the OS kills a backgrounded app well
+  /// inside that (seen on 2026-09-23: the process was gone within five
+  /// minutes, the note stuck at "Transcribing…"). A foreground service is
+  /// the one thing Android will not kill. Started only if the user has not
+  /// already turned background sync on, and stopped again afterwards.
+  final BackgroundSyncController? _keepAlive;
+  int _active = 0;
+  bool _startedService = false;
+
+  Future<void> _hold(Note note) async {
+    _active++;
+    final BackgroundSyncController? k = _keepAlive;
+    if (k == null) return;
+    if (_active == 1 && k.mode == BackgroundMode.off) {
+      final BackgroundMode got = await k.enable();
+      _startedService = got == BackgroundMode.foregroundService;
+      debugPrint('jota/queue  keep-alive: $got');
+    }
+    await k.report('Transcribing ${note.displayId}…');
+  }
+
+  Future<void> _release() async {
+    _active--;
+    final BackgroundSyncController? k = _keepAlive;
+    if (k == null || _active > 0) return;
+    if (_startedService) {
+      _startedService = false;
+      await k.disable();
+    } else {
+      await k.report('Listening for notes');
+    }
+  }
 
   /// A factory, not an instance: the user can change the key or the model in
   /// settings between two items in the queue.
@@ -62,11 +101,15 @@ class TranscriptionQueue {
     if (!_settings.autoTranscribe) return;
 
     final Transcriber t = _transcriber();
-    if (!await t.isReady) return; // no key: leave the notes pending, not failed
+    if (!await t.isReady) {
+      debugPrint('jota/queue  transcriber not ready; leaving notes pending');
+      return; // no key: leave the notes pending, not failed
+    }
 
     _draining = true;
     try {
       final List<Note> queue = await _notes.awaitingTranscription();
+      debugPrint('jota/queue  drain: ${queue.length} waiting');
       if (queue.isNotEmpty) await _notifier?.prepare();
       for (final Note note in queue) {
         final bool keepGoing = await _transcribeOne(note, t);
@@ -89,6 +132,7 @@ class TranscriptionQueue {
     final int key = note.rowId ?? note.noteId;
     if (_inFlight.contains(key)) return true;
     _inFlight.add(key);
+    await _hold(note);
 
     await _notes.setTranscriptState(note, TranscriptState.running);
     _changes.add(null);
@@ -148,6 +192,7 @@ class TranscriptionQueue {
     } finally {
       _inFlight.remove(key);
       _changes.add(null);
+      await _release();
     }
   }
 

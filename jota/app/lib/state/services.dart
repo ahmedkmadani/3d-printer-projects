@@ -133,6 +133,7 @@ class Services {
         settings: settings,
         transcriber: buildTranscriber,
         notifier: LocalTranscriptionNotifier(),
+        keepAlive: background,
       ),
       auth: LocalAuthenticator(),
       newPlayer: () => DecodedNotePlayer(audio),
