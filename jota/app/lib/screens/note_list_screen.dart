@@ -19,6 +19,7 @@
 // ============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../data/note.dart';
@@ -89,6 +90,14 @@ class _NoteListScreenState extends State<NoteListScreen>
     super.dispose();
   }
 
+  Future<void> _openFilter(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.ink.bg,
+      builder: (_) => const _FilterSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final NotesController notes = context.watch<NotesController>();
@@ -135,41 +144,30 @@ class _NoteListScreenState extends State<NoteListScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 // No "pull down to sync" line: everyone pulls a list to
-                // refresh, and the pull still works. The one thing beside
-                // the title is the order, a quiet link that flips.
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: <Widget>[
-                    Expanded(child: Text('Notes', style: t.headline)),
-                    if (notes.count > 1)
-                      GestureDetector(
-                        onTap: () => notes.setNewestFirst(!notes.newestFirst),
-                        behavior: HitTestBehavior.opaque,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Text(
-                            notes.newestFirst ? 'Newest first' : 'Oldest first',
-                            style: t.prose.copyWith(color: c.inkMuted),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                // refresh, and the pull still works.
+                Text('Notes', style: t.headline),
                 if (notes.count > 0) ...<Widget>[
                   const SizedBox(height: JotaGrid.gapL),
-                  JotaSearchField(
-                    controller: _search,
-                    hint: 'Search notes',
-                    onChanged: notes.setQuery,
+                  // Search, and beside it the one button that opens the
+                  // filter sheet — order and tag — the way a shop does it.
+                  // The button inverts while a filter is on, so the list
+                  // never looks short without saying why.
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: JotaSearchField(
+                          controller: _search,
+                          hint: 'Search notes',
+                          onChanged: notes.setQuery,
+                        ),
+                      ),
+                      const SizedBox(width: JotaRows.gap),
+                      _FilterButton(
+                        active: notes.tagFilter != null || !notes.newestFirst,
+                        onTap: () => _openFilter(context),
+                      ),
+                    ],
                   ),
-                  if (notes.tagsInUse.isNotEmpty) ...<Widget>[
-                    const SizedBox(height: JotaGrid.gapM),
-                    _TagFilterRow(
-                      tags: notes.tagsInUse,
-                      selected: notes.tagFilter,
-                      onSelect: notes.setTagFilter,
-                    ),
-                  ],
                 ],
                 const SizedBox(height: JotaGrid.gapL),
                 const JotaRule(),
@@ -399,68 +397,179 @@ class _EmptyArchive extends StatelessWidget {
   }
 }
 
-/// ALL and then every tag in use, as pills; the chosen one inverts, which is
-/// what "chosen" looks like everywhere in the product. Scrolls sideways
-/// rather than wrapping so it costs one row whatever the tag count.
-class _TagFilterRow extends StatelessWidget {
-  const _TagFilterRow({
-    required this.tags,
-    required this.selected,
-    required this.onSelect,
-  });
+/// The filter button: a circle the height of the search stadium, with the
+/// sliders glyph. Outlined at rest; inverted while a filter is on, which is
+/// what "chosen" looks like everywhere in the product.
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({required this.active, required this.onTap});
 
-  final List<String> tags;
-  final String? selected;
-  final ValueChanged<String?> onSelect;
+  final bool active;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 32,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: <Widget>[
-          _FilterPill(
-            label: 'ALL',
-            selected: selected == null,
-            onTap: () => onSelect(null),
-          ),
-          for (final String tag in tags) ...<Widget>[
-            const SizedBox(width: JotaRows.gap),
-            _FilterPill(
-              label: tag,
-              selected: selected == tag,
-              // Tapping the chosen one again clears it, the same rule as
-              // the device's TAGS screen.
-              onTap: () => onSelect(selected == tag ? null : tag),
+    final JotaColors c = context.ink;
+    return Semantics(
+      button: true,
+      label: 'Filter',
+      selected: active,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: JotaMotion.fast,
+          curve: JotaMotion.curve,
+          width: JotaRows.heightCompact,
+          height: JotaRows.heightCompact,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? c.ink : Colors.transparent,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: active ? c.ink : c.rule,
+              width: JotaGrid.hairline,
             ),
-          ],
-        ],
+          ),
+          child: Icon(
+            LucideIcons.slidersHorizontal,
+            size: 16,
+            color: active ? c.onInk : c.ink,
+          ),
+        ),
       ),
     );
   }
 }
 
-class _FilterPill extends StatelessWidget {
-  const _FilterPill({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+/// The filter sheet. Two questions — which way round, and which tag — each
+/// as stadium rows with the chosen one inverted. Choices apply as they are
+/// tapped, so the list behind the sheet is already right when it closes.
+/// "Clear" in the corner puts everything back; "Done" just closes.
+class _FilterSheet extends StatelessWidget {
+  const _FilterSheet();
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Center(child: JotaTagPill(label: label, selected: selected)),
+    final NotesController notes = context.watch<NotesController>();
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+    final bool anything = notes.tagFilter != null || !notes.newestFirst;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          JotaGrid.margin,
+          JotaGrid.gapL,
+          JotaGrid.margin,
+          JotaGrid.gapL,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    'Filter',
+                    style: t.headline.copyWith(fontSize: 28),
+                  ),
+                ),
+                if (anything)
+                  GestureDetector(
+                    onTap: () {
+                      notes.setTagFilter(null);
+                      notes.setNewestFirst(true);
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Text(
+                      'Clear',
+                      style: t.prose.copyWith(color: c.inkMuted),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: JotaGrid.gapL),
+            const _SheetLabel('ORDER'),
+            const SizedBox(height: JotaGrid.gapM),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: JotaRow(
+                    label: 'Newest first',
+                    selected: notes.newestFirst,
+                    height: JotaRows.heightCompact,
+                    onTap: () => notes.setNewestFirst(true),
+                  ),
+                ),
+                const SizedBox(width: JotaRows.gap),
+                Expanded(
+                  child: JotaRow(
+                    label: 'Oldest first',
+                    selected: !notes.newestFirst,
+                    height: JotaRows.heightCompact,
+                    onTap: () => notes.setNewestFirst(false),
+                  ),
+                ),
+              ],
+            ),
+            if (notes.tagsInUse.isNotEmpty) ...<Widget>[
+              const SizedBox(height: JotaGrid.gapL),
+              const _SheetLabel('TAG'),
+              const SizedBox(height: JotaGrid.gapM),
+              Wrap(
+                spacing: JotaRows.gap,
+                runSpacing: JotaRows.gap,
+                children: <Widget>[
+                  IntrinsicWidth(
+                    child: JotaRow(
+                      label: 'All',
+                      selected: notes.tagFilter == null,
+                      height: JotaRows.heightCompact,
+                      onTap: () => notes.setTagFilter(null),
+                    ),
+                  ),
+                  for (final String tag in notes.tagsInUse)
+                    IntrinsicWidth(
+                      child: JotaRow(
+                        label: tag,
+                        selected: notes.tagFilter == tag,
+                        height: JotaRows.heightCompact,
+                        onTap: () => notes.setTagFilter(tag),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: JotaGrid.gapL),
+            JotaButton(
+              label: 'Done',
+              primary: true,
+              upcase: false,
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A section label inside the sheet: mono, small, spaced — a card label,
+/// never the start of a sentence.
+class _SheetLabel extends StatelessWidget {
+  const _SheetLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: context.type.reading.copyWith(
+        color: context.ink.inkMuted,
+        fontSize: 10,
+        letterSpacing: 1.4,
       ),
     );
   }
