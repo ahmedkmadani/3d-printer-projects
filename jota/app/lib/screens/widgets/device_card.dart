@@ -77,11 +77,7 @@ class DeviceCard extends StatelessWidget {
 
     // Mono, small, tracked and muted: every figure in the card (the id, the
     // charge, the count) is one the device itself prints in the same face.
-    final TextStyle small = t.reading.copyWith(
-      color: c.inkMuted,
-      fontSize: 12,
-      letterSpacing: 0.8,
-    );
+    final TextStyle small = t.meta.copyWith(color: c.inkMuted);
 
     return Semantics(
       label: 'Jota status: ${line.name} ${line.figure ?? ''} ${line.status}',
@@ -134,7 +130,10 @@ class DeviceCard extends StatelessWidget {
                   if (line.figure != null) ...<Widget>[
                     Text(
                       line.figure!,
-                      style: t.figure.copyWith(fontSize: 34, height: 1),
+                      // The display role is the big mono figure; only the
+                      // leading is tightened so the status line can sit
+                      // right under it.
+                      style: t.display.copyWith(height: 1),
                     ),
                     const SizedBox(height: JotaGrid.unit),
                   ],
@@ -169,8 +168,8 @@ class _Dot extends StatelessWidget {
     // borrowed from a web page.
     if (busy) return _Breathing(color: c.signal);
     return Container(
-      width: 8,
-      height: 8,
+      width: JotaIndicators.signalDot,
+      height: JotaIndicators.signalDot,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: present ? c.signal : Colors.transparent,
@@ -210,8 +209,8 @@ class _BreathingState extends State<_Breathing>
         CurvedAnimation(parent: _c, curve: Curves.easeInOut),
       ),
       child: Container(
-        width: 8,
-        height: 8,
+        width: JotaIndicators.signalDot,
+        height: JotaIndicators.signalDot,
         decoration: BoxDecoration(shape: BoxShape.circle, color: widget.color),
       ),
     );

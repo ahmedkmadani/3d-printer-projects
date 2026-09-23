@@ -324,11 +324,7 @@ class _NoteRow extends StatelessWidget {
               children: <Widget>[
                 Text(
                   fmtNoteStamp(note.recordedAt),
-                  style: t.reading.copyWith(
-                    color: c.inkMuted,
-                    fontSize: 12,
-                    letterSpacing: 0.8,
-                  ),
+                  style: t.meta.copyWith(color: c.inkMuted),
                 ),
                 const SizedBox(width: JotaGrid.gapS),
                 if (note.tag != null) JotaTagPill(label: note.tag!),
@@ -470,10 +466,7 @@ class _FilterSheet extends StatelessWidget {
             Row(
               children: <Widget>[
                 Expanded(
-                  child: Text(
-                    'Filter',
-                    style: t.headline.copyWith(fontSize: 28),
-                  ),
+                  child: Text('Filter', style: t.sheetTitle),
                 ),
                 if (anything)
                   GestureDetector(
@@ -519,7 +512,7 @@ class _FilterSheet extends StatelessWidget {
               const SizedBox(height: JotaGrid.gapM),
               Wrap(
                 spacing: JotaRows.gap,
-                runSpacing: 2,
+                runSpacing: JotaRows.gap,
                 children: <Widget>[
                   JotaTagChoice(
                     label: 'All',
@@ -560,11 +553,7 @@ class _SheetLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: context.type.reading.copyWith(
-        color: context.ink.inkMuted,
-        fontSize: 10,
-        letterSpacing: 1.4,
-      ),
+      style: context.type.cardLabel.copyWith(color: context.ink.inkMuted),
     );
   }
 }

@@ -121,7 +121,7 @@ class _TopicRow extends StatelessWidget {
             const SizedBox(width: JotaGrid.gapM),
             Text(
               '${topic.noteCount} NOTES',
-              style: t.reading.copyWith(color: c.inkMuted, fontSize: 12),
+              style: t.meta.copyWith(color: c.inkMuted),
             ),
           ],
         ),

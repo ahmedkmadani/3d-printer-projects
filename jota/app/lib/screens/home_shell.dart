@@ -32,6 +32,9 @@ import 'note_list_screen.dart';
 import 'settings_screen.dart';
 import 'pair_screen.dart';
 
+/// The floating nav: a compact row plus a gap of paper above and below.
+const double _navHeight = JotaRows.heightCompact + 2 * JotaGrid.gapM;
+
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, this.initialIndex = 0});
 
@@ -201,10 +204,13 @@ class HomeNavBar extends StatelessWidget {
             JotaGrid.gapM,
           ),
           child: Container(
-            height: 60,
+            // A compact-row tab with a gap of paper either side: the same two
+            // tokens as everywhere else, so the bar and its pills share a
+            // scale with the rest of the app instead of a 60 of their own.
+            height: _navHeight,
             decoration: BoxDecoration(
               color: c.bg,
-              borderRadius: const BorderRadius.all(Radius.circular(30)),
+              borderRadius: JotaRows.borderRadiusOf(_navHeight),
               border: Border.all(color: c.rule, width: JotaGrid.hairline),
               boxShadow: <BoxShadow>[
                 BoxShadow(
@@ -273,10 +279,12 @@ class _NavItem extends StatelessWidget {
         child: AnimatedContainer(
           duration: JotaMotion.fast,
           curve: JotaMotion.curve,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          height: JotaRows.heightCompact,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             color: active ? c.ink : Colors.transparent,
-            borderRadius: const BorderRadius.all(Radius.circular(20)),
+            borderRadius: JotaRows.borderRadiusOf(JotaRows.heightCompact),
           ),
           // Mono caps, not the sans label style: the design lock draws the nav
           // in the figure face, and it is the same treatment the device's own
@@ -285,11 +293,7 @@ class _NavItem extends StatelessWidget {
           // was always there, not around one that just appeared.
           child: Text(
             label.toUpperCase(),
-            style: t.reading.copyWith(
-              color: fg,
-              fontSize: 12,
-              letterSpacing: 1.2,
-            ),
+            style: t.navLabel.copyWith(color: fg),
           ),
         ),
       ),

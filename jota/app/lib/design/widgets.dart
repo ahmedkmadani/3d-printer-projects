@@ -1111,9 +1111,10 @@ class _JotaSearchFieldState extends State<JotaSearchField> {
   }
 }
 
-/// A tag pill you can tap: the same pill as on a note, with a hit area a
-/// finger can find. For choosers — the note's tag sheet, the archive's
-/// filter — so a tag looks the same whether it is a label or a choice.
+/// A choice on a sheet — a tag to file under, a language — as a stadium a
+/// finger can read and hit: the `choice` role inside JotaRows.choicePadding,
+/// outlined in ink, inverted when it is the chosen one. A step up from the
+/// tag pill on a note, which is a label on something already chosen.
 class JotaTagChoice extends StatelessWidget {
   const JotaTagChoice({
     super.key,
@@ -1128,15 +1129,27 @@ class JotaTagChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    final JotaType t = context.type;
     return Semantics(
       button: true,
       selected: selected,
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: JotaTagPill(label: label, selected: selected),
+        child: AnimatedContainer(
+          duration: JotaMotion.fast,
+          curve: JotaMotion.curve,
+          padding: JotaRows.choicePadding,
+          decoration: BoxDecoration(
+            color: selected ? c.ink : Colors.transparent,
+            border: Border.all(color: c.ink, width: JotaGrid.hairline),
+            borderRadius: const BorderRadius.all(Radius.circular(999)),
+          ),
+          child: Text(
+            label.toUpperCase(),
+            style: t.choice.copyWith(color: selected ? c.onInk : c.ink),
+          ),
         ),
       ),
     );

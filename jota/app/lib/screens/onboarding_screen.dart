@@ -208,7 +208,7 @@ class _OnboardingPage extends StatelessWidget {
           const SizedBox(height: JotaGrid.gapXL),
           Text(
             page.headline,
-            style: t.headline.copyWith(fontSize: 24, height: 1.2),
+            style: t.titleSmall,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: JotaGrid.gapM),

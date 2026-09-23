@@ -139,6 +139,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
   }
 
+  /// The language hint, on a sheet shaped like the note's tag sheet: title,
+  /// one line, the choices as stadiums with the current one inverted.
+  Future<void> _pickLanguage(Services s) async {
+    final String? picked = await showModalBottomSheet<String?>(
+      context: context,
+      backgroundColor: context.ink.bg,
+      builder: (BuildContext sheetContext) {
+        final JotaType t = sheetContext.type;
+        final JotaColors c = sheetContext.ink;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              JotaGrid.margin,
+              JotaGrid.gapL,
+              JotaGrid.margin,
+              JotaGrid.gapL,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('Notes are in', style: t.sheetTitle),
+                const SizedBox(height: JotaGrid.gapS),
+                Text(
+                  'Tells Whisper what to listen for. Auto guesses per note.',
+                  style: t.prose.copyWith(color: c.inkMuted),
+                ),
+                const SizedBox(height: JotaGrid.gapL),
+                Wrap(
+                  spacing: JotaRows.gap,
+                  runSpacing: JotaRows.gap,
+                  children: <Widget>[
+                    for (final String? code in _languages)
+                      JotaTagChoice(
+                        label: _languageLabel(code),
+                        selected: s.settings.language == code,
+                        // The sheet returns the code; null is a real
+                        // choice (auto), so "dismissed" is told apart by
+                        // a sentinel below.
+                        onTap: () =>
+                            Navigator.of(sheetContext).pop(code ?? _auto),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (picked == null || !mounted) return; // dismissed
+    await s.settings.setLanguage(picked == _auto ? null : picked);
+    if (mounted) setState(() {});
+  }
+
+  static const String _auto = 'auto';
+
   Future<void> _load() async {
     final Services s = context.read<Services>();
     final int archive = await s.audio.archiveBytes();
@@ -365,16 +422,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // Which language the notes are in. Auto lets
                         // whisper.cpp guess from the first thirty seconds,
                         // which on a short mixed clip is a coin toss; a hint
-                        // settles it. One tap cycles, like every other row.
+                        // settles it. A sheet, not a tap that cycles: three
+                        // states behind one tap is a thing nobody discovers.
                         _SettingRow(
                           label: 'Notes are in',
                           value: _languageLabel(s.settings.language),
-                          onTap: () async {
-                            await s.settings.setLanguage(
-                              _nextLanguage(s.settings.language),
-                            );
-                            setState(() {});
-                          },
+                          onTap: () => _pickLanguage(s),
                         ),
 
                         // The four the design names, in its order.
@@ -576,11 +629,6 @@ String _languageLabel(String? code) {
   }
 }
 
-String? _nextLanguage(String? code) {
-  final int i = _languages.indexOf(code);
-  return _languages[(i + 1) % _languages.length];
-}
-
 class _SettingRow extends StatelessWidget {
   const _SettingRow({required this.label, required this.value, this.onTap});
 
@@ -681,11 +729,7 @@ class _LeavesCard extends StatelessWidget {
             'WHAT LEAVES YOUR PHONE',
             // Mono, like every other label in a card in the design — this is
             // chrome on a figure-shaped surface, not prose.
-            style: t.reading.copyWith(
-              color: c.inkMuted,
-              fontSize: 11,
-              letterSpacing: 1.5,
-            ),
+            style: t.cardLabel.copyWith(color: c.inkMuted),
           ),
           const SizedBox(height: JotaGrid.gapS),
           Text(

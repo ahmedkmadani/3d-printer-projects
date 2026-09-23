@@ -226,11 +226,7 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
                     const Spacer(),
                     Text(
                       'SETTINGS · TAGS',
-                      style: t.reading.copyWith(
-                        color: c.inkMuted,
-                        fontSize: 11,
-                        letterSpacing: 1.2,
-                      ),
+                      style: t.cardLabel.copyWith(color: c.inkMuted),
                     ),
                   ],
                 ),
@@ -703,13 +699,7 @@ class _TagRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: JotaGrid.gapM),
-                  Text(
-                    '$count',
-                    style: t.reading.copyWith(
-                      color: c.inkMuted,
-                      fontSize: 12,
-                    ),
-                  ),
+                  Text('$count', style: t.meta.copyWith(color: c.inkMuted)),
                 ],
               ),
             ),
@@ -742,11 +732,7 @@ class _DeviceCutLine extends StatelessWidget {
               'ON JOTA ↑',
               // Mono: it is a label on a rule, the same voice as every other
               // piece of chrome on this screen.
-              style: t.reading.copyWith(
-                color: c.inkMuted,
-                fontSize: 11,
-                letterSpacing: 1.4,
-              ),
+              style: t.cardLabel.copyWith(color: c.inkMuted),
             ),
           ),
           Expanded(child: Container(height: JotaGrid.hairline, color: c.rule)),

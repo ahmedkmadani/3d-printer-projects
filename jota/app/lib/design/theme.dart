@@ -165,6 +165,12 @@ abstract final class JotaRows {
   /// screen (pair, an empty-state action). Taller so it carries the screen.
   static const double heightTall = 56;
 
+  /// The inset of a choice stadium on a sheet (JotaTagChoice): enough
+  /// around a 12pt word that a finger finds it and it reads as a control,
+  /// not a label. The tag pill on a note is smaller on purpose.
+  static const EdgeInsets choicePadding =
+      EdgeInsets.symmetric(horizontal: 14, vertical: 7);
+
   static double radiusOf(double height) => height / 2;
 
   static BorderRadius borderRadiusOf(double height) =>
@@ -296,12 +302,45 @@ class JotaType extends ThemeExtension<JotaType> {
     required this.headline,
     required this.prose,
     required this.wordmark,
+    required this.meta,
+    required this.cardLabel,
+    required this.navLabel,
+    required this.sheetTitle,
+    required this.titleSmall,
+    required this.choice,
   });
 
   final TextStyle label;
   final TextStyle reading;
   final TextStyle figure;
   final TextStyle display;
+
+  /// The small figure beside a thing: a note's stamp, a count, a device's
+  /// state line, the player's ratio. Mono, a step under `reading`, a hair of
+  /// tracking. Callers mute it; the role carries the size so the same datum
+  /// cannot render at two sizes on two screens (it did: 11 on Home, 12 on
+  /// the list).
+  final TextStyle meta;
+
+  /// A caption in caps on a card or a sheet section — WHAT KEEPS COMING BACK,
+  /// ORDER, SETTINGS · TAGS. Mono, small, widely tracked; never the start of
+  /// a sentence.
+  final TextStyle cardLabel;
+
+  /// The nav tabs and the one link drawn like them (SEE ALL PATTERNS →).
+  final TextStyle navLabel;
+
+  /// The serif title on a bottom sheet: the headline a size down, because a
+  /// sheet is a question, not a screen.
+  final TextStyle sheetTitle;
+
+  /// A centred headline over an illustration (onboarding, Bluetooth off).
+  final TextStyle titleSmall;
+
+  /// The word inside a choice stadium on a sheet (a tag to file under, a
+  /// language). Mono caps a step over `meta`: it is something to pick, not
+  /// a label on something already picked — that is the tag pill.
+  final TextStyle choice;
 
   /// Serif, large. The one warm, elegant voice in the app — reserved for
   /// onboarding and splash headlines. Never a figure, never an identifier.
@@ -385,6 +424,48 @@ class JotaType extends ThemeExtension<JotaType> {
         letterSpacing: 0.5,
         height: 1.05,
       ),
+      meta: _mono.copyWith(
+        color: ink,
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0.8,
+        height: 1.3,
+      ),
+      cardLabel: _mono.copyWith(
+        color: ink,
+        fontSize: 11,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 1.5,
+        height: 1.3,
+      ),
+      navLabel: _mono.copyWith(
+        color: ink,
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 1.2,
+        height: 1.3,
+      ),
+      sheetTitle: _serif.copyWith(
+        color: ink,
+        fontSize: 28,
+        fontWeight: FontWeight.w400,
+        letterSpacing: -0.3,
+        height: 1.15,
+      ),
+      titleSmall: _serif.copyWith(
+        color: ink,
+        fontSize: 24,
+        fontWeight: FontWeight.w400,
+        letterSpacing: -0.3,
+        height: 1.2,
+      ),
+      choice: _mono.copyWith(
+        color: ink,
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 1.0,
+        height: 1.2,
+      ),
     );
   }
 
@@ -397,6 +478,12 @@ class JotaType extends ThemeExtension<JotaType> {
     TextStyle? headline,
     TextStyle? prose,
     TextStyle? wordmark,
+    TextStyle? meta,
+    TextStyle? cardLabel,
+    TextStyle? navLabel,
+    TextStyle? sheetTitle,
+    TextStyle? titleSmall,
+    TextStyle? choice,
   }) {
     return JotaType(
       label: label ?? this.label,
@@ -406,6 +493,12 @@ class JotaType extends ThemeExtension<JotaType> {
       headline: headline ?? this.headline,
       prose: prose ?? this.prose,
       wordmark: wordmark ?? this.wordmark,
+      meta: meta ?? this.meta,
+      cardLabel: cardLabel ?? this.cardLabel,
+      navLabel: navLabel ?? this.navLabel,
+      sheetTitle: sheetTitle ?? this.sheetTitle,
+      titleSmall: titleSmall ?? this.titleSmall,
+      choice: choice ?? this.choice,
     );
   }
 
@@ -420,6 +513,12 @@ class JotaType extends ThemeExtension<JotaType> {
       headline: TextStyle.lerp(headline, other.headline, t)!,
       prose: TextStyle.lerp(prose, other.prose, t)!,
       wordmark: TextStyle.lerp(wordmark, other.wordmark, t)!,
+      meta: TextStyle.lerp(meta, other.meta, t)!,
+      cardLabel: TextStyle.lerp(cardLabel, other.cardLabel, t)!,
+      navLabel: TextStyle.lerp(navLabel, other.navLabel, t)!,
+      sheetTitle: TextStyle.lerp(sheetTitle, other.sheetTitle, t)!,
+      titleSmall: TextStyle.lerp(titleSmall, other.titleSmall, t)!,
+      choice: TextStyle.lerp(choice, other.choice, t)!,
     );
   }
 }

@@ -110,11 +110,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
             children: <Widget>[
               Text(
                 fmtNoteStamp(_note.recordedAt),
-                style: t.reading.copyWith(
-                  color: c.inkMuted,
-                  fontSize: 12,
-                  letterSpacing: 0.8,
-                ),
+                style: t.meta.copyWith(color: c.inkMuted),
               ),
               const SizedBox(width: JotaGrid.gapS),
               // Inverted here, outlined in the list: this is the tag that was
@@ -222,10 +218,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 Row(
                   children: <Widget>[
                     Expanded(
-                      child: Text(
-                        'Tag',
-                        style: t.headline.copyWith(fontSize: 28),
-                      ),
+                      child: Text('Tag', style: t.sheetTitle),
                     ),
                     GestureDetector(
                       onTap: () => Navigator.of(sheetContext).pop(true),
@@ -251,7 +244,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                   // what it will become once chosen.
                   Wrap(
                     spacing: JotaRows.gap,
-                    runSpacing: 2,
+                    runSpacing: JotaRows.gap,
                     children: <Widget>[
                       for (final String tag in tags)
                         JotaTagChoice(
@@ -381,11 +374,7 @@ class _SummaryCard extends StatelessWidget {
           // a sentence.
           Text(
             'WHAT IT WAS ABOUT',
-            style: t.reading.copyWith(
-              color: c.inkMuted,
-              fontSize: 10,
-              letterSpacing: 1.4,
-            ),
+            style: t.cardLabel.copyWith(color: c.inkMuted),
           ),
           const SizedBox(height: JotaGrid.gapM),
           Text(
@@ -478,6 +467,7 @@ class _PlayerPill extends StatefulWidget {
 
 class _PlayerPillState extends State<_PlayerPill> {
   static const double _circle = 28;
+  static const double _inset = (JotaRows.height - _circle) / 2;
 
   late final NotePlayer _player = widget.createPlayer();
   StreamSubscription<bool>? _playingSub;
@@ -571,11 +561,15 @@ class _PlayerPillState extends State<_PlayerPill> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 11),
+          padding: const EdgeInsets.symmetric(
+            horizontal: _inset,
+            vertical: _inset,
+          ),
           decoration: BoxDecoration(
             // Radius = height/2, so it is a stadium like every other shape in
-            // the product. The pill is 50 high: 28 of circle, 11 either side.
-            borderRadius: JotaRows.borderRadiusOf(_circle + 22),
+            // the product, and the height is the row height every other
+            // stadium uses: the circle plus its inset either side.
+            borderRadius: JotaRows.borderRadiusOf(JotaRows.height),
             border: Border.all(color: c.rule, width: JotaGrid.hairline),
           ),
           child: Row(
@@ -635,7 +629,7 @@ class _PlayerPillState extends State<_PlayerPill> {
               Text(
                 '${fmtDuration(_position.inSeconds)} / '
                 '${fmtDuration(total.inSeconds)}',
-                style: t.reading.copyWith(color: c.inkMuted, fontSize: 11),
+                style: t.meta.copyWith(color: c.inkMuted),
               ),
             ],
           ),
@@ -765,7 +759,7 @@ class _TranscriptBlock extends StatelessWidget {
                     note.transcriptState == TranscriptState.manual
                         ? 'Edited by hand'
                         : 'Hold to edit',
-                    style: t.prose.copyWith(color: c.inkMuted, fontSize: 12),
+                    style: t.prose.copyWith(color: c.inkMuted),
                   ),
                 ),
                 // A second pass is worth offering: the model changes (the
@@ -778,7 +772,7 @@ class _TranscriptBlock extends StatelessWidget {
                   behavior: HitTestBehavior.opaque,
                   child: Text(
                     'Transcribe again',
-                    style: t.prose.copyWith(color: c.inkMuted, fontSize: 12),
+                    style: t.prose.copyWith(color: c.inkMuted),
                   ),
                 ),
               ],

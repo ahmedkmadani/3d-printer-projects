@@ -63,7 +63,7 @@ class BluetoothOffScreen extends StatelessWidget {
                 // A shade under the full headline: it is a centred line on a
                 // near-empty screen, and the same size the onboarding pages use
                 // in the same position.
-                style: t.headline.copyWith(fontSize: 24, height: 1.2),
+                style: t.titleSmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: JotaGrid.gapM),

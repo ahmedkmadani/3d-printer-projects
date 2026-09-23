@@ -134,109 +134,109 @@ class _ConnectScreenState extends State<ConnectScreen> {
             minHeight: MediaQuery.sizeOf(context).height * 0.60,
           ),
           child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          const SizedBox(height: JotaGrid.gapM),
-          Text('Connect your Jota', style: t.headline),
-          const SizedBox(height: JotaGrid.gapS),
-          Text(
-            // The device is not obvious to operate, and nothing else in the
-            // product says this. It shows its code by itself when no phone owns
-            // it, so there is no menu to talk anyone through any more.
-            'Switch it on. It shows a code the first time.',
-            style: t.prose.copyWith(color: c.inkMuted),
-          ),
-          const SizedBox(height: JotaGrid.gapL),
-          const JotaRule(),
-          const SizedBox(height: JotaGrid.gapM),
-
-          // The Jotas in range. The id-bearing name, because every Jota
-          // advertises as plain "JOTA" and the bare local name cannot tell two
-          // of them apart — these are the same four characters the device
-          // prints on its own screen.
-          for (final JotaAdvertisement ad in found)
-            _FoundRow(
-              name: ad.shortName,
-              state: device.pairedId == ad.remoteId ? 'PAIRED' : 'NEARBY',
-              onTap: wantsCode ? null : () => device.pairWith(ad),
-            ),
-
-          if (found.isEmpty || device.isScanning)
-            Padding(
-              padding: const EdgeInsets.only(top: JotaGrid.gapS),
-              child: Text(
-                found.isEmpty
-                    ? (device.isScanning
-                        ? 'Looking for your Jota…'
-                        : 'No Jota found nearby.')
-                    : 'Looking for more…',
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              const SizedBox(height: JotaGrid.gapM),
+              Text('Connect your Jota', style: t.headline),
+              const SizedBox(height: JotaGrid.gapS),
+              Text(
+                // The device is not obvious to operate, and nothing else in the
+                // product says this. It shows its code by itself when no phone owns
+                // it, so there is no menu to talk anyone through any more.
+                'Switch it on. It shows a code the first time.',
                 style: t.prose.copyWith(color: c.inkMuted),
               ),
-            ),
+              const SizedBox(height: JotaGrid.gapL),
+              const JotaRule(),
+              const SizedBox(height: JotaGrid.gapM),
 
-          // A fixed gap, not a Spacer. This column lives inside a scroll
-          // view so it can survive the keyboard, and a scroll view hands its
-          // child unbounded height — a flex child cannot divide infinity, so a
-          // Spacer here is a layout error rather than a centred screen.
-          const SizedBox(height: JotaGrid.gapXL * 2),
+              // The Jotas in range. The id-bearing name, because every Jota
+              // advertises as plain "JOTA" and the bare local name cannot tell two
+              // of them apart — these are the same four characters the device
+              // prints on its own screen.
+              for (final JotaAdvertisement ad in found)
+                _FoundRow(
+                  name: ad.shortName,
+                  state: device.pairedId == ad.remoteId ? 'PAIRED' : 'NEARBY',
+                  onTap: wantsCode ? null : () => device.pairWith(ad),
+                ),
 
-          if (wantsCode) ...<Widget>[
-            Text(
-              'Enter the code showing on Jota',
-              style: t.prose.copyWith(color: c.inkMuted),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: JotaGrid.gapM),
-            // The boxes are the visible field; the real one is invisible behind
-            // them, which is how the digits can be mono and evenly spaced
-            // without fighting a text cursor.
-            Stack(
-              alignment: Alignment.center,
-              children: <Widget>[
-                JotaCodeBoxes(digits: _digits, length: kPairCodeLength),
-                Positioned.fill(
-                  child: Opacity(
-                    opacity: 0,
-                    child: TextField(
-                      controller: _code,
-                      focusNode: _codeFocus,
-                      autofocus: true,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: <TextInputFormatter>[
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(kPairCodeLength),
-                      ],
-                      onChanged: (String v) {
-                        if (v.length == kPairCodeLength) _submit(device);
-                      },
-                    ),
+              if (found.isEmpty || device.isScanning)
+                Padding(
+                  padding: const EdgeInsets.only(top: JotaGrid.gapS),
+                  child: Text(
+                    found.isEmpty
+                        ? (device.isScanning
+                            ? 'Looking for your Jota…'
+                            : 'No Jota found nearby.')
+                        : 'Looking for more…',
+                    style: t.prose.copyWith(color: c.inkMuted),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: JotaGrid.gapL),
-            JotaButton(
-              label: 'Pair',
-              primary: true,
-              upcase: false,
-              // Dimmed until six digits exist. A live button on an incomplete
-              // code invites a press that can only fail.
-              onTap: _complete ? () => _submit(device) : null,
-            ),
-            const SizedBox(height: JotaGrid.gapM),
-          ],
 
-          if (device.lastError != null) ...<Widget>[
-            const SizedBox(height: JotaGrid.gapM),
-            Text(
-              device.lastError!,
-              style: t.prose.copyWith(color: c.signal),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: JotaGrid.gapM),
-          ],
-        ],
-      ),
+              // A fixed gap, not a Spacer. This column lives inside a scroll
+              // view so it can survive the keyboard, and a scroll view hands its
+              // child unbounded height — a flex child cannot divide infinity, so a
+              // Spacer here is a layout error rather than a centred screen.
+              const SizedBox(height: JotaGrid.gapXL * 2),
+
+              if (wantsCode) ...<Widget>[
+                Text(
+                  'Enter the code showing on Jota',
+                  style: t.prose.copyWith(color: c.inkMuted),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: JotaGrid.gapM),
+                // The boxes are the visible field; the real one is invisible behind
+                // them, which is how the digits can be mono and evenly spaced
+                // without fighting a text cursor.
+                Stack(
+                  alignment: Alignment.center,
+                  children: <Widget>[
+                    JotaCodeBoxes(digits: _digits, length: kPairCodeLength),
+                    Positioned.fill(
+                      child: Opacity(
+                        opacity: 0,
+                        child: TextField(
+                          controller: _code,
+                          focusNode: _codeFocus,
+                          autofocus: true,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: <TextInputFormatter>[
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(kPairCodeLength),
+                          ],
+                          onChanged: (String v) {
+                            if (v.length == kPairCodeLength) _submit(device);
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: JotaGrid.gapL),
+                JotaButton(
+                  label: 'Pair',
+                  primary: true,
+                  upcase: false,
+                  // Dimmed until six digits exist. A live button on an incomplete
+                  // code invites a press that can only fail.
+                  onTap: _complete ? () => _submit(device) : null,
+                ),
+                const SizedBox(height: JotaGrid.gapM),
+              ],
+
+              if (device.lastError != null) ...<Widget>[
+                const SizedBox(height: JotaGrid.gapM),
+                Text(
+                  device.lastError!,
+                  style: t.prose.copyWith(color: c.signal),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: JotaGrid.gapM),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -280,14 +280,7 @@ class _FoundRow extends StatelessWidget {
                 children: <Widget>[
                   Expanded(child: Text(name, style: t.reading)),
                   const SizedBox(width: JotaGrid.gapM),
-                  Text(
-                    state,
-                    style: t.reading.copyWith(
-                      color: c.inkMuted,
-                      fontSize: 11,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
+                  Text(state, style: t.meta.copyWith(color: c.inkMuted)),
                 ],
               ),
             ),

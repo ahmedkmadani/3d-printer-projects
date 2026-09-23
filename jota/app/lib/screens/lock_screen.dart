@@ -45,11 +45,7 @@ class LockScreen extends StatelessWidget {
                 // wordmark carries the screen; this only labels it.
                 'LOCKED',
                 textAlign: TextAlign.center,
-                style: t.reading.copyWith(
-                  color: c.inkMuted,
-                  fontSize: 11,
-                  letterSpacing: 1.8,
-                ),
+                style: t.cardLabel.copyWith(color: c.inkMuted),
               ),
               const Spacer(),
               const Center(child: _BiometricMarks()),

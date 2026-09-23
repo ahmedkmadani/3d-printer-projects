@@ -73,8 +73,7 @@ class _SplashScreenState extends State<SplashScreen>
         context.read<Services>().settings.hasSeenOnboarding;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            seen ? const HomeShell() : const OnboardingScreen(),
+        builder: (_) => seen ? const HomeShell() : const OnboardingScreen(),
       ),
     );
   }
@@ -120,7 +119,7 @@ class _SplashScreenState extends State<SplashScreen>
                 padding: const EdgeInsets.only(bottom: JotaGrid.gapXL),
                 child: Text(
                   kVersionLabel,
-                  style: t.reading.copyWith(color: c.inkMuted, fontSize: 12),
+                  style: t.meta.copyWith(color: c.inkMuted),
                 ),
               ),
             ],

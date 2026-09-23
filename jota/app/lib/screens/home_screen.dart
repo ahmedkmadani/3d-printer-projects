@@ -159,7 +159,7 @@ class _Card extends StatelessWidget {
 /// tracked, muted. Every small caption on this screen is a figure's chrome, so
 /// they all share the figure face.
 TextStyle _cardLabel(JotaType t, JotaColors c) =>
-    t.reading.copyWith(color: c.inkMuted, fontSize: 11, letterSpacing: 1.5);
+    t.cardLabel.copyWith(color: c.inkMuted);
 
 /// Two figures, in mono, because they are measurements. Nothing else on the
 /// screen is allowed to be this big.
@@ -244,16 +244,13 @@ class _TopicsCard extends StatelessWidget {
               const SizedBox(width: JotaGrid.gapM),
               Text(
                 '${topic.noteCount}',
-                style: t.reading.copyWith(color: c.inkMuted, fontSize: 12),
+                style: t.meta.copyWith(color: c.inkMuted),
               ),
             ],
           ),
         // Ink, not the accent: this is a link, and the accent means live
         // or dangerous. See docs/brand.md.
-        Text(
-          'SEE ALL PATTERNS →',
-          style: t.reading.copyWith(fontSize: 12, letterSpacing: 1.3),
-        ),
+        Text('SEE ALL PATTERNS →', style: t.navLabel),
       ],
     );
   }
@@ -306,7 +303,7 @@ class _LatestCard extends StatelessWidget {
           children: <Widget>[
             Text(
               fmtNoteStamp(note.recordedAt),
-              style: t.reading.copyWith(color: c.inkMuted, fontSize: 11),
+              style: t.meta.copyWith(color: c.inkMuted),
             ),
             const SizedBox(width: JotaGrid.gapS),
             // Inverted, as the sheet draws it: on a card that holds exactly one
