@@ -41,16 +41,33 @@ String fmtClock(DateTime t) {
 /// reaches for a note — "the one after Tuesday's session", never "the one from
 /// 2026-08-12". Upper case and mono so it sits in the same figure vocabulary
 /// as every other measurement.
+const List<String> _kDays = <String>[
+  'MON',
+  'TUE',
+  'WED',
+  'THU',
+  'FRI',
+  'SAT',
+  'SUN',
+];
+const List<String> _kMonths = <String>[
+  'JAN',
+  'FEB',
+  'MAR',
+  'APR',
+  'MAY',
+  'JUN',
+  'JUL',
+  'AUG',
+  'SEP',
+  'OCT',
+  'NOV',
+  'DEC',
+];
+
 String fmtNoteStamp(DateTime t) {
-  const List<String> days = <String>[
-    'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN',
-  ];
-  const List<String> months = <String>[
-    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
-    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
-  ];
-  final String d = days[(t.weekday - 1) % 7];
-  final String m = months[(t.month - 1) % 12];
+  final String d = _kDays[(t.weekday - 1) % 7];
+  final String m = _kMonths[(t.month - 1) % 12];
   return '$d ${t.day} $m · ${fmtClock(t)}';
 }
 
@@ -71,16 +88,21 @@ String fmtDayHeading(DateTime t, {DateTime? now}) {
   final int days = b.difference(a).inDays;
   if (days == 0) return 'TODAY';
   if (days == 1) return 'YESTERDAY';
-  return fmtDate(t);
+  // The stamp's own voice, minus the clock. It fell through to fmtDate here,
+  // which put an ISO 2026-09-21 over a list whose every other word is spoken.
+  final String d = _kDays[(t.weekday - 1) % 7];
+  final String m = _kMonths[(t.month - 1) % 12];
+  return '$d ${t.day} $m';
 }
 
 /// `389120` -> `380K`. Right-aligned in a mono column, so a fixed width
 /// matters more than precision.
 String fmtBytes(int bytes) {
-  if (bytes < 1024) return '${bytes.toString().padLeft(3, '0')}B';
-  if (bytes < 1024 * 1024) {
-    return '${(bytes / 1024).round().toString().padLeft(3, '0')}K';
-  }
+  // A measurement, not an identifier: zero padding is for figures that line
+  // up in a column of their kind, and this one stands alone in a settings
+  // row, where an empty archive printed as 000B — which reads as broken.
+  if (bytes < 1024) return '${bytes}B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).round()}K';
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}M';
 }
 

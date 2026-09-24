@@ -38,7 +38,7 @@ class JotaDeviceMark extends StatelessWidget {
         dark: c.brightnessIsDark,
         ink: c.ink,
         onInk: c.onInk,
-        word: t.reading,
+        word: t.wordmark,
         done: done,
         check: checkProgress,
       ),
@@ -186,7 +186,8 @@ class _DevicePainter extends CustomPainter {
       return;
     }
 
-    // The word on the panel, mono and small, as the splash draws it.
+    // The word on the panel in the wordmark serif — what the real e-paper
+    // shows when asleep. It was mono, which no Jota screen ever prints.
     final TextPainter tp = TextPainter(
       text: TextSpan(
         text: 'Jota',

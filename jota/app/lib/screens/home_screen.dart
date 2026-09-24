@@ -123,10 +123,10 @@ class HomeScreen extends StatelessWidget {
               ),
             )
           // Hidden until there are enough notes for a count to mean
-          // something: see kMinNotesForPatterns.
-          else if (!enoughForPatterns(notes.notes) || week.topics.isEmpty)
-            const _NothingYet()
-          else
+          // something (kMinNotesForPatterns) — hidden, not replaced by a
+          // "No patterns yet" line: an absence note about a card the person
+          // has never seen is chrome.
+          else if (enoughForPatterns(notes.notes) && week.topics.isNotEmpty)
             _TopicsCard(
               topics: week.topics,
               onSeeAll: () => Navigator.of(context).push(
@@ -305,22 +305,6 @@ class _TopicsCard extends StatelessWidget {
         // or dangerous. See docs/brand.md.
         Text('SEE ALL PATTERNS →', style: t.navLabel),
       ],
-    );
-  }
-}
-
-class _NothingYet extends StatelessWidget {
-  const _NothingYet();
-
-  @override
-  Widget build(BuildContext context) {
-    final JotaType t = context.type;
-    final JotaColors c = context.ink;
-    return Text(
-      // Said plainly, because "no patterns" reads as a failure otherwise —
-      // and the honest reason is simply that there is not enough yet.
-      'No patterns yet',
-      style: t.prose.copyWith(color: c.inkMuted),
     );
   }
 }
