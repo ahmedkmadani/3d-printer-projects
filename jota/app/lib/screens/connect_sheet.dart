@@ -16,13 +16,13 @@
 // ============================================================================
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../ble/jota_protocol.dart';
+import '../design/device_mark.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
@@ -98,6 +98,9 @@ class _ConnectSheetState extends State<ConnectSheet> {
 
   /// Bumped to shake the code row once.
   int _shake = 0;
+
+  /// Of several Jotas in range, the one drawn. Null means the nearest.
+  String? _chosenId;
 
   bool _wasPairing = false;
   bool _wasSyncing = false;
@@ -253,40 +256,29 @@ class _ConnectSheetState extends State<ConnectSheet> {
             switchOutCurve: JotaMotion.curve,
             child: searching
                 ? const _Searching(key: ValueKey<String>('searching'))
-                : Column(
+                : _Found(
                     key: const ValueKey<String>('found'),
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      for (int i = 0; i < found.length; i++) ...<Widget>[
-                        if (i > 0) const SizedBox(height: JotaRows.gap),
-                        _Rise(
-                          index: i,
-                          child: _JotaCard(
-                            ad: found[i],
-                            state: _stateOf(device, found[i]),
-                            connecting: _tappedId == found[i].remoteId &&
-                                _doneId == null,
-                            done: _doneId == found[i].remoteId,
-                            onTap: (_tappedId == null && _doneId == null)
-                                ? () => _tap(device, found[i])
-                                : null,
-                          ),
-                        ),
-                        if (wantsCode && _tappedId == found[i].remoteId)
-                          _CodeRow(
+                    ad: _shown(found),
+                    others: <JotaAdvertisement>[
+                      for (final JotaAdvertisement a in found)
+                        if (a.remoteId != _shown(found).remoteId) a,
+                    ],
+                    state: _stateOf(device, _shown(found)),
+                    connecting:
+                        _tappedId == _shown(found).remoteId && _doneId == null,
+                    done: _doneId == _shown(found).remoteId,
+                    onConnect: (_tappedId == null && _doneId == null)
+                        ? () => _tap(device, _shown(found))
+                        : null,
+                    onSwitch: (String id) => setState(() => _chosenId = id),
+                    code: wantsCode && _tappedId == _shown(found).remoteId
+                        ? _CodeRow(
                             controller: _code,
                             focus: _codeFocus,
                             shake: _shake,
                             onComplete: () => _submit(device),
-                          ),
-                      ],
-                      if (_doneId == null) ...<Widget>[
-                        const SizedBox(height: JotaGrid.gapL),
-                        const Center(
-                          child: _Radar(size: 48, quiet: true),
-                        ),
-                      ],
-                    ],
+                          )
+                        : null,
                   ),
           ),
         ),
@@ -302,6 +294,18 @@ class _ConnectSheetState extends State<ConnectSheet> {
     );
   }
 
+  /// The nearest Jota by signal, unless the user picked another.
+  JotaAdvertisement _shown(List<JotaAdvertisement> found) {
+    for (final JotaAdvertisement a in found) {
+      if (a.remoteId == _chosenId) return a;
+    }
+    JotaAdvertisement best = found.first;
+    for (final JotaAdvertisement a in found) {
+      if (a.rssi > best.rssi) best = a;
+    }
+    return best;
+  }
+
   String _stateOf(DeviceController device, JotaAdvertisement ad) {
     if (_doneId == ad.remoteId) return 'PAIRED';
     if (_tappedId == ad.remoteId) return 'CONNECTING';
@@ -315,14 +319,45 @@ class _ConnectSheetState extends State<ConnectSheet> {
 
 // ---- searching -------------------------------------------------------------
 
-class _Searching extends StatelessWidget {
+class _Searching extends StatefulWidget {
   const _Searching({super.key});
 
   @override
+  State<_Searching> createState() => _SearchingState();
+}
+
+/// The Jota, drawn in muted ink and breathing slowly (0.35 → 0.55 opacity,
+/// 2.4 s), with the rings expanding from behind it. There is never a frame
+/// that shows only circles: the device is the picture from the first one.
+class _SearchingState extends State<_Searching>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    return SizedBox(
       height: 220,
-      child: Center(child: _Radar(size: 220)),
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          const _Radar(size: 220),
+          FadeTransition(
+            opacity: Tween<double>(begin: 0.35, end: 0.55).animate(
+              CurvedAnimation(parent: _c, curve: Curves.easeInOut),
+            ),
+            child: const JotaDeviceMark(),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -332,10 +367,9 @@ class _Searching extends StatelessWidget {
 /// as it goes, on the product's own curve. [quiet] is the small version that
 /// keeps listening under the cards for a second Jota.
 class _Radar extends StatefulWidget {
-  const _Radar({required this.size, this.quiet = false});
+  const _Radar({required this.size});
 
   final double size;
-  final bool quiet;
 
   @override
   State<_Radar> createState() => _RadarState();
@@ -363,9 +397,9 @@ class _RadarState extends State<_Radar> with SingleTickerProviderStateMixin {
         painter: _RadarPainter(
           t: _c.value,
           ink: c.ink,
-          rings: widget.quiet ? 2 : 3,
-          dot: widget.quiet ? 3 : 6,
-          strength: widget.quiet ? 0.35 : 0.7,
+          rings: 3,
+          dot: 78,
+          strength: 0.5,
         ),
       ),
     );
@@ -394,14 +428,16 @@ class _RadarPainter extends CustomPainter {
     final Paint stroke = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = JotaGrid.hairline;
+    // Rings rise from behind the drawn device (radius ~ its half height)
+    // and fade as they reach the edge. No dot: the device is the centre.
+    final double r0 = dot;
     for (int k = 0; k < rings; k++) {
       final double p = (t + k / rings) % 1.0;
       final double e = JotaMotion.curve.transform(p);
-      final double r = dot + e * (rMax - dot);
+      final double r = r0 + e * (rMax - r0);
       stroke.color = ink.withValues(alpha: (1 - p) * strength);
       canvas.drawCircle(centre, r, stroke);
     }
-    canvas.drawCircle(centre, dot, Paint()..color = ink);
   }
 
   @override
@@ -410,98 +446,106 @@ class _RadarPainter extends CustomPainter {
 
 // ---- found -----------------------------------------------------------------
 
-/// A card that rises into place: fades in and lifts a few pixels, later cards
-/// a beat after the one above them.
-class _Rise extends StatelessWidget {
-  const _Rise({required this.index, required this.child});
-
-  final int index;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: 1),
-      duration: JotaMotion.normal + Duration(milliseconds: 90 * index),
-      curve: JotaMotion.curve,
-      child: child,
-      builder: (BuildContext context, double v, Widget? child) => Opacity(
-        opacity: v,
-        child: Transform.translate(
-          offset: Offset(0, (1 - v) * 14),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-/// One Jota, as a stadium: its id on the left, the charge and the one state
-/// word on the right. Pulses while connecting; fills with ink and draws a
-/// check when it is done.
-class _JotaCard extends StatelessWidget {
-  const _JotaCard({
+/// The Jota, found: the device itself rises into view the way an earbud
+/// case does on a phone — scale 0.85 → 1 with a fade and one overshoot —
+/// with its id, its charge, the one state word and a Connect button
+/// under it. Other Jotas in range are small ids underneath, to switch.
+class _Found extends StatelessWidget {
+  const _Found({
+    super.key,
     required this.ad,
+    required this.others,
     required this.state,
     required this.connecting,
     required this.done,
-    this.onTap,
+    required this.onConnect,
+    required this.onSwitch,
+    this.code,
   });
 
   final JotaAdvertisement ad;
+  final List<JotaAdvertisement> others;
   final String state;
   final bool connecting;
   final bool done;
-  final VoidCallback? onTap;
+  final VoidCallback? onConnect;
+  final ValueChanged<String> onSwitch;
+  final Widget? code;
 
   @override
   Widget build(BuildContext context) {
     final JotaType t = context.type;
     final JotaColors c = context.ink;
-    final Color fg = done ? c.onInk : c.ink;
-    final Color muted = done ? c.onInk : c.inkMuted;
-    final double h = scaledHeight(context, JotaRows.heightTall);
 
-    Widget card = AnimatedContainer(
-      duration: JotaMotion.normal,
-      curve: JotaMotion.curve,
-      height: h,
-      padding: const EdgeInsets.symmetric(horizontal: JotaGrid.gapL),
-      decoration: BoxDecoration(
-        color: done ? c.ink : Colors.transparent,
-        borderRadius: JotaRows.borderRadiusOf(h),
-        border: Border.all(color: c.ink, width: JotaGrid.hairline),
-      ),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              ad.shortName,
-              style: t.reading.copyWith(color: fg),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+    Widget mark = done
+        ? TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 350),
+            curve: JotaMotion.curve,
+            builder: (BuildContext context, double v, _) =>
+                JotaDeviceMark(done: true, checkProgress: v),
+          )
+        : const JotaDeviceMark();
+    if (connecting) mark = _Pulse(child: mark);
+
+    return Column(
+      key: ValueKey<String>('found-${ad.remoteId}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0, end: 1),
+          duration: JotaMotion.normal,
+          curve: Curves.easeOutBack,
+          child: SizedBox(height: 160, child: Center(child: mark)),
+          builder: (BuildContext context, double v, Widget? child) => Opacity(
+            opacity: v.clamp(0.0, 1.0),
+            child: Transform.scale(scale: 0.85 + 0.15 * v, child: child),
           ),
-          const SizedBox(width: JotaGrid.gapM),
-          if (done)
-            _Check(color: c.onInk)
-          else ...<Widget>[
-            if (ad.battery != null) ...<Widget>[
-              Text('${ad.battery}%', style: t.reading.copyWith(color: fg)),
-              const SizedBox(width: JotaGrid.gapM),
+        ),
+        const SizedBox(height: JotaGrid.gapM),
+        Text(
+          ad.shortName,
+          textAlign: TextAlign.center,
+          style: t.reading.copyWith(color: c.ink),
+        ),
+        const SizedBox(height: JotaGrid.gapS),
+        Text(
+          <String>[if (ad.battery != null) '${ad.battery}%', state]
+              .join('  ·  '),
+          textAlign: TextAlign.center,
+          style: t.meta.copyWith(color: c.inkMuted),
+        ),
+        if (others.isNotEmpty) ...<Widget>[
+          const SizedBox(height: JotaGrid.gapM),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: JotaGrid.gapL,
+            children: <Widget>[
+              for (final JotaAdvertisement o in others)
+                JotaPressable(
+                  onTap: () => onSwitch(o.remoteId),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      o.shortName,
+                      style: t.meta.copyWith(color: c.inkMuted),
+                    ),
+                  ),
+                ),
             ],
-            Text(state, style: t.meta.copyWith(color: muted)),
-          ],
+          ),
         ],
-      ),
-    );
-
-    if (connecting) card = _Pulse(child: card);
-
-    return Semantics(
-      button: onTap != null,
-      label: '${ad.shortName} $state',
-      child: JotaPressable(onTap: onTap, child: card),
+        if (code != null) code!,
+        if (!done) ...<Widget>[
+          const SizedBox(height: JotaGrid.gapL),
+          JotaButton(
+            label: connecting ? 'Connecting' : 'Connect',
+            primary: true,
+            upcase: false,
+            onTap: onConnect,
+          ),
+        ],
+      ],
     );
   }
 }
@@ -539,55 +583,6 @@ class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
   }
 }
 
-/// A check drawn as one stroke, over ~350 ms, in the knocked-out colour.
-class _Check extends StatelessWidget {
-  const _Check({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 350),
-      curve: JotaMotion.curve,
-      builder: (BuildContext context, double v, _) => CustomPaint(
-        size: const Size(22, 22),
-        painter: _CheckPainter(progress: v, color: color),
-      ),
-    );
-  }
-}
-
-class _CheckPainter extends CustomPainter {
-  const _CheckPainter({required this.progress, required this.color});
-
-  final double progress;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double w = size.width, h = size.height;
-    final Path path = Path()
-      ..moveTo(w * 0.18, h * 0.55)
-      ..lineTo(w * 0.42, h * 0.78)
-      ..lineTo(w * 0.84, h * 0.26);
-    final Paint p = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    for (final PathMetric m in path.computeMetrics()) {
-      canvas.drawPath(m.extractPath(0, m.length * progress), p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_CheckPainter old) =>
-      old.progress != progress || old.color != color;
-}
-
 // ---- the code --------------------------------------------------------------
 
 /// The six boxes, sliding up under the tapped card with the keyboard. Each
@@ -608,8 +603,15 @@ class _CodeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String digits = controller.text;
-    return _Rise(
-      index: 0,
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: JotaMotion.normal,
+      curve: JotaMotion.curve,
+      builder: (BuildContext context, double v, Widget? child) => Opacity(
+        opacity: v,
+        child:
+            Transform.translate(offset: Offset(0, (1 - v) * 14), child: child),
+      ),
       child: Padding(
         padding: const EdgeInsets.only(top: JotaGrid.gapL),
         child: _Shake(
