@@ -94,7 +94,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     unawaited(
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => const ConnectScreen(),
+          builder: (_) => const ConnectScreen(onboarding: true),
         ),
       ),
     );
@@ -143,7 +143,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 itemCount: _pages.length,
                 onPageChanged: (int i) => setState(() => _index = i),
                 itemBuilder: (BuildContext context, int i) =>
-                    _OnboardingPage(page: _pages[i]),
+                    _OnboardingPage(page: _pages[i], active: i == _index),
               ),
             ),
 
@@ -177,9 +177,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 }
 
 class _OnboardingPage extends StatelessWidget {
-  const _OnboardingPage({required this.page});
+  const _OnboardingPage({required this.page, required this.active});
 
   final _Page page;
+
+  /// True for the page on screen: its drawing plays its entrance then, not
+  /// when the PageView builds it out of sight.
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
@@ -203,7 +207,7 @@ class _OnboardingPage extends StatelessWidget {
           SizedBox(
             width: 180,
             height: 110,
-            child: MindIllustration(stage: page.stage),
+            child: MindIllustration(stage: page.stage, active: active),
           ),
           const SizedBox(height: JotaGrid.gapXL),
           Text(

@@ -24,13 +24,14 @@ import 'package:provider/provider.dart';
 
 import '../data/note.dart';
 import '../design/format.dart';
+import '../design/marks.dart';
 import '../design/script.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
 import '../state/notes_controller.dart';
 import 'note_detail_screen.dart';
-import 'connect_screen.dart';
+import 'connect_sheet.dart';
 import 'widgets/note_actions.dart';
 
 class NoteListScreen extends StatefulWidget {
@@ -496,11 +497,7 @@ class _EmptyArchive extends StatelessWidget {
           primary: true,
           upcase: false,
           height: JotaRows.heightTall,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const ConnectScreen(),
-            ),
-          ),
+          onTap: () => showConnectSheet(context),
         ),
       ),
     );
@@ -720,6 +717,7 @@ class _NoMatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return JotaEmpty(
+      mark: const JotaEmptyMarkView(EmptyMark.noMatch),
       message: 'No notes match',
       action: SizedBox(
         width: 160,

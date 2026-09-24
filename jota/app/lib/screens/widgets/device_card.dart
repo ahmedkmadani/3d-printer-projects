@@ -29,7 +29,7 @@ import '../../ble/device_scanner.dart';
 import '../../ble/sync_service.dart';
 import '../../design/theme.dart';
 import '../../state/device_controller.dart';
-import '../connect_screen.dart';
+import '../connect_sheet.dart';
 
 class DeviceCard extends StatefulWidget {
   const DeviceCard({super.key});
@@ -52,26 +52,19 @@ class _DeviceCardState extends State<DeviceCard> {
 
   Future<void> _tapped(BuildContext context) async {
     final DeviceController device = context.read<DeviceController>();
-    if (!device.hasPairedDevice) {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const ConnectScreen()),
-      );
-      return;
-    }
     if (device.isSyncing) return;
 
-    // A Jota that is not advertising is asleep, not lost. Connecting to it
-    // used to run for 25 seconds and end in a "timed out" toast, which read
-    // as a fault. The honest thing is to listen for it and say so; the
-    // moment it wakes and advertises with notes, the auto-sync takes over.
-    if (device.pendingOnDevice == null && device.bluetoothReady) {
-      await device.startScan(timeout: null);
+    // Nothing paired, or a Jota that is not advertising: open the connect
+    // sheet. It listens with the rings, shows the Jota when it is heard,
+    // and pairs or syncs from there — the one connect experience, whether
+    // it is the first time or a sleeping device on a Tuesday. A sleeping
+    // Jota is asleep, not lost: no 25-second attempt, no "timed out".
+    if (!device.hasPairedDevice ||
+        (device.pendingOnDevice == null && device.bluetoothReady)) {
       _listenTimer?.cancel();
-      if (!mounted) return;
       setState(() => _listening = true);
-      _listenTimer = Timer(const Duration(seconds: 8), () {
-        if (mounted) setState(() => _listening = false);
-      });
+      await showConnectSheet(context);
+      if (mounted) setState(() => _listening = false);
       return;
     }
 

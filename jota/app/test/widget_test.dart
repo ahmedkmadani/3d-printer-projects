@@ -16,7 +16,7 @@ import 'package:jota/app.dart';
 import 'package:jota/design/widgets.dart';
 import 'package:jota/preview/preview_services.dart';
 import 'package:jota/screens/note_detail_screen.dart';
-import 'package:jota/screens/connect_screen.dart';
+import 'package:jota/screens/connect_sheet.dart';
 import 'package:jota/screens/widgets/device_card.dart';
 import 'package:jota/state/services.dart';
 
@@ -185,9 +185,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.byType(ConnectScreen), findsOneWidget);
-
-    // Nothing paired yet, so the screen leads with the connect flow.
+    // The connect choreography rises as a sheet over Home rather than a
+    // pushed page, so it is the same experience from the card as from
+    // first run.
+    expect(find.byType(ConnectSheet), findsOneWidget);
     expect(find.text('Connect your Jota'), findsOneWidget);
 
     // The fake advertises after a beat, the way a real one does; the device
