@@ -12,6 +12,8 @@
 //  app, which is all it needs to do.
 // ============================================================================
 import 'package:flutter/widgets.dart';
+
+import '../l10n/app_localizations.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../data/note.dart';
@@ -34,6 +36,19 @@ class LocalTranscriptionNotifier
   }
 
   static const String _channelId = 'jota_transcripts';
+
+  /// The app's pinned locale, read at post time. Set by Services after boot;
+  /// null follows the phone. A notification is app UI, so it speaks the
+  /// app's language, loaded here without a BuildContext.
+  Locale? Function()? localeOf;
+
+  AppLocalizations get _l {
+    final Locale device = WidgetsBinding.instance.platformDispatcher.locale;
+    final Locale loc = localeOf?.call() ?? device;
+    return lookupAppLocalizations(
+      loc.languageCode == 'ar' ? const Locale('ar') : const Locale('en'),
+    );
+  }
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -88,19 +103,19 @@ class LocalTranscriptionNotifier
       // One id per note, so a re-run replaces its own notification instead
       // of stacking a second one.
       note.rowId ?? note.noteId,
-      '${note.displayId} is ready',
+      _l.noteReady(note.displayId),
       note.preview,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           _channelId,
-          'Transcripts',
-          channelDescription: 'A note has been transcribed.',
+          _l.channelTranscripts,
+          channelDescription: _l.channelTranscriptsBody,
           importance: Importance.low,
           priority: Priority.low,
           playSound: false,
           enableVibration: false,
         ),
-        iOS: DarwinNotificationDetails(presentSound: false),
+        iOS: const DarwinNotificationDetails(presentSound: false),
       ),
     );
   }

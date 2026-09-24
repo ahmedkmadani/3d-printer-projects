@@ -15,6 +15,7 @@
 // ============================================================================
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jota/l10n/l10n.dart';
 import 'package:jota/ble/jota_protocol.dart';
 import 'package:jota/ble/sync_service.dart';
 import 'package:jota/data/note.dart';
@@ -91,7 +92,11 @@ Future<Services> pumpTagEditor(
           ),
         ),
       ],
-      child: const MaterialApp(home: TagEditorScreen()),
+      child: const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: TagEditorScreen(),
+      ),
     ),
   );
   return services;
@@ -229,7 +234,13 @@ void main() {
       // one is another button press and another e-paper refresh inside the ten
       // seconds you have to tag a note at the wheel.
       const List<String> all = <String>[
-        'PERSONAL', 'IDEAS', 'WORK', 'THERAPY', 'MONEY', 'BOOKS', 'HEALTH',
+        'PERSONAL',
+        'IDEAS',
+        'WORK',
+        'THERAPY',
+        'MONEY',
+        'BOOKS',
+        'HEALTH',
       ];
       await device.writeDeviceTags(all);
 
@@ -243,7 +254,13 @@ void main() {
       // And the order is the setting: drag MONEY to the top and it travels,
       // while THERAPY drops off the end. No second switch to keep in step.
       final List<String> reordered = <String>[
-        'MONEY', 'PERSONAL', 'IDEAS', 'WORK', 'BOOKS', 'THERAPY', 'HEALTH',
+        'MONEY',
+        'PERSONAL',
+        'IDEAS',
+        'WORK',
+        'BOOKS',
+        'THERAPY',
+        'HEALTH',
       ];
       await device.writeDeviceTags(reordered);
       expect(

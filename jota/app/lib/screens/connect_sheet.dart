@@ -24,12 +24,21 @@ import 'package:provider/provider.dart';
 import '../ble/jota_protocol.dart';
 import '../design/device_mark.dart';
 import '../design/theme.dart';
+import '../l10n/l10n.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
 
+/// True while a connect sheet is on screen. Rapid taps on the device card
+/// used to stack sheets: the top one closed on success and revealed a stale
+/// twin underneath — a page that flashed and disappeared. One sheet, ever.
+bool _connectSheetOpen = false;
+
 /// The connect choreography as a bottom sheet over whatever is on screen.
-/// Resolves when the sheet closes, however it closed.
+/// Resolves when the sheet closes, however it closed. Single-flight: while
+/// one is open, further calls do nothing.
 Future<void> showConnectSheet(BuildContext context) {
+  if (_connectSheetOpen) return Future<void>.value();
+  _connectSheetOpen = true;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -61,7 +70,7 @@ Future<void> showConnectSheet(BuildContext context) {
         ),
       );
     },
-  );
+  ).whenComplete(() => _connectSheetOpen = false);
 }
 
 class ConnectSheet extends StatefulWidget {
@@ -238,11 +247,18 @@ class _ConnectSheetState extends State<ConnectSheet> {
     });
 
     final bool searching = found.isEmpty && _doneId == null;
+    // A paired Jota is not being CONNECTED, it is being woken: first-run
+    // pairing copy on an owned device read like switching devices. The
+    // paired sheet says wake / press a button / Sync instead.
+    final bool paired = device.hasPairedDevice;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text('Connect your Jota', style: t.headline),
+        Text(
+          paired ? context.l10n.wakeYourJota : context.l10n.connectYourJota,
+          style: t.headline,
+        ),
         const SizedBox(height: JotaGrid.gapL),
         // Searching and found swap in place: the rings breathe until a Jota
         // is heard, then the cards rise where the rings were.
@@ -264,6 +280,8 @@ class _ConnectSheetState extends State<ConnectSheet> {
                         if (a.remoteId != _shown(found).remoteId) a,
                     ],
                     state: _stateOf(device, _shown(found)),
+                    pairedDevice: device.hasPairedDevice &&
+                        device.pairedId == _shown(found).remoteId,
                     connecting:
                         _tappedId == _shown(found).remoteId && _doneId == null,
                     done: _doneId == _shown(found).remoteId,
@@ -285,7 +303,9 @@ class _ConnectSheetState extends State<ConnectSheet> {
         if (searching) ...<Widget>[
           const SizedBox(height: JotaGrid.gapL),
           Text(
-            'Switch on your Jota',
+            paired
+                ? context.l10n.pressButtonOnIt
+                : context.l10n.switchOnYourJota,
             textAlign: TextAlign.center,
             style: t.prose.copyWith(color: c.inkMuted),
           ),
@@ -307,13 +327,14 @@ class _ConnectSheetState extends State<ConnectSheet> {
   }
 
   String _stateOf(DeviceController device, JotaAdvertisement ad) {
-    if (_doneId == ad.remoteId) return 'PAIRED';
-    if (_tappedId == ad.remoteId) return 'CONNECTING';
-    if (_asleep.contains(ad.remoteId)) return 'ASLEEP';
+    final AppLocalizations l = context.l10n;
+    if (_doneId == ad.remoteId) return l.statePaired;
+    if (_tappedId == ad.remoteId) return l.stateConnecting;
+    if (_asleep.contains(ad.remoteId)) return l.stateAsleep;
     if (device.hasPairedDevice && device.pairedId == ad.remoteId) {
-      return 'PAIRED';
+      return l.statePaired;
     }
-    return 'NEARBY';
+    return l.stateNearby;
   }
 }
 
@@ -492,6 +513,7 @@ class _Backdrop extends StatelessWidget {
 /// under it. Other Jotas in range are small ids underneath, to switch.
 class _Found extends StatelessWidget {
   const _Found({
+    this.pairedDevice = false,
     super.key,
     required this.ad,
     required this.others,
@@ -503,6 +525,7 @@ class _Found extends StatelessWidget {
     this.code,
   });
 
+  final bool pairedDevice;
   final JotaAdvertisement ad;
   final List<JotaAdvertisement> others;
   final String state;
@@ -585,7 +608,11 @@ class _Found extends StatelessWidget {
         if (!done) ...<Widget>[
           const SizedBox(height: JotaGrid.gapL),
           JotaButton(
-            label: connecting ? 'Connecting' : 'Connect',
+            label: connecting
+                ? context.l10n.connectingLabel
+                : pairedDevice
+                    ? context.l10n.sync
+                    : context.l10n.connect,
             primary: true,
             upcase: false,
             onTap: onConnect,

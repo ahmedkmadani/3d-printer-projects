@@ -28,6 +28,8 @@ import 'package:provider/provider.dart';
 import '../../ble/device_scanner.dart';
 import '../../ble/sync_service.dart';
 import '../../design/theme.dart';
+import '../../design/widgets.dart';
+import '../../l10n/l10n.dart';
 import '../../state/device_controller.dart';
 import '../connect_sheet.dart';
 
@@ -84,15 +86,13 @@ class _DeviceCardState extends State<DeviceCard> {
     // alike; this only has to cover the runs that brought nothing.
     if (r != null && r.ok && r.notesAdded > 0) return;
     final String message = r == null
-        ? (device.lastError ?? 'Nothing to sync')
+        ? (device.lastError ?? context.l10n.nothingToSync)
         : !r.ok
-            ? (r.error ?? 'Sync failed')
+            ? (r.error ?? context.l10n.syncFailed)
             : r.notesRemaining > 0
                 ? '${r.notesRemaining} still on Jota — could not transfer'
-                : 'Already up to date';
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+                : context.l10n.alreadyUpToDate;
+    jotaToast(context, message);
   }
 
   @override
@@ -101,7 +101,8 @@ class _DeviceCardState extends State<DeviceCard> {
     final JotaColors c = context.ink;
     final JotaType t = context.type;
 
-    final _DeviceLine line = _DeviceLine.of(device, listening: _listening);
+    final _DeviceLine line =
+        _DeviceLine.of(context.l10n, device, listening: _listening);
 
     // Mono, small, tracked and muted: every figure in the card (the id, the
     // charge, the count) is one the device itself prints in the same face.
@@ -283,9 +284,13 @@ class _DeviceLine {
     return pct == null ? '—' : '$pct%';
   }
 
-  static _DeviceLine of(DeviceController device, {bool listening = false}) {
+  static _DeviceLine of(
+    AppLocalizations l,
+    DeviceController device, {
+    bool listening = false,
+  }) {
     if (!device.hasPairedDevice) {
-      return const _DeviceLine(name: 'NO JOTA', status: 'TAP TO CONNECT');
+      return _DeviceLine(name: l.stateNoJota, status: l.stateTapToConnect);
     }
     final String name = device.pairedName;
     final String charge = _charge(device);
@@ -294,7 +299,7 @@ class _DeviceLine {
       return _DeviceLine(
         name: name,
         figure: charge,
-        status: 'SAVING',
+        status: l.stateSaving,
         present: true,
         busy: true,
       );
@@ -303,11 +308,15 @@ class _DeviceLine {
       return _DeviceLine(
         name: name,
         figure: charge,
-        status: 'NEEDS PERMISSION',
+        status: l.stateNeedsPermission,
       );
     }
     if (!device.bluetoothReady) {
-      return _DeviceLine(name: name, figure: charge, status: 'BLUETOOTH OFF');
+      return _DeviceLine(
+        name: name,
+        figure: charge,
+        status: l.stateBluetoothOff,
+      );
     }
 
     final int? pending = device.pendingOnDevice;
@@ -320,21 +329,21 @@ class _DeviceLine {
         return _DeviceLine(
           name: name,
           figure: charge,
-          status: 'LISTENING',
+          status: l.stateListening,
           busy: true,
         );
       }
       return _DeviceLine(
         name: name,
         figure: charge,
-        status: 'ASLEEP',
+        status: l.stateAsleep,
       );
     }
     if (pending == 0) {
       return _DeviceLine(
         name: name,
         figure: charge,
-        status: 'SYNCED',
+        status: l.stateSynced,
         present: true,
       );
     }
@@ -343,7 +352,7 @@ class _DeviceLine {
     return _DeviceLine(
       name: name,
       figure: '$pending',
-      status: 'WAITING · $charge',
+      status: '${l.stateWaiting} · $charge',
       present: true,
     );
   }

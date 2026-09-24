@@ -81,13 +81,21 @@ String fmtDate(DateTime t) {
 
 /// Relative day heading — `TODAY`, `YESTERDAY`, or the ISO date. Uppercase
 /// because it goes in a `label` slot.
-String fmtDayHeading(DateTime t, {DateTime? now}) {
+String fmtDayHeading(
+  DateTime t, {
+  DateTime? now,
+  // Injectable so the archive can hand in the translated words; the dated
+  // form below stays in the stamp's own Latin voice in every locale, the
+  // same rule as every mono figure.
+  String today = 'TODAY',
+  String yesterday = 'YESTERDAY',
+}) {
   final DateTime n = now ?? DateTime.now();
   final DateTime a = DateTime(t.year, t.month, t.day);
   final DateTime b = DateTime(n.year, n.month, n.day);
   final int days = b.difference(a).inDays;
-  if (days == 0) return 'TODAY';
-  if (days == 1) return 'YESTERDAY';
+  if (days == 0) return today;
+  if (days == 1) return yesterday;
   // The stamp's own voice, minus the clock. It fell through to fmtDate here,
   // which put an ISO 2026-09-21 over a list whose every other word is spoken.
   final String d = _kDays[(t.weekday - 1) % 7];

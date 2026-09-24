@@ -10,16 +10,14 @@ import 'package:share_plus/share_plus.dart';
 import '../../data/note.dart';
 import '../../design/format.dart';
 import '../../design/theme.dart';
+import '../../design/widgets.dart';
+import '../../l10n/l10n.dart';
 
 /// Hand the transcript to the system share sheet as plain text. The words are
 /// the note; the audio stays where it is.
 Future<void> shareNote(BuildContext context, Note note) async {
   if (!note.hasTranscript) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('No words to share yet')),
-      );
+    jotaToast(context, context.l10n.noWordsToShareYet);
     return;
   }
   final String tag = note.tag == null ? '' : ' · ${note.tag}';
@@ -38,20 +36,20 @@ Future<bool> confirmDeleteNote(BuildContext context) async {
     context: context,
     builder: (BuildContext dialogContext) {
       return AlertDialog(
-        title: Text('Delete this note?', style: context.type.headline),
+        title: Text(context.l10n.deleteThisNote, style: context.type.headline),
         content: Text(
-          'Your Jota has already let go of its copy, so this can’t be undone.',
+          context.l10n.deleteNoteBody,
           style: context.type.prose,
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text('Cancel', style: context.type.label),
+            child: Text(context.l10n.cancel, style: context.type.label),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: Text(
-              'Delete',
+              context.l10n.delete,
               style: context.type.label.copyWith(color: context.ink.signal),
             ),
           ),

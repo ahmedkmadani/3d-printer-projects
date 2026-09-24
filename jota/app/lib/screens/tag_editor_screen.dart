@@ -23,6 +23,7 @@ import 'package:provider/provider.dart';
 import '../ble/jota_protocol.dart';
 import '../data/note.dart';
 import '../design/theme.dart';
+import '../l10n/l10n.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
 import '../state/notes_controller.dart';
@@ -85,7 +86,7 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
     // Renaming a tag onto one that already exists would leave two identical
     // rows. Say why nothing happened rather than silently discarding the edit.
     if (value.isNotEmpty && value != _tags[index] && _tags.contains(value)) {
-      _say(context, '$value is already a tag');
+      _say(context, context.l10n.alreadyATag(value));
       return;
     }
     setState(() {
@@ -102,7 +103,7 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
     // The ceiling is the device's, so it is explained rather than enforced by a
     // button that has quietly gone grey.
     if (_tags.length >= kMaxTags) {
-      _say(context, '$kMaxTags tags is the limit');
+      _say(context, context.l10n.maxTags(kMaxTags));
       return;
     }
     final String? value = await promptForTag(context);
@@ -110,7 +111,7 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
     // The edit path has always refused duplicates; this one never did, so the
     // same tag could be added twice and the list would show it twice.
     if (_tags.contains(value)) {
-      _say(context, '$value is already a tag');
+      _say(context, context.l10n.alreadyATag(value));
       return;
     }
     setState(() => _tags.add(value));
@@ -138,7 +139,7 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
     final List<String> sorted = List<String>.of(_tags)
       ..sort((String a, String b) => (counts[b] ?? 0) - (counts[a] ?? 0));
     if (_listEquals(sorted, _tags)) {
-      _say(context, 'Already sorted');
+      _say(context, context.l10n.alreadySorted);
       return;
     }
     setState(() => _tags = sorted);
@@ -158,10 +159,10 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text('$tag removed'),
+          content: Text(context.l10n.tagRemoved(tag)),
           duration: const Duration(seconds: 5),
           action: SnackBarAction(
-            label: 'UNDO',
+            label: context.l10n.undo,
             onPressed: () {
               if (!mounted || _tags.contains(tag)) return;
               setState(
@@ -225,7 +226,8 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
                       _BackChevron(onTap: () => Navigator.of(context).pop()),
                     const Spacer(),
                     Text(
-                      'SETTINGS · TAGS',
+                      '${context.l10n.settingsTitle} · ${context.l10n.tagsTitle}'
+                          .toUpperCase(),
                       style: t.cardLabel.copyWith(color: c.inkMuted),
                     ),
                   ],
@@ -234,10 +236,12 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
             ),
             Expanded(
               child: _tags.isEmpty && _readingDevice
-                  ? Center(child: Text('Reading Jota…', style: t.label))
+                  ? Center(
+                      child: Text(context.l10n.readingJota, style: t.label),
+                    )
                   : _tags.isEmpty
-                      ? const JotaEmpty(
-                          message: 'No tags yet',
+                      ? JotaEmpty(
+                          message: context.l10n.noTagsYet,
                         )
                       : TagList(
                           tags: _tags,
@@ -258,7 +262,7 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
                 JotaGrid.gapM,
               ),
               child: JotaButton(
-                label: 'Add tag',
+                label: context.l10n.addTag,
                 upcase: false,
                 onTap: _add,
               ),
@@ -287,11 +291,11 @@ class _TagsHeader extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: <Widget>[
-            Expanded(child: Text('Tags', style: t.headline)),
+            Expanded(child: Text(context.l10n.tagsTitle, style: t.headline)),
             if (onSortByUse != null)
               // The same quiet text link as "Edit tags" on the note's tag
               // sheet: an action, not a mode, so it is not a stadium.
-              JotaTextLink(label: 'Sort by use', onTap: onSortByUse!),
+              JotaTextLink(label: context.l10n.sortByUse, onTap: onSortByUse!),
           ],
         ),
         // No sentence: the grip says drag, the cut line says which tags
@@ -314,7 +318,7 @@ class _BackChevron extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Back',
+      label: context.l10n.back,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
@@ -329,11 +333,7 @@ class _BackChevron extends StatelessWidget {
 
 /// One-line feedback. The tag screens have no room for an error region and no
 /// need for one — nothing here fails in a way you must act on.
-void _say(BuildContext context, String message) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message)));
-}
+void _say(BuildContext context, String message) => jotaToast(context, message);
 
 /// Persist the tag list app-side, and — best effort, silent — push it to the
 /// device when one is connected. It also gets pushed on the next sync. Shared by
@@ -342,6 +342,8 @@ Future<void> saveTags(BuildContext context, List<String> tags) async {
   final Services s = context.read<Services>();
   final DeviceController device = context.read<DeviceController>();
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  // Captured before the awaits: the callback below outlives this context.
+  final String savedMsg = context.l10n.savedTagsSync;
 
   await s.settings.setTags(tags);
   if (!device.hasPairedDevice) return;
@@ -354,8 +356,8 @@ Future<void> saveTags(BuildContext context, List<String> tags) async {
     device.writeDeviceTags(tags).then((bool ok) {
       if (ok || !messenger.mounted) return;
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Saved. Jota gets them at sync'),
+        SnackBar(
+          content: Text(savedMsg, textAlign: TextAlign.center),
         ),
       );
     }),
@@ -413,7 +415,7 @@ class _TagSheetState extends State<_TagSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Text('Tag', style: context.type.label),
+          Text(context.l10n.tagSheetTitle, style: context.type.label),
           const SizedBox(height: JotaGrid.gapM),
           TextField(
             controller: controller,
@@ -429,7 +431,7 @@ class _TagSheetState extends State<_TagSheet> {
                     next.copyWith(text: next.text.toUpperCase()),
               ),
             ],
-            decoration: const InputDecoration(hintText: 'WORK'),
+            decoration: InputDecoration(hintText: context.l10n.tagHint),
             onSubmitted: (String v) => Navigator.of(sheetContext).pop(v.trim()),
           ),
           const SizedBox(height: JotaGrid.gapM),
@@ -438,7 +440,7 @@ class _TagSheetState extends State<_TagSheet> {
               if (initial.isNotEmpty) ...<Widget>[
                 Expanded(
                   child: JotaButton(
-                    label: 'Remove',
+                    label: context.l10n.remove,
                     danger: true,
                     upcase: false,
                     height: JotaRows.heightCompact,
@@ -449,7 +451,7 @@ class _TagSheetState extends State<_TagSheet> {
               ],
               Expanded(
                 child: JotaButton(
-                  label: 'Done',
+                  label: context.l10n.done,
                   primary: true,
                   upcase: false,
                   height: JotaRows.heightCompact,
@@ -603,7 +605,7 @@ class _RemoveHint extends StatelessWidget {
       alignment: Alignment.centerRight,
       padding: const EdgeInsets.symmetric(horizontal: JotaGrid.gapM),
       child: Text(
-        'REMOVE',
+        context.l10n.swipeDelete,
         style: context.type.label.copyWith(
           color: c.signal,
           letterSpacing: 1.2,
@@ -718,7 +720,7 @@ class _DeviceCutLine extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: JotaGrid.gapM),
             child: Text(
-              'ON JOTA',
+              context.l10n.onJota,
               // Mono: it is a label on a rule, the same voice as every other
               // piece of chrome on this screen.
               style: t.cardLabel.copyWith(color: c.inkMuted),

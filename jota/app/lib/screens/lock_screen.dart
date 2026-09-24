@@ -15,6 +15,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../design/theme.dart';
+import '../l10n/l10n.dart';
 import '../design/widgets.dart';
 import '../state/lock_controller.dart';
 
@@ -54,13 +55,13 @@ class LockScreen extends StatelessWidget {
                 // Not "Use Face ID": the app does not know which of the two the
                 // phone will offer, and naming the wrong one reads as a lie the
                 // first time the other sheet comes up.
-                'Use your face or fingerprint',
+                context.l10n.useFaceOrFingerprint,
                 textAlign: TextAlign.center,
                 style: t.prose.copyWith(color: c.inkMuted),
               ),
               const SizedBox(height: JotaGrid.gapL),
               JotaButton(
-                label: 'Unlock',
+                label: context.l10n.unlock,
                 // Outlined, not filled. The prompt comes up by itself on open
                 // and on every resume — this button is the second chance after
                 // a cancelled sheet, so it should not shout over the mark.

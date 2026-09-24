@@ -26,6 +26,7 @@ import '../data/note.dart';
 import '../design/format.dart';
 import '../design/script.dart';
 import '../design/theme.dart';
+import '../l10n/l10n.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
 import '../state/notes_controller.dart';
@@ -155,7 +156,7 @@ class _NoteListScreenState extends State<NoteListScreen>
               children: <Widget>[
                 // No "pull down to sync" line: everyone pulls a list to
                 // refresh, and the pull still works.
-                Text('Notes', style: t.headline),
+                Text(context.l10n.tabNotes, style: t.headline),
                 if (notes.count > 0) ...<Widget>[
                   const SizedBox(height: JotaGrid.gapL),
                   // Search, and beside it the one button that opens the
@@ -167,7 +168,7 @@ class _NoteListScreenState extends State<NoteListScreen>
                       Expanded(
                         child: JotaSearchField(
                           controller: _search,
-                          hint: 'Search notes',
+                          hint: context.l10n.searchNotes,
                           onChanged: notes.setQuery,
                         ),
                       ),
@@ -243,12 +244,12 @@ class _NoteListScreenState extends State<NoteListScreen>
                                 DismissDirection.startToEnd: 0.35,
                                 DismissDirection.endToStart: 0.35,
                               },
-                              background: const _SwipeHint(
-                                label: 'SHARE',
+                              background: _SwipeHint(
+                                label: context.l10n.swipeShare,
                                 alignment: Alignment.centerLeft,
                               ),
-                              secondaryBackground: const _SwipeHint(
-                                label: 'DELETE',
+                              secondaryBackground: _SwipeHint(
+                                label: context.l10n.swipeDelete,
                                 alignment: Alignment.centerRight,
                                 danger: true,
                               ),
@@ -266,10 +267,10 @@ class _NoteListScreenState extends State<NoteListScreen>
                                   ..hideCurrentSnackBar()
                                   ..showSnackBar(
                                     SnackBar(
-                                      content: const Text('Note deleted'),
+                                      content: Text(context.l10n.noteDeleted),
                                       duration: const Duration(seconds: 5),
                                       action: SnackBarAction(
-                                        label: 'UNDO',
+                                        label: context.l10n.undo,
                                         onPressed: () {
                                           if (!notes.undoDelete(note)) return;
                                           if (mounted) {
@@ -422,7 +423,11 @@ class _DayHeader extends StatelessWidget {
         JotaGrid.unit,
       ),
       child: Text(
-        fmtDayHeading(day),
+        fmtDayHeading(
+          day,
+          today: context.l10n.today,
+          yesterday: context.l10n.yesterday,
+        ),
         style: context.type.cardLabel.copyWith(color: context.ink.inkMuted),
       ),
     );
@@ -439,14 +444,14 @@ class _EmptyArchive extends StatelessWidget {
     if (hasDevice) {
       // A paired device and no notes yet: say the one thing that starts
       // everything, in the product's own voice, and stop.
-      return const JotaEmpty(message: 'Press the button on your Jota');
+      return JotaEmpty(message: context.l10n.pressJotaButton);
     }
     return JotaEmpty(
-      message: 'No device paired',
+      message: context.l10n.noDevicePaired,
       action: SizedBox(
         width: 200,
         child: JotaButton(
-          label: 'Pair a device',
+          label: context.l10n.pairADevice,
           primary: true,
           upcase: false,
           height: JotaRows.heightTall,
@@ -471,7 +476,7 @@ class _FilterButton extends StatelessWidget {
     final JotaColors c = context.ink;
     return Semantics(
       button: true,
-      label: 'Filter',
+      label: context.l10n.filter,
       selected: active,
       child: GestureDetector(
         onTap: onTap,
@@ -533,11 +538,11 @@ class _FilterSheet extends StatelessWidget {
             Row(
               children: <Widget>[
                 Expanded(
-                  child: Text('Filter', style: t.sheetTitle),
+                  child: Text(context.l10n.filter, style: t.sheetTitle),
                 ),
                 if (anything)
                   JotaTextLink(
-                    label: 'Clear',
+                    label: context.l10n.clear,
                     onTap: () {
                       notes.setNewestFirst(true);
                       onClear();
@@ -546,13 +551,13 @@ class _FilterSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: JotaGrid.gapL),
-            const _SheetLabel('ORDER'),
+            _SheetLabel(context.l10n.orderCaption),
             const SizedBox(height: JotaGrid.gapM),
             Row(
               children: <Widget>[
                 Expanded(
                   child: JotaRow(
-                    label: 'Newest first',
+                    label: context.l10n.newestFirst,
                     selected: notes.newestFirst,
                     height: JotaRows.heightCompact,
                     onTap: () => notes.setNewestFirst(true),
@@ -561,7 +566,7 @@ class _FilterSheet extends StatelessWidget {
                 const SizedBox(width: JotaRows.gap),
                 Expanded(
                   child: JotaRow(
-                    label: 'Oldest first',
+                    label: context.l10n.oldestFirst,
                     selected: !notes.newestFirst,
                     height: JotaRows.heightCompact,
                     onTap: () => notes.setNewestFirst(false),
@@ -571,14 +576,14 @@ class _FilterSheet extends StatelessWidget {
             ),
             if (notes.tagsInUse.isNotEmpty) ...<Widget>[
               const SizedBox(height: JotaGrid.gapL),
-              const _SheetLabel('TAG'),
+              _SheetLabel(context.l10n.tagCaption),
               const SizedBox(height: JotaGrid.gapM),
               Wrap(
                 spacing: JotaRows.gap,
                 runSpacing: JotaRows.gap,
                 children: <Widget>[
                   JotaTagChoice(
-                    label: 'All',
+                    label: context.l10n.all,
                     selected: notes.tagFilter == null,
                     onTap: () => notes.setTagFilter(null),
                   ),
@@ -670,11 +675,11 @@ class _NoMatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return JotaEmpty(
-      message: 'No notes match',
+      message: context.l10n.noNotesMatch,
       action: SizedBox(
         width: 160,
         child: JotaButton(
-          label: 'Show all',
+          label: context.l10n.showAll,
           upcase: false,
           height: JotaRows.heightCompact,
           onTap: onClear,

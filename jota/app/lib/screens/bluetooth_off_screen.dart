@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../design/theme.dart';
+import '../l10n/l10n.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
 
@@ -59,7 +60,9 @@ class BluetoothOffScreen extends StatelessWidget {
               ),
               const SizedBox(height: JotaGrid.gapL),
               Text(
-                unauthorized ? 'Jota needs Bluetooth' : 'Bluetooth is off',
+                unauthorized
+                    ? context.l10n.jotaNeedsBluetooth
+                    : context.l10n.bluetoothOff,
                 // A shade under the full headline: it is a centred line on a
                 // near-empty screen, and the same size the onboarding pages use
                 // in the same position.
@@ -76,8 +79,8 @@ class BluetoothOffScreen extends StatelessWidget {
                   constraints: const BoxConstraints(maxWidth: 300),
                   child: Text(
                     unauthorized
-                        ? 'Allow Bluetooth in Settings'
-                        : 'Turn on Bluetooth',
+                        ? context.l10n.allowBluetooth
+                        : context.l10n.turnOnBluetooth,
                     style: t.prose.copyWith(color: c.inkMuted),
                     textAlign: TextAlign.center,
                   ),

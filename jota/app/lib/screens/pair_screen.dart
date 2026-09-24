@@ -19,6 +19,7 @@ import 'package:flutter/services.dart';
 
 import '../ble/jota_protocol.dart';
 import '../design/theme.dart';
+import '../l10n/l10n.dart';
 import '../design/widgets.dart';
 
 class PairScreen extends StatefulWidget {
@@ -69,7 +70,7 @@ class _PairScreenState extends State<PairScreen> {
     // The app's own chrome, not a bespoke chevron: this is a pushed screen like
     // any other, and popping it cancels the pairing the engine is waiting on.
     return JotaScreen(
-      label: 'Pair',
+      label: context.l10n.pair,
       upcase: false,
       onBack: () => Navigator.of(context).pop(),
       // One hairline, and it is the one under "Pair with Jota" in the body. The
@@ -105,7 +106,7 @@ class _PairScreenState extends State<PairScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
                       const SizedBox(height: JotaGrid.gapM),
-                      Text('Pair with Jota', style: t.headline),
+                      Text(context.l10n.pairWithJota, style: t.headline),
                       const SizedBox(height: JotaGrid.gapS),
                       Text(
                         // The device only accepts a code while its PAIR screen is up, and
@@ -113,7 +114,7 @@ class _PairScreenState extends State<PairScreen> {
                         // The device has no PAIR menu item any more — it shows its code
                         // by itself whenever no phone owns it. Telling someone to press a
                         // button that no longer exists is worse than saying nothing.
-                        'Switch on your Jota',
+                        context.l10n.switchOnYourJota,
                         style: t.prose.copyWith(color: c.inkMuted),
                       ),
                       const SizedBox(height: JotaGrid.gapL),
@@ -126,7 +127,7 @@ class _PairScreenState extends State<PairScreen> {
                       const SizedBox(height: JotaGrid.gapXL * 2),
 
                       Text(
-                        'Enter the code on the Jota',
+                        context.l10n.enterCodeOnJota,
                         style: t.prose.copyWith(color: c.inkMuted),
                         textAlign: TextAlign.center,
                       ),
@@ -166,7 +167,7 @@ class _PairScreenState extends State<PairScreen> {
                       ),
                       const SizedBox(height: JotaGrid.gapL),
                       JotaButton(
-                        label: 'Pair',
+                        label: context.l10n.pair,
                         primary: true,
                         upcase: false,
                         // Dimmed until six digits exist. A live button on an incomplete

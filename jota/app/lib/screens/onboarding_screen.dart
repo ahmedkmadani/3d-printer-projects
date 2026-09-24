@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../design/theme.dart';
+import '../l10n/l10n.dart';
 import '../design/widgets.dart';
 import '../state/services.dart';
 import 'onboarding_illustration.dart';
@@ -40,23 +41,11 @@ class _Page {
 // second clause explaining the first ("— the crowd in your head", "come back to
 // it whenever you're ready"), which is the app talking itself out of a sentence
 // that already landed. One line each, as specified.
-const List<_Page> _pages = <_Page>[
-  _Page(
-    stage: 0,
-    headline: 'When your head\nis full.',
-    body: 'Thoughts pile up and talk over each other. That is jota.',
-  ),
-  _Page(
-    stage: 1,
-    headline: 'Say it,\nlet it out.',
-    body: 'Press once and speak. Jota holds it for you.',
-  ),
-  _Page(
-    stage: 2,
-    headline: 'Feel\nlighter.',
-    body: 'It is out, it is saved, and it is yours.',
-  ),
-];
+List<_Page> _pagesOf(AppLocalizations l) => <_Page>[
+      _Page(stage: 0, headline: l.obHead1, body: l.obBody1),
+      _Page(stage: 1, headline: l.obHead2, body: l.obBody2),
+      _Page(stage: 2, headline: l.obHead3, body: l.obBody3),
+    ];
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -69,7 +58,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _controller = PageController();
   int _index = 0;
 
-  bool get _isLast => _index == _pages.length - 1;
+  bool get _isLast => _index == _pagesOf(context.l10n).length - 1;
 
   @override
   void dispose() {
@@ -123,12 +112,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         padding: const EdgeInsets.only(right: JotaGrid.margin),
                         child: Semantics(
                           button: true,
-                          label: 'Skip',
+                          label: context.l10n.skip,
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: _finish,
                             child: Text(
-                              'Skip',
+                              context.l10n.skip,
                               style: t.label.copyWith(color: c.inkMuted),
                             ),
                           ),
@@ -140,10 +129,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Expanded(
               child: PageView.builder(
                 controller: _controller,
-                itemCount: _pages.length,
+                itemCount: _pagesOf(context.l10n).length,
                 onPageChanged: (int i) => setState(() => _index = i),
-                itemBuilder: (BuildContext context, int i) =>
-                    _OnboardingPage(page: _pages[i], active: i == _index),
+                itemBuilder: (BuildContext context, int i) => _OnboardingPage(
+                  page: _pagesOf(context.l10n)[i],
+                  active: i == _index,
+                ),
               ),
             ),
 
@@ -158,10 +149,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  JotaDots(count: _pages.length, active: _index),
+                  JotaDots(
+                    count: _pagesOf(context.l10n).length,
+                    active: _index,
+                  ),
                   const SizedBox(height: JotaGrid.gapM),
                   JotaButton(
-                    label: _isLast ? 'Connect my Jota' : 'Next',
+                    label: _isLast
+                        ? context.l10n.connectMyJota
+                        : context.l10n.next,
                     primary: true,
                     upcase: false,
                     onTap: _next,

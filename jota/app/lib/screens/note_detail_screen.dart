@@ -21,6 +21,7 @@ import '../audio/note_player.dart';
 import '../data/note.dart';
 import '../design/format.dart';
 import '../design/theme.dart';
+import '../l10n/l10n.dart';
 import '../design/transcript.dart';
 import '../design/widgets.dart';
 import '../state/notes_controller.dart';
@@ -84,7 +85,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         children: <Widget>[
           Expanded(
             child: JotaButton(
-              label: 'Share',
+              label: context.l10n.share,
               upcase: false,
               onTap: () => shareNote(context, _note),
             ),
@@ -92,7 +93,9 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           const SizedBox(width: JotaRows.gap),
           Expanded(
             child: JotaButton(
-              label: _note.tag == null ? 'Add tag' : 'Tag: ${_note.tag}',
+              label: _note.tag == null
+                  ? context.l10n.addTag
+                  : context.l10n.tagValue(_note.tag!),
               upcase: false,
               onTap: () => _editTag(context, notes, services),
             ),
@@ -245,10 +248,13 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 Row(
                   children: <Widget>[
                     Expanded(
-                      child: Text('Tag', style: t.sheetTitle),
+                      child: Text(
+                        sheetContext.l10n.tagSheetTitle,
+                        style: t.sheetTitle,
+                      ),
                     ),
                     JotaTextLink(
-                      label: 'Edit tags',
+                      label: sheetContext.l10n.editTags,
                       onTap: () => Navigator.of(sheetContext).pop(true),
                     ),
                   ],
@@ -258,7 +264,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 if (tags.isEmpty) ...<Widget>[
                   const SizedBox(height: JotaGrid.gapS),
                   Text(
-                    'No tags yet',
+                    sheetContext.l10n.noTagsYet,
                     style: t.prose.copyWith(color: c.inkMuted),
                   ),
                 ],
@@ -284,7 +290,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                         ),
                       if (_note.tag != null)
                         JotaTagChoice(
-                          label: 'No tag',
+                          label: sheetContext.l10n.noTag,
                           selected: false,
                           onTap: () {
                             notes.setTag(_note, null);
@@ -332,7 +338,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Text('Transcript', style: context.type.label),
+              Text(context.l10n.transcriptTitle, style: context.type.label),
               const SizedBox(height: JotaGrid.gapM),
               TextField(
                 controller: controller,
@@ -340,14 +346,14 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 minLines: 4,
                 autofocus: true,
                 style: context.type.prose,
-                decoration: const InputDecoration(
-                  hintText: 'What was said',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  hintText: context.l10n.whatWasSaid,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: JotaGrid.gapM),
               JotaButton(
-                label: 'Save',
+                label: context.l10n.save,
                 primary: true,
                 upcase: false,
                 onTap: () =>
@@ -395,26 +401,33 @@ class _FactsBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Text('DETAILS', style: t.cardLabel.copyWith(color: c.inkMuted)),
+          Text(
+            context.l10n.detailsCaption,
+            style: t.cardLabel.copyWith(color: c.inkMuted),
+          ),
           const SizedBox(height: JotaGrid.gapS),
-          _Fact(name: 'Length', value: fmtDuration(note.secs)),
+          _Fact(name: context.l10n.factLength, value: fmtDuration(note.secs)),
           // A plain count, not zero-padded: padding is for figures that
           // line up in a column of their kind, and this one stands alone.
-          if (note.hasTranscript) _Fact(name: 'Words', value: '$words'),
+          if (note.hasTranscript)
+            _Fact(name: context.l10n.factWords, value: '$words'),
           if (model != null && model.isNotEmpty)
             _Fact(
               name: note.transcriptState == TranscriptState.manual
-                  ? 'Written by'
-                  : 'Read by',
+                  ? context.l10n.factWrittenBy
+                  : context.l10n.factReadBy,
               // "On this phone", not the model's name: which model is a
               // Settings fact, and the thing worth knowing here is that
               // the audio never left.
               value: note.transcriptState == TranscriptState.manual
-                  ? 'You'
-                  : 'On this phone',
+                  ? context.l10n.factYou
+                  : context.l10n.factOnThisPhone,
             ),
-          _Fact(name: 'Synced', value: fmtNoteStamp(note.syncedAt)),
-          _Fact(name: 'Note', value: note.displayId),
+          _Fact(
+            name: context.l10n.factSynced,
+            value: fmtNoteStamp(note.syncedAt),
+          ),
+          _Fact(name: context.l10n.factNote, value: note.displayId),
           const SizedBox(height: JotaGrid.gapS),
           // The destructive row closes the card the way Erase device closes
           // Settings: same shape as the facts above it, the label in the
@@ -430,7 +443,7 @@ class _FactsBlock extends StatelessWidget {
                   children: <Widget>[
                     Expanded(
                       child: Text(
-                        'Delete note',
+                        context.l10n.deleteNote,
                         style: context.type.prose
                             .copyWith(color: context.ink.signal),
                       ),
@@ -664,7 +677,7 @@ class _PlayerPillState extends State<_PlayerPill> {
         if (!ok) {
           setState(() {
             _loading = false;
-            _error = 'Audio file is missing';
+            _error = context.l10n.audioFileMissing;
           });
           return;
         }
@@ -673,7 +686,7 @@ class _PlayerPillState extends State<_PlayerPill> {
         if (!mounted) return;
         setState(() {
           _loading = false;
-          _error = 'Could not play this note ($e)';
+          _error = context.l10n.couldNotPlay('$e');
         });
         return;
       }
@@ -714,7 +727,9 @@ class _PlayerPillState extends State<_PlayerPill> {
             children: <Widget>[
               Semantics(
                 button: true,
-                label: _player.playing ? 'Pause' : 'Play',
+                label: _player.playing
+                    ? context.l10n.pauseSemantics
+                    : context.l10n.playSemantics,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: _toggle,
@@ -763,7 +778,7 @@ class _PlayerPillState extends State<_PlayerPill> {
               // of listening is to hear a phrase again.
               Semantics(
                 button: true,
-                label: 'Back fifteen seconds',
+                label: context.l10n.backFifteen,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () async {
@@ -807,6 +822,11 @@ class _PlayerPillState extends State<_PlayerPill> {
               Text(
                 '${fmtDuration(_position.inSeconds)} / '
                 '${fmtDuration(total.inSeconds)}',
+                // Pinned LTR: under an RTL app the weak digits let the bidi
+                // algorithm swap position and total around the slash, and
+                // 00:37 of a 00:00 note is nonsense. Figures are the brand's
+                // own script in every language — they never reshape.
+                textDirection: TextDirection.ltr,
                 style: t.meta.copyWith(color: c.inkMuted),
               ),
             ],
@@ -919,7 +939,7 @@ class _TranscriptBlock extends StatelessWidget {
 
     if (transcribing || note.transcriptState == TranscriptState.running) {
       return Text(
-        'Transcribing…',
+        context.l10n.transcribing,
         style: t.prose.copyWith(color: c.inkMuted),
       );
     }
@@ -947,7 +967,7 @@ class _TranscriptBlock extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: JotaButton(
-                    label: 'Edit',
+                    label: context.l10n.edit,
                     upcase: false,
                     height: JotaRows.heightCompact,
                     onTap: onEdit,
@@ -956,7 +976,7 @@ class _TranscriptBlock extends StatelessWidget {
                 const SizedBox(width: JotaRows.gap),
                 Expanded(
                   child: JotaButton(
-                    label: 'Transcribe again',
+                    label: context.l10n.transcribeAgain,
                     upcase: false,
                     height: JotaRows.heightCompact,
                     onTap: onTranscribe,
@@ -976,8 +996,8 @@ class _TranscriptBlock extends StatelessWidget {
       children: <Widget>[
         Text(
           note.transcriptState == TranscriptState.done
-              ? 'No speech detected'
-              : 'Not transcribed yet',
+              ? context.l10n.noSpeechDetected
+              : context.l10n.notTranscribedYet,
           style: t.prose.copyWith(color: c.inkMuted),
         ),
         const SizedBox(height: JotaGrid.gapM),
@@ -985,7 +1005,7 @@ class _TranscriptBlock extends StatelessWidget {
           children: <Widget>[
             Expanded(
               child: JotaButton(
-                label: 'Transcribe',
+                label: context.l10n.transcribe,
                 primary: true,
                 upcase: false,
                 height: JotaRows.heightCompact,
@@ -995,7 +1015,7 @@ class _TranscriptBlock extends StatelessWidget {
             const SizedBox(width: JotaRows.gap),
             Expanded(
               child: JotaButton(
-                label: 'Write it',
+                label: context.l10n.writeIt,
                 upcase: false,
                 height: JotaRows.heightCompact,
                 onTap: onEdit,

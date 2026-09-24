@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' show ThemeMode, ValueNotifier;
+import 'package:flutter/material.dart' show Locale, ThemeMode, ValueNotifier;
 // ============================================================================
 //  Jota — service container
 //
@@ -81,6 +81,12 @@ class Services {
   final ValueNotifier<ThemeMode> themeMode =
       ValueNotifier<ThemeMode>(ThemeMode.system);
 
+  /// The app's own locale, live: null follows the phone. Seeded from the
+  /// settings store at boot, changed from Settings without a restart.
+  final ValueNotifier<Locale?> appLocale = ValueNotifier<Locale?>(null);
+
+  static Locale? localeOf(String? code) => code == null ? null : Locale(code);
+
   static ThemeMode themeModeOf(String appearance) {
     switch (appearance) {
       case 'light':
@@ -111,6 +117,8 @@ class Services {
 
     final BackgroundSyncController background =
         ForegroundServiceBackgroundSync()..configure();
+
+    final LocalTranscriptionNotifier notifier = LocalTranscriptionNotifier();
 
     // The transcriber is rebuilt per use so a key or model changed in settings
     // takes effect on the very next note, with no restart and no stale client.
@@ -150,13 +158,15 @@ class Services {
         audio: audio,
         settings: settings,
         transcriber: buildTranscriber,
-        notifier: LocalTranscriptionNotifier(),
+        notifier: notifier,
         keepAlive: background,
       ),
       auth: LocalAuthenticator(),
       newPlayer: () => DecodedNotePlayer(audio),
     );
     built.themeMode.value = themeModeOf(settings.appearance);
+    built.appLocale.value = localeOf(settings.appLocale);
+    notifier.localeOf = () => built.appLocale.value;
     return built;
   }
 

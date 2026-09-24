@@ -26,6 +26,7 @@ import '../data/note.dart';
 import '../design/format.dart';
 import '../design/script.dart';
 import '../design/theme.dart';
+import '../l10n/l10n.dart';
 import '../design/widgets.dart';
 import '../insights/insights.dart';
 import '../state/device_controller.dart';
@@ -61,14 +62,14 @@ class HomeScreen extends StatelessWidget {
       }
     }
     final String title = pending > 0
-        ? '$pending note${pending == 1 ? '' : 's'} waiting'
+        ? context.l10n.notesWaiting(pending)
         : running != null
-            ? 'Transcribing'
-            : 'This week';
+            ? context.l10n.transcribingHeadline
+            : context.l10n.thisWeek;
     // No sentence under the headline: the headline is the whole news. The
     // figures get their THIS WEEK caption only when the headline is about
     // something else.
-    final bool captionFigures = title != 'This week';
+    final bool captionFigures = title != context.l10n.thisWeek;
 
     // DateTime.now() is read here rather than held in state: the summary is
     // cheap, and a cached "now" is how a screen ends up insisting it is still
@@ -106,7 +107,7 @@ class HomeScreen extends StatelessWidget {
           // The two figures sit under the device card now: what is waiting
           // outranks how much was said, and the card is the thing to tap.
           if (captionFigures) ...<Widget>[
-            Text('THIS WEEK', style: _cardLabel(t, c)),
+            Text(context.l10n.thisWeek.toUpperCase(), style: _cardLabel(t, c)),
             const SizedBox(height: JotaGrid.gapM),
           ],
           _Figures(week: week),
@@ -116,10 +117,10 @@ class HomeScreen extends StatelessWidget {
           // Nothing recorded yet: one sentence about what to do, in place
           // of two cards about nothing.
           if (notes.notes.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: JotaGrid.gapXL),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: JotaGrid.gapXL),
               child: JotaEmpty(
-                message: 'Nothing recorded yet',
+                message: context.l10n.nothingRecordedYet,
               ),
             )
           // Hidden until there are enough notes for a count to mean
@@ -215,9 +216,14 @@ class _Figures extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _Figure(value: '${week.noteCount}', unit: 'NOTES'),
+        _Figure(value: '${week.noteCount}', unit: context.l10n.unitNotes),
         const SizedBox(width: JotaGrid.gapXL),
-        _Figure(value: week.spokenValue, unit: week.spokenUnit),
+        _Figure(
+          value: week.spokenValue,
+          unit: week.spokenUnit == 'SECONDS'
+              ? context.l10n.unitSeconds
+              : context.l10n.unitMinutes,
+        ),
       ],
     );
   }
@@ -287,7 +293,7 @@ class _TopicsCard extends StatelessWidget {
     final JotaType t = context.type;
     final JotaColors c = context.ink;
     return _Card(
-      label: 'What keeps coming back',
+      label: context.l10n.whatKeepsComingBack,
       onTap: onSeeAll,
       children: <Widget>[
         for (final Topic topic in topics)
@@ -303,7 +309,7 @@ class _TopicsCard extends StatelessWidget {
           ),
         // Ink, not the accent: this is a link, and the accent means live
         // or dangerous. See docs/brand.md.
-        Text('SEE ALL PATTERNS →', style: t.navLabel),
+        Text(context.l10n.seeAllPatterns, style: t.navLabel),
       ],
     );
   }
@@ -327,7 +333,7 @@ class _LatestCard extends StatelessWidget {
     final JotaType t = context.type;
     final JotaColors c = context.ink;
     return _Card(
-      label: 'Latest',
+      label: context.l10n.latest,
       onTap: onTap,
       children: <Widget>[
         Row(

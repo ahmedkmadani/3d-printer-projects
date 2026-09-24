@@ -133,6 +133,14 @@ class PrefsSettingsStore implements SettingsStore {
   Future<void> setAppearance(String v) => _prefs.setString('appearance', v);
 
   @override
+  String? get appLocale => _prefs.getString('app_locale');
+
+  @override
+  Future<void> setAppLocale(String? v) => v == null
+      ? _prefs.remove('app_locale').then((_) {})
+      : _prefs.setString('app_locale', v);
+
+  @override
   Future<void> setNotesNewestFirst(bool v) => _prefs.setBool(_kNewestFirst, v);
 
   @override

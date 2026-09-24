@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'theme.dart';
+import '../l10n/l10n.dart';
 
 // ---- rule ------------------------------------------------------------------
 // widgets.h: rule(). One hairline. It is the only divider in the app and it is
@@ -131,7 +132,7 @@ class JotaStatusBar extends StatelessWidget {
                 _StatusIconButton(
                   icon: LucideIcons.arrowLeft,
                   onTap: onBack!,
-                  semanticLabel: 'Back',
+                  semanticLabel: context.l10n.back,
                 ),
               // Expanded, then aligned to its end: the group hugs the right
               // edge whatever it contains, and the label — the only part that
@@ -1096,7 +1097,7 @@ class _JotaSearchFieldState extends State<JotaSearchField> {
                 curve: JotaMotion.curve,
                 child: Semantics(
                   button: true,
-                  label: 'Clear search',
+                  label: context.l10n.clearSearch,
                   child: GestureDetector(
                     onTap: has ? _clear : null,
                     behavior: HitTestBehavior.opaque,
@@ -1177,6 +1178,19 @@ class JotaTextLink extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The one way to say something small: a floating stadium with the words
+/// CENTRED. Pure-text toasts read squeezed to the left of the pill; centred
+/// they read as the pill's own voice, and RTL Arabic centres identically.
+/// Snackbars WITH an action (UNDO) keep the stock left-text/right-action
+/// layout — do not route those through here.
+void jotaToast(BuildContext context, String message) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(content: Text(message, textAlign: TextAlign.center)),
+    );
 }
 
 /// Press feedback for every tappable shape: the shape sinks a hair under the

@@ -1,9 +1,12 @@
+import 'package:jota/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jota/design/theme.dart';
 import 'package:jota/design/transcript.dart';
 
 Widget _host(String text) => MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: JotaTheme.light(),
       home: Scaffold(
         body: SingleChildScrollView(

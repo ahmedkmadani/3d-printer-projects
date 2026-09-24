@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'paragraphs.dart';
 import 'script.dart';
 import 'theme.dart';
+import '../l10n/l10n.dart';
 import 'widgets.dart';
 
 /// Words past which a transcript folds. About a minute of speech.
@@ -106,7 +107,7 @@ class _JotaTranscriptState extends State<JotaTranscript> {
         Align(
           alignment: Alignment.centerLeft,
           child: JotaTextLink(
-            label: _expanded ? 'Show less' : 'Show more',
+            label: _expanded ? context.l10n.showLess : context.l10n.showMore,
             onTap: () => setState(() => _expanded = !_expanded),
           ),
         ),

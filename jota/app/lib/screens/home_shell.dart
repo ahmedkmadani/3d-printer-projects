@@ -27,6 +27,8 @@ import 'package:provider/provider.dart';
 
 import '../ble/device_scanner.dart';
 import '../design/theme.dart';
+import '../design/widgets.dart';
+import '../l10n/l10n.dart';
 import '../state/device_controller.dart';
 import 'bluetooth_off_screen.dart';
 import 'home_screen.dart';
@@ -66,11 +68,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     // fetched them: the answer to "did that just sync?".
     _syncedSub = context.read<DeviceController>().syncedNotes.listen((int n) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text('$n note${n == 1 ? '' : 's'} synced')),
-        );
+      jotaToast(context, context.l10n.notesSynced(n));
     });
   }
 
@@ -251,17 +249,17 @@ class HomeNavBar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: <Widget>[
                 _NavItem(
-                  label: 'Home',
+                  label: context.l10n.tabHome,
                   active: current == 0,
                   onTap: () => onSelect(0),
                 ),
                 _NavItem(
-                  label: 'Notes',
+                  label: context.l10n.tabNotes,
                   active: current == 1,
                   onTap: () => onSelect(1),
                 ),
                 _NavItem(
-                  label: 'Settings',
+                  label: context.l10n.tabSettings,
                   active: current == 2,
                   onTap: () => onSelect(2),
                 ),

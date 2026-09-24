@@ -427,6 +427,12 @@ class InMemorySettingsStore implements SettingsStore {
   @override
   Future<void> setAppearance(String v) async => _appearance = v;
 
+  String? _appLocale;
+  @override
+  String? get appLocale => _appLocale;
+  @override
+  Future<void> setAppLocale(String? v) async => _appLocale = v;
+
   @override
   Future<void> setNotesNewestFirst(bool v) async => _newestFirst = v;
 

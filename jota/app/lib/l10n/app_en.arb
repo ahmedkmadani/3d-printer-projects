@@ -1,0 +1,299 @@
+{
+  "@@locale": "en",
+  "tabHome": "Home",
+  "tabNotes": "Notes",
+  "tabSettings": "Settings",
+  "thisWeek": "This week",
+  "latest": "Latest",
+  "unitNotes": "NOTES",
+  "unitSeconds": "SECONDS",
+  "unitMinutes": "MINUTES",
+  "whatKeepsComingBack": "What keeps coming back",
+  "seeAllPatterns": "SEE ALL PATTERNS →",
+  "nothingRecordedYet": "Nothing recorded yet",
+  "noPatternsYet": "No patterns yet",
+  "notesWaiting": "{count, plural, =1{1 note waiting} other{{count} notes waiting}}",
+  "@notesWaiting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "transcribingHeadline": "Transcribing",
+  "stateAsleep": "ASLEEP",
+  "stateListening": "LISTENING",
+  "stateSaving": "SAVING",
+  "stateSynced": "SYNCED",
+  "stateWaiting": "WAITING",
+  "stateNotPaired": "NOT PAIRED",
+  "stateTapToConnect": "TAP TO CONNECT",
+  "stateNoJota": "NO JOTA",
+  "stateNearby": "NEARBY",
+  "stateConnecting": "CONNECTING",
+  "statePaired": "PAIRED",
+  "searchNotes": "Search notes",
+  "clearSearch": "Clear search",
+  "filter": "Filter",
+  "orderCaption": "ORDER",
+  "tagCaption": "TAG",
+  "newestFirst": "Newest first",
+  "oldestFirst": "Oldest first",
+  "all": "All",
+  "clear": "Clear",
+  "showAll": "Show all",
+  "noNotesMatch": "No notes match",
+  "noDevicePaired": "No device paired",
+  "pairADevice": "Pair a device",
+  "pressJotaButton": "Press the button on your Jota",
+  "today": "TODAY",
+  "yesterday": "YESTERDAY",
+  "swipeShare": "SHARE",
+  "swipeDelete": "DELETE",
+  "noteDeleted": "Note deleted",
+  "undo": "UNDO",
+  "nNew": "{count} NEW",
+  "@nNew": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notesSynced": "{count, plural, =1{1 note synced} other{{count} notes synced}}",
+  "@notesSynced": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "edit": "Edit",
+  "transcribe": "Transcribe",
+  "transcribeAgain": "Transcribe again",
+  "writeIt": "Write it",
+  "transcribing": "Transcribing…",
+  "notTranscribedYet": "Not transcribed yet",
+  "noSpeechDetected": "No speech detected",
+  "showMore": "Show more",
+  "showLess": "Show less",
+  "detailsCaption": "DETAILS",
+  "factLength": "Length",
+  "factWords": "Words",
+  "factReadBy": "Read by",
+  "factWrittenBy": "Written by",
+  "factYou": "You",
+  "factOnThisPhone": "On this phone",
+  "factSynced": "Synced",
+  "factNote": "Note",
+  "deleteNote": "Delete note",
+  "deleteThisNote": "Delete this note?",
+  "deleteNoteBody": "Your Jota has already let go of its copy, so this can’t be undone.",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "share": "Share",
+  "addTag": "Add tag",
+  "tagValue": "Tag: {tag}",
+  "@tagValue": {
+    "placeholders": {
+      "tag": {
+        "type": "String"
+      }
+    }
+  },
+  "transcriptTitle": "Transcript",
+  "whatWasSaid": "What was said",
+  "save": "Save",
+  "audioFileMissing": "Audio file is missing",
+  "couldNotPlay": "Could not play this note ({error})",
+  "@couldNotPlay": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "playSemantics": "Play",
+  "pauseSemantics": "Pause",
+  "backFifteen": "Back fifteen seconds",
+  "noWordsToShareYet": "No words to share yet",
+  "tagSheetTitle": "Tag",
+  "editTags": "Edit tags",
+  "noTag": "No tag",
+  "noTagsYet": "No tags yet",
+  "tagsTitle": "Tags",
+  "onJota": "ON JOTA",
+  "sortByUse": "Sort by use",
+  "alreadySorted": "Already sorted",
+  "readingJota": "Reading Jota…",
+  "tagRemoved": "{tag} removed",
+  "@tagRemoved": {
+    "placeholders": {
+      "tag": {
+        "type": "String"
+      }
+    }
+  },
+  "alreadyATag": "{value} is already a tag",
+  "@alreadyATag": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "maxTags": "{max} is the most your Jota holds",
+  "@maxTags": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "savedTagsSync": "Saved. Jota gets them at sync",
+  "settingsTitle": "Settings",
+  "captionTranscription": "TRANSCRIPTION",
+  "captionDevice": "DEVICE",
+  "captionYourData": "YOUR DATA",
+  "captionAbout": "ABOUT",
+  "rowTranscribe": "Transcribe",
+  "onDevice": "On device",
+  "spokenLanguage": "Spoken language",
+  "languageAuto": "Auto",
+  "languageArabic": "Arabic",
+  "languageEnglish": "English",
+  "languageSheetTitle": "Spoken language",
+  "transcribeAutomatically": "Transcribe automatically",
+  "valueOn": "On",
+  "valueOff": "Off",
+  "valueUnknown": "Unknown",
+  "rowDevice": "Device",
+  "rowBattery": "Battery",
+  "rowFirmware": "Firmware",
+  "firmwareTitle": "Firmware",
+  "fwVersion": "Version",
+  "fwBuilt": "Built",
+  "fwLastReset": "Last reset",
+  "fwBoots": "Boots",
+  "fwCrashes": "Crashes",
+  "fwNotesRecorded": "Notes recorded",
+  "fwSyncs": "Syncs",
+  "fwUptime": "Uptime",
+  "fwFreeMemory": "Free memory",
+  "rowTags": "Tags",
+  "rowSyncBackground": "Sync in the background",
+  "forgetThisJota": "Forget this Jota",
+  "jotaNotInRange": "Jota isn’t in range",
+  "forgetBody": "Bring your Jota close and try again, so it forgets this phone too.\n\nRemove it anyway and this Jota will still trust this phone until you erase it on the device — hold both buttons.",
+  "removeAnyway": "Remove anyway",
+  "jotaForgotten": "Jota forgotten",
+  "eraseDevice": "Erase device",
+  "eraseThisJota": "Erase this Jota?",
+  "eraseBody": "Every note on it is deleted. It forgets this phone.",
+  "erase": "Erase",
+  "waitingForJota": "Waiting for your Jota — press a button on it",
+  "noJotaNearby": "No Jota nearby",
+  "jotaErased": "Jota erased",
+  "couldNotErase": "Could not erase",
+  "holdBothButtons": "Not yet — hold both buttons on the Jota for five seconds",
+  "rowStorage": "Storage",
+  "shareAllNotes": "Share all notes",
+  "exportCorrections": "Export corrections",
+  "noCorrectionsYet": "No corrections yet",
+  "playbackCache": "Playback cache",
+  "unlockWithFingerprint": "Unlock with fingerprint",
+  "setPhoneLockFirst": "Set a phone lock first",
+  "appearance": "Appearance",
+  "appearanceSystem": "System",
+  "appearanceLight": "Light",
+  "appearanceDark": "Dark",
+  "appLanguage": "App language",
+  "appLanguageSystem": "System",
+  "appLanguageEnglish": "English",
+  "appLanguageArabic": "العربية",
+  "rowThisPhone": "This phone",
+  "rowVersion": "Version",
+  "replayOnboarding": "Replay onboarding",
+  "connectYourJota": "Connect your Jota",
+  "switchOnYourJota": "Switch on your Jota",
+  "connect": "Connect",
+  "enterCodeOnJota": "Enter the code on the Jota",
+  "pair": "Pair",
+  "pairWithJota": "Pair with Jota",
+  "setUpLater": "Set up later",
+  "notNow": "Not now",
+  "connectMyJota": "Connect my Jota",
+  "next": "Next",
+  "skip": "Skip",
+  "obHead1": "When your head\nis full.",
+  "obBody1": "Thoughts pile up and talk over each other. That is jota.",
+  "obHead2": "Say it,\nlet it out.",
+  "obBody2": "Press once and speak. Jota holds it for you.",
+  "obHead3": "Feel\nlighter.",
+  "obBody3": "It is out, it is saved, and it is yours.",
+  "bluetoothOff": "Bluetooth is off",
+  "jotaNeedsBluetooth": "Jota needs Bluetooth",
+  "turnOnBluetooth": "Turn on Bluetooth",
+  "allowBluetooth": "Allow Bluetooth in Settings",
+  "unlockJota": "Unlock Jota",
+  "useFaceOrFingerprint": "Use your face or fingerprint",
+  "unlock": "Unlock",
+  "patternsAcrossWeeks": "Across your last {weeks} weeks",
+  "@patternsAcrossWeeks": {
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "topicNotes": "{count} NOTES",
+  "@topicNotes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "topicNotesThisWeek": "{count} NOTES · {week} THIS WEEK",
+  "@topicNotesThisWeek": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "week": {
+        "type": "int"
+      }
+    }
+  },
+  "weeksFigure": "{weeks} WEEKS",
+  "@weeksFigure": {
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "stateNeedsPermission": "NEEDS PERMISSION",
+  "stateBluetoothOff": "BLUETOOTH OFF",
+  "nothingToSync": "Nothing to sync",
+  "syncFailed": "Sync failed",
+  "alreadyUpToDate": "Already up to date",
+  "tagHint": "WORK",
+  "done": "Done",
+  "remove": "Remove",
+  "back": "Back",
+  "wakeYourJota": "Wake your Jota",
+  "pressButtonOnIt": "Press a button on it",
+  "sync": "Sync",
+  "connectingLabel": "Connecting",
+  "noteReady": "{id} is ready",
+  "@noteReady": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "channelTranscripts": "Transcripts",
+  "channelTranscriptsBody": "A note has been transcribed."
+}

@@ -68,6 +68,12 @@ abstract class SettingsStore {
   String get appearance;
   Future<void> setAppearance(String v);
 
+  /// The app's own language: null follows the phone, 'en' or 'ar' pins it.
+  /// Separate from the SPOKEN language above, which is what Whisper listens
+  /// for — a person can read the app in Arabic and record English notes.
+  String? get appLocale;
+  Future<void> setAppLocale(String? v);
+
   Future<void> setNotesNewestFirst(bool v);
 
   /// Whether the first-run splash → onboarding flow has been completed. False on

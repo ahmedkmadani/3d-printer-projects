@@ -34,6 +34,7 @@ import '../data/settings_store.dart';
 import '../export/backup.dart';
 import '../export/corrections.dart';
 import '../design/format.dart';
+import '../l10n/l10n.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
@@ -93,7 +94,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {});
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Jota forgotten')));
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              context.l10n.jotaForgotten,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
       return;
     } on Exception {
       // Out of range, or off. Fall through to the choice below.
@@ -104,22 +112,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: Text('Jota isn’t in range', style: context.type.headline),
+          title:
+              Text(context.l10n.jotaNotInRange, style: context.type.headline),
           content: Text(
-            'Bring your Jota close and try again, so it forgets this phone '
-            'too.\n\nRemove it anyway and this Jota will still trust this '
-            'phone until you erase it on the device — hold both buttons.',
+            context.l10n.forgetBody,
             style: context.type.prose,
           ),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text('Cancel', style: context.type.label),
+              child: Text(context.l10n.cancel, style: context.type.label),
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: Text(
-                'Remove anyway',
+                context.l10n.removeAnyway,
                 style: context.type.label.copyWith(color: context.ink.signal),
               ),
             ),
@@ -135,8 +142,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        const SnackBar(
-          content: Text('Jota forgotten'),
+        SnackBar(
+          content: Text(
+            context.l10n.jotaForgotten,
+            textAlign: TextAlign.center,
+          ),
         ),
       );
   }
@@ -163,7 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Appearance', style: t.sheetTitle),
+                Text(sheetContext.l10n.appearance, style: t.sheetTitle),
                 const SizedBox(height: JotaGrid.gapL),
                 // Full rows, not pills: three tiny stadiums under a serif
                 // title made the sheet read as an afterthought, and the
@@ -175,7 +185,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'dark',
                 ]) ...<Widget>[
                   JotaRow(
-                    label: _appearanceLabel(v),
+                    label: _appearanceLabel(sheetContext.l10n, v),
                     selected: s.settings.appearance == v,
                     onTap: () => Navigator.of(sheetContext).pop(v),
                   ),
@@ -211,11 +221,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Language', style: t.sheetTitle),
+                Text(sheetContext.l10n.languageSheetTitle, style: t.sheetTitle),
                 const SizedBox(height: JotaGrid.gapL),
                 for (final String? code in _languages) ...<Widget>[
                   JotaRow(
-                    label: _languageLabel(code),
+                    label: _languageLabel(sheetContext.l10n, code),
                     selected: s.settings.language == code,
                     // The sheet returns the code; null is a real choice
                     // (auto), so "dismissed" is told apart by a sentinel
@@ -237,6 +247,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   static const String _auto = 'auto';
 
+  /// The app's own language: system, English or Arabic. Same sheet shape as
+  /// Appearance. Takes effect as it is tapped — MaterialApp listens to
+  /// Services.appLocale — so the sheet you picked from re-renders in the
+  /// language you picked.
+  Future<void> _pickAppLanguage(Services s) async {
+    final String? picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: context.ink.bg,
+      builder: (BuildContext sheetContext) {
+        final JotaType t = sheetContext.type;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              JotaGrid.margin,
+              JotaGrid.gapL,
+              JotaGrid.margin,
+              JotaGrid.gapL,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(sheetContext.l10n.appLanguage, style: t.sheetTitle),
+                const SizedBox(height: JotaGrid.gapL),
+                for (final String? code in const <String?>[null, 'en', 'ar'])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: JotaRows.gap),
+                    child: JotaRow(
+                      label: _appLanguageLabel(sheetContext.l10n, code),
+                      selected: s.settings.appLocale == code,
+                      onTap: () =>
+                          Navigator.of(sheetContext).pop(code ?? _system),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    final String? code = picked == _system ? null : picked;
+    await s.settings.setAppLocale(code);
+    s.appLocale.value = Services.localeOf(code);
+    if (mounted) setState(() {});
+  }
+
+  static const String _system = 'system';
+
   /// The device's own account of itself, in the same key/value voice as the
   /// note's DETAILS card.
   Future<void> _showFirmware(DeviceDiag d) async {
@@ -257,18 +316,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                Text('Firmware', style: t.sheetTitle),
+                Text(sheetContext.l10n.firmwareTitle, style: t.sheetTitle),
                 const SizedBox(height: JotaGrid.gapL),
-                _DiagRow('Version', d.fw.toUpperCase()),
-                if (d.built.isNotEmpty) _DiagRow('Built', d.built),
+                _DiagRow(sheetContext.l10n.fwVersion, d.fw.toUpperCase()),
+                if (d.built.isNotEmpty)
+                  _DiagRow(sheetContext.l10n.fwBuilt, d.built),
                 if (d.reset.isNotEmpty)
-                  _DiagRow('Last reset', _resetWord(d.reset)),
-                _DiagRow('Boots', '${d.boots}'),
-                _DiagRow('Crashes', '${d.crashes}'),
-                _DiagRow('Notes recorded', '${d.notes}'),
-                _DiagRow('Syncs', '${d.syncs}'),
-                _DiagRow('Uptime', _fmtUptime(d.upSeconds)),
-                _DiagRow('Free memory', fmtBytes(d.freeHeap)),
+                  _DiagRow(sheetContext.l10n.fwLastReset, _resetWord(d.reset)),
+                _DiagRow(sheetContext.l10n.fwBoots, '${d.boots}'),
+                _DiagRow(sheetContext.l10n.fwCrashes, '${d.crashes}'),
+                _DiagRow(sheetContext.l10n.fwNotesRecorded, '${d.notes}'),
+                _DiagRow(sheetContext.l10n.fwSyncs, '${d.syncs}'),
+                _DiagRow(sheetContext.l10n.fwUptime, _fmtUptime(d.upSeconds)),
+                _DiagRow(sheetContext.l10n.fwFreeMemory, fmtBytes(d.freeHeap)),
               ],
             ),
           ),
@@ -283,20 +343,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: Text('Erase this Jota?', style: context.type.headline),
+          title: Text(context.l10n.eraseThisJota, style: context.type.headline),
           content: Text(
-            'Every note on it is deleted. It forgets this phone.',
+            context.l10n.eraseBody,
             style: context.type.prose,
           ),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text('Cancel', style: context.type.label),
+              child: Text(context.l10n.cancel, style: context.type.label),
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: Text(
-                'Erase',
+                context.l10n.erase,
                 style: context.type.label.copyWith(color: context.ink.signal),
               ),
             ),
@@ -310,25 +370,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // wake, so demanding it be awake BEFORE the dialog made erasing a
     // race the person always lost. Now the app waits and the one
     // instruction is on screen while it does.
-    _say(context, 'Waiting for your Jota — press a button on it');
+    _say(context, context.l10n.waitingForJota);
     try {
       final bool seen = await device.eraseWhenSeen();
       if (!mounted) return;
       if (!seen) {
-        _say(context, 'No Jota nearby');
+        _say(context, context.l10n.noJotaNearby);
         return;
       }
       setState(() {});
-      _say(context, 'Jota erased');
+      _say(context, context.l10n.jotaErased);
     } on EraseUnsupported {
       if (!mounted) return;
       _say(
         context,
-        'Not yet — hold both buttons on the Jota for five seconds',
+        context.l10n.holdBothButtons,
       );
     } on Exception catch (e) {
       if (!mounted) return;
-      _say(context, e is SyncException ? e.message : 'Could not erase');
+      _say(
+        context,
+        e is SyncException ? e.message : context.l10n.couldNotErase,
+      );
     }
   }
 
@@ -353,11 +416,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final LockSetupResult result = await lock.setEnabled(value);
     if (!mounted) return;
     if (result == LockSetupResult.unavailable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Set a phone lock first'),
-        ),
-      );
+      jotaToast(context, context.l10n.setPhoneLockFirst);
     }
     setState(() {});
   }
@@ -512,21 +571,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // Title, then the first caption at gapL: no rule
                         // under the title (Notes has none) and no second
                         // gap. The first row draws the only hairline.
-                        Text('Settings', style: t.headline),
+                        Text(context.l10n.settingsTitle, style: t.headline),
 
                         // Four groups, each under a card caption, so the
                         // seventeen rows read as four questions instead of
                         // one long wall.
-                        const _Caption('Transcription', first: true),
+                        _Caption(
+                          context.l10n.captionTranscription,
+                          first: true,
+                        ),
                         // Where transcription happens. On device keeps the
                         // audio on the phone, which problem.md treats as a
                         // functional requirement rather than a feature. The
                         // multilingual `small` model reads Arabic and English;
                         // the cloud path stays hidden unless it is needed.
                         _SettingRow(
-                          label: 'Transcribe',
+                          label: context.l10n.rowTranscribe,
                           value: !kShowCloudTranscription
-                              ? 'On device'
+                              ? context.l10n.onDevice
                               : s.settings.backend == 'device'
                                   ? 'On device →'
                                   : 'Google Cloud →',
@@ -548,6 +610,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     ..showSnackBar(
                                       SnackBar(
                                         content: Text(
+                                          textAlign: TextAlign.center,
                                           onDevice
                                               ? 'Using Google Cloud'
                                               : 'On device — the first note '
@@ -563,13 +626,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // settles it. A sheet, not a tap that cycles: three
                         // states behind one tap is a thing nobody discovers.
                         _SettingRow(
-                          label: 'Language',
-                          value: _languageLabel(s.settings.language),
+                          label: context.l10n.spokenLanguage,
+                          value: _languageLabel(
+                            context.l10n,
+                            s.settings.language,
+                          ),
                           onTap: () => _pickLanguage(s),
                         ),
                         _SettingRow(
-                          label: 'Transcribe automatically',
-                          value: s.settings.autoTranscribe ? 'On' : 'Off',
+                          label: context.l10n.transcribeAutomatically,
+                          value: s.settings.autoTranscribe
+                              ? context.l10n.valueOn
+                              : context.l10n.valueOff,
                           onTap: () async {
                             await s.settings.setAutoTranscribe(
                               !s.settings.autoTranscribe,
@@ -591,29 +659,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 : 'Not set →',
                             onTap: () => _editKey(s, hasKey: hasKey),
                           ),
-                        const _Caption('Device'),
+                        _Caption(context.l10n.captionDevice),
                         _SettingRow(
-                          label: 'Device',
+                          label: context.l10n.rowDevice,
                           value: device.hasPairedDevice
                               ? device.pairedName
                               : 'Not set up',
                         ),
                         _SettingRow(
-                          label: 'Battery',
+                          label: context.l10n.rowBattery,
                           // "Unknown" rather than a dash or a zero: this board
                           // may simply have no way to measure it, which is a
                           // different thing from a flat pack.
                           value: device.batteryOnDevice == null
-                              ? 'Unknown'
+                              ? context.l10n.valueUnknown
                               : '${device.batteryOnDevice}%',
                         ),
                         // What the device reported about itself on the last
                         // connection. Unknown until it has connected once on
                         // firmware that can say (the `diag` characteristic).
                         _SettingRow(
-                          label: 'Firmware',
+                          label: context.l10n.rowFirmware,
                           value: device.deviceDiag == null
-                              ? 'Unknown'
+                              ? context.l10n.valueUnknown
                               : device.deviceDiag!.fw.toUpperCase(),
                           onTap: device.deviceDiag == null
                               ? null
@@ -621,7 +689,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         // The four the design names, in its order.
                         _SettingRow(
-                          label: 'Tags',
+                          label: context.l10n.rowTags,
                           value: '${s.settings.tags.length} →',
                           onTap: () async {
                             await Navigator.of(context).push(
@@ -633,8 +701,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           },
                         ),
                         _SettingRow(
-                          label: 'Sync in the background',
-                          value: s.settings.backgroundSync ? 'On' : 'Off',
+                          label: context.l10n.rowSyncBackground,
+                          value: s.settings.backgroundSync
+                              ? context.l10n.valueOn
+                              : context.l10n.valueOff,
                           onTap: () async {
                             await device.setBackgroundSync(
                               !s.settings.backgroundSync,
@@ -644,7 +714,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         if (device.hasPairedDevice)
                           _SettingRow(
-                            label: 'Forget this Jota',
+                            label: context.l10n.forgetThisJota,
                             value: '→',
                             onTap: () => _forget(device),
                           ),
@@ -655,21 +725,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // shows its PAIR screen for the next owner.
                         if (device.hasPairedDevice)
                           _SettingRow(
-                            label: 'Erase device',
+                            label: context.l10n.eraseDevice,
                             value: '→',
                             danger: true,
                             onTap: () => _eraseDevice(device),
                           ),
-                        const _Caption('Your data'),
+                        _Caption(context.l10n.captionYourData),
                         _SettingRow(
-                          label: 'Storage',
+                          label: context.l10n.rowStorage,
                           value: fmtBytes(_archiveBytes),
                         ),
                         // The archive is on this phone and nowhere else. One
                         // file of every note's words, to the share sheet, is
                         // the whole backup story for now.
                         _SettingRow(
-                          label: 'Share all notes',
+                          label: context.l10n.shareAllNotes,
                           value: '→',
                           onTap: () => _shareBackup(s),
                         ),
@@ -677,12 +747,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // texts: the training data for a Whisper that knows
                         // this voice. See lib/export/corrections.dart.
                         _SettingRow(
-                          label: 'Export corrections',
+                          label: context.l10n.exportCorrections,
                           value: '→',
                           onTap: () => _shareCorrections(context, s),
                         ),
                         _SettingRow(
-                          label: 'Playback cache',
+                          label: context.l10n.playbackCache,
                           value: '${fmtBytes(_cacheBytes)} →',
                           onTap: () async {
                             await s.audio.clearCache();
@@ -690,29 +760,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           },
                         ),
                         _SettingRow(
-                          label: 'Unlock with fingerprint',
-                          value: lock.enabled ? 'On' : 'Off',
+                          label: context.l10n.unlockWithFingerprint,
+                          value: lock.enabled
+                              ? context.l10n.valueOn
+                              : context.l10n.valueOff,
                           onTap: () => _setLock(lock, !lock.enabled),
                         ),
-                        const _Caption('About'),
+                        _Caption(context.l10n.captionAbout),
                         _SettingRow(
-                          label: 'Appearance',
-                          value: _appearanceLabel(s.settings.appearance),
+                          label: context.l10n.appearance,
+                          value: _appearanceLabel(
+                            context.l10n,
+                            s.settings.appearance,
+                          ),
                           onTap: () => _pickAppearance(s),
+                        ),
+                        // The app's own language, apart from the spoken one:
+                        // a person can read the app in Arabic and record
+                        // English notes, or the other way round.
+                        _SettingRow(
+                          label: context.l10n.appLanguage,
+                          value: _appLanguageLabel(
+                            context.l10n,
+                            s.settings.appLocale,
+                          ),
+                          onTap: () => _pickAppLanguage(s),
                         ),
                         // Kept next to Device because the question the pair
                         // answers is a comparison: which Jota is this, and
                         // which phone owns it.
                         _SettingRow(
-                          label: 'This phone',
+                          label: context.l10n.rowThisPhone,
                           value: _shortAppId(device.appId),
                         ),
-                        const _SettingRow(
-                          label: 'Version',
+                        _SettingRow(
+                          label: context.l10n.rowVersion,
                           value: kVersionLabel,
                         ),
                         _SettingRow(
-                          label: 'Replay onboarding',
+                          label: context.l10n.replayOnboarding,
                           value: '→',
                           onTap: () async {
                             await s.settings.setHasSeenOnboarding(false);
@@ -762,25 +848,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
 /// own detection.
 const List<String?> _languages = <String?>[null, 'ar', 'en'];
 
-String _appearanceLabel(String v) {
+String _appearanceLabel(AppLocalizations l, String v) {
   switch (v) {
     case 'light':
-      return 'Light';
+      return l.appearanceLight;
     case 'dark':
-      return 'Dark';
+      return l.appearanceDark;
     default:
-      return 'System';
+      return l.appearanceSystem;
   }
 }
 
-String _languageLabel(String? code) {
+String _languageLabel(AppLocalizations l, String? code) {
   switch (code) {
     case 'ar':
-      return 'Arabic';
+      return l.languageArabic;
     case 'en':
-      return 'English';
+      return l.languageEnglish;
     default:
-      return 'Auto';
+      return l.languageAuto;
+  }
+}
+
+/// English and Arabic are shown in their own names — the one row where a
+/// label must be readable to someone lost in the wrong language.
+String _appLanguageLabel(AppLocalizations l, String? code) {
+  switch (code) {
+    case 'ar':
+      return l.appLanguageArabic;
+    case 'en':
+      return l.appLanguageEnglish;
+    default:
+      return l.appLanguageSystem;
   }
 }
 
@@ -947,7 +1046,7 @@ Future<void> _shareCorrections(BuildContext context, Services s) async {
   );
   if (zip == null) {
     if (context.mounted) {
-      _say(context, 'No corrections yet');
+      _say(context, context.l10n.noCorrectionsYet);
     }
     return;
   }
@@ -1006,11 +1105,7 @@ class _DiagRow extends StatelessWidget {
   }
 }
 
-void _say(BuildContext context, String message) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message)));
-}
+void _say(BuildContext context, String message) => jotaToast(context, message);
 
 /// A uuid is 36 characters of noise. The first eight are plenty to tell two
 /// phones apart by eye, which is the only thing anyone does with it.

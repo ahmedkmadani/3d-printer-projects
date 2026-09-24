@@ -18,6 +18,7 @@ import 'package:provider/provider.dart';
 
 import '../design/script.dart';
 import '../design/theme.dart';
+import '../l10n/l10n.dart';
 import '../design/widgets.dart';
 import '../insights/insights.dart';
 import '../state/notes_controller.dart';
@@ -56,8 +57,8 @@ class PatternsScreen extends StatelessWidget {
       // chrome on a screen the design gives one.
       rule: false,
       child: week.topics.isEmpty
-          ? const JotaEmpty(
-              message: 'No patterns yet',
+          ? JotaEmpty(
+              message: context.l10n.noPatternsYet,
             )
           : ListView(
               padding: const EdgeInsets.only(
@@ -65,10 +66,10 @@ class PatternsScreen extends StatelessWidget {
                 bottom: JotaGrid.gapXL,
               ),
               children: <Widget>[
-                Text('What keeps coming back', style: t.headline),
+                Text(context.l10n.whatKeepsComingBack, style: t.headline),
                 const SizedBox(height: JotaGrid.gapS),
                 Text(
-                  'Across your last $weeks weeks',
+                  context.l10n.patternsAcrossWeeks(weeks),
                   style: t.prose.copyWith(color: c.inkMuted),
                 ),
                 const SizedBox(height: JotaGrid.gapL),

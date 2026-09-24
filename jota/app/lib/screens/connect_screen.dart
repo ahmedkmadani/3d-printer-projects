@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../design/theme.dart';
+import '../l10n/l10n.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
 import '../state/services.dart';
@@ -56,7 +57,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final bool wantsCode = device.needsPairCode;
 
     return JotaScreen(
-      label: 'Connect',
+      label: context.l10n.connect,
       upcase: false,
       rule: false,
       onBack: widget.onboarding ? null : () => Navigator.of(context).pop(),
@@ -64,7 +65,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
       footer: wantsCode
           ? null
           : JotaButton(
-              label: widget.onboarding ? 'Set up later' : 'Not now',
+              label: widget.onboarding
+                  ? context.l10n.setUpLater
+                  : context.l10n.notNow,
               upcase: false,
               onTap: _onwards,
             ),
