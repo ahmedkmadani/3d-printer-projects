@@ -32,7 +32,16 @@ class NotesController extends ChangeNotifier {
   StreamSubscription<void>? _sub;
 
   List<Note> _notes = <Note>[];
-  List<Note> get notes => _notes;
+
+  /// Everything except notes mid-undo: a swiped note must vanish from Home's
+  /// counters and its Latest card in the same frame it leaves the archive,
+  /// or the app looks like it kept a copy for a few seconds.
+  List<Note> get notes => _notes
+      .where((Note n) => !_pendingDeletes.containsKey(_keyOf(n)))
+      .toList();
+
+  /// The raw list, undo-pending included; only the undo path needs it.
+  List<Note> get allNotes => _notes;
 
   /// Null means "all". Set by the tag pills on the list screen.
   String? _tagFilter;
@@ -61,7 +70,7 @@ class NotesController extends ChangeNotifier {
   List<String> _tagsInUse = <String>[];
   List<String> get tagsInUse => _tagsInUse;
 
-  int get count => _notes.length;
+  int get count => notes.length;
 
   List<Note> get visible {
     final String q = _query.trim().toLowerCase();

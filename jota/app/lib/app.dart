@@ -15,6 +15,7 @@ import 'design/format.dart';
 import 'design/theme.dart';
 import 'preview/seed_data.dart';
 import 'screens/lock_screen.dart';
+import 'screens/connect_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/splash_screen.dart' show kForceOnboarding;
@@ -90,8 +91,13 @@ class JotaApp extends StatelessWidget {
             // off for now: it stood between you and your notes on every open and
             // said nothing the shell does not. SplashScreen still exists; put it
             // back here when there is a reason to.
+            // With no Jota paired the app leads with finding one — an
+            // empty Home says nothing worth opening to — and the skip is
+            // there for looking around without a device.
             home: !kForceOnboarding && services.settings.hasSeenOnboarding
-                ? const HomeShell()
+                ? (services.settings.hasDevice
+                    ? const HomeShell()
+                    : const ConnectScreen())
                 : const OnboardingScreen(),
           ),
         ),

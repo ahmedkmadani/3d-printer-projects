@@ -39,6 +39,14 @@ class _ConnectScreenState extends State<ConnectScreen> {
     if (!widget.onboarding) {
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
+      } else if (mounted) {
+        // Launched as the app's first screen (no Jota paired yet): skipping
+        // goes to the shell, the same place pairing lands.
+        unawaited(
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(builder: (_) => const HomeShell()),
+          ),
+        );
       }
       return;
     }
