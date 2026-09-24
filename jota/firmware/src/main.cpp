@@ -55,6 +55,12 @@ static const int PWR_LATCH = 17;  // HIGH keeps the board alive off USB
 // in hours. Asleep it is microamps. Without this, daily use means
 // remembering to hold PWR after every note.
 static const uint32_t IDLE_SLEEP_MS = 120000;
+// A Jota with no owner rests on its PAIR screen, and that screen used to
+// count as activity for ever: a new or freshly erased device sat awake for
+// days waiting for a phone. Ten minutes is long enough to unbox, install
+// the app and pair; after that it sleeps, and any button brings the PAIR
+// screen back.
+static const uint32_t PAIR_SLEEP_MS = 600000;
 
 GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(
     GxEPD2_154_D67(EPD_CS, EPD_DC, EPD_RST, EPD_BUSY));
@@ -477,10 +483,14 @@ void loop() {
 
   // Anything that is not "READY with nobody around" counts as activity: a
   // note being captured, a phone mid-sync, a screen with a timer on it.
-  if (nav.screen() != Screen::Ready || recorder.busy() || bleLink.connected()) {
+  const bool resting =
+      nav.screen() == Screen::Ready || nav.screen() == Screen::Pair;
+  if (!resting || recorder.busy() || bleLink.connected()) {
     lastActivityMs = now;
   }
-  if (now - lastActivityMs >= IDLE_SLEEP_MS) enterDeepSleep();
+  const uint32_t limit =
+      nav.screen() == Screen::Pair ? PAIR_SLEEP_MS : IDLE_SLEEP_MS;
+  if (now - lastActivityMs >= limit) enterDeepSleep();
 
   delay(5);
 }
