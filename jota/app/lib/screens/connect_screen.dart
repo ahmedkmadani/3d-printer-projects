@@ -85,21 +85,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 onTap: _onwards,
               ),
             ),
-      // Centred in the page's height while searching, so the drawing owns
-      // the paper instead of hanging under the title with a void below;
-      // scrollable the moment the keyboard needs the room.
-      child: wantsCode
-          ? SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.only(top: JotaGrid.gapM),
-                child: ConnectSheet(onDone: _onwards),
-              ),
-            )
-          : Center(
-              child: SingleChildScrollView(
-                child: ConnectSheet(onDone: _onwards),
-              ),
-            ),
+      // The title anchors at the top like every screen; the device block
+      // centres in the height that remains, and the keyboard shrinks that
+      // height rather than pushing the title around.
+      child: Padding(
+        padding: const EdgeInsets.only(top: JotaGrid.gapM),
+        child: ConnectSheet(onDone: _onwards, fillHeight: true),
+      ),
     );
   }
 }

@@ -74,7 +74,16 @@ Future<void> showConnectSheet(BuildContext context) {
 }
 
 class ConnectSheet extends StatefulWidget {
-  const ConnectSheet({super.key, required this.onDone});
+  const ConnectSheet({
+    super.key,
+    required this.onDone,
+    this.fillHeight = false,
+  });
+
+  /// True when the sheet IS the page (the connect screen): the title anchors
+  /// at the top and the device block centres in the height that remains. As
+  /// a bottom sheet the compact top-to-bottom flow stays.
+  final bool fillHeight;
 
   /// Called once the success animation has played out. The host decides
   /// where to go: onboarding replaces itself with Home, the sheet closes.
@@ -265,64 +274,90 @@ class _ConnectSheetState extends State<ConnectSheet> {
     // paired sheet says wake / press a button / Sync instead.
     final bool paired = device.hasPairedDevice;
 
+    final Widget title = Text(
+      paired ? context.l10n.wakeYourJota : context.l10n.connectYourJota,
+      style: t.headline,
+    );
+    // Searching and found swap in place: the rings breathe until a Jota
+    // is heard, then the cards rise where the rings were.
+    final Widget body = AnimatedSize(
+      duration: JotaMotion.normal,
+      curve: JotaMotion.curve,
+      alignment: Alignment.topCenter,
+      child: AnimatedSwitcher(
+        duration: JotaMotion.normal,
+        switchInCurve: JotaMotion.curve,
+        switchOutCurve: JotaMotion.curve,
+        child: searching
+            ? const _Searching(key: ValueKey<String>('searching'))
+            : _Found(
+                key: const ValueKey<String>('found'),
+                ad: _shown(found),
+                others: <JotaAdvertisement>[
+                  for (final JotaAdvertisement a in found)
+                    if (a.remoteId != _shown(found).remoteId) a,
+                ],
+                state: _stateOf(device, _shown(found)),
+                pairedDevice: device.hasPairedDevice &&
+                    device.pairedId == _shown(found).remoteId,
+                connecting:
+                    _tappedId == _shown(found).remoteId && _doneId == null,
+                done: _doneId == _shown(found).remoteId,
+                onConnect: (_tappedId == null && _doneId == null)
+                    ? () => _tap(device, _shown(found))
+                    : null,
+                onSwitch: (String id) => setState(() => _chosenId = id),
+                code: wantsCode && _tappedId == _shown(found).remoteId
+                    ? _CodeRow(
+                        controller: _code,
+                        focus: _codeFocus,
+                        shake: _shake,
+                        onComplete: () => _submit(device),
+                      )
+                    : null,
+              ),
+      ),
+    );
+    final Widget hint = searching
+        ? Padding(
+            padding: const EdgeInsets.only(top: JotaGrid.gapL),
+            child: Text(
+              paired
+                  ? context.l10n.pressButtonOnIt
+                  : context.l10n.switchOnYourJota,
+              textAlign: TextAlign.center,
+              style: t.prose.copyWith(color: c.inkMuted),
+            ),
+          )
+        : const SizedBox.shrink();
+
+    if (widget.fillHeight) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          title,
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[body, hint],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text(
-          paired ? context.l10n.wakeYourJota : context.l10n.connectYourJota,
-          style: t.headline,
-        ),
+        title,
         const SizedBox(height: JotaGrid.gapL),
-        // Searching and found swap in place: the rings breathe until a Jota
-        // is heard, then the cards rise where the rings were.
-        AnimatedSize(
-          duration: JotaMotion.normal,
-          curve: JotaMotion.curve,
-          alignment: Alignment.topCenter,
-          child: AnimatedSwitcher(
-            duration: JotaMotion.normal,
-            switchInCurve: JotaMotion.curve,
-            switchOutCurve: JotaMotion.curve,
-            child: searching
-                ? const _Searching(key: ValueKey<String>('searching'))
-                : _Found(
-                    key: const ValueKey<String>('found'),
-                    ad: _shown(found),
-                    others: <JotaAdvertisement>[
-                      for (final JotaAdvertisement a in found)
-                        if (a.remoteId != _shown(found).remoteId) a,
-                    ],
-                    state: _stateOf(device, _shown(found)),
-                    pairedDevice: device.hasPairedDevice &&
-                        device.pairedId == _shown(found).remoteId,
-                    connecting:
-                        _tappedId == _shown(found).remoteId && _doneId == null,
-                    done: _doneId == _shown(found).remoteId,
-                    onConnect: (_tappedId == null && _doneId == null)
-                        ? () => _tap(device, _shown(found))
-                        : null,
-                    onSwitch: (String id) => setState(() => _chosenId = id),
-                    code: wantsCode && _tappedId == _shown(found).remoteId
-                        ? _CodeRow(
-                            controller: _code,
-                            focus: _codeFocus,
-                            shake: _shake,
-                            onComplete: () => _submit(device),
-                          )
-                        : null,
-                  ),
-          ),
-        ),
-        if (searching) ...<Widget>[
-          const SizedBox(height: JotaGrid.gapL),
-          Text(
-            paired
-                ? context.l10n.pressButtonOnIt
-                : context.l10n.switchOnYourJota,
-            textAlign: TextAlign.center,
-            style: t.prose.copyWith(color: c.inkMuted),
-          ),
-        ],
+        body,
+        hint,
       ],
     );
   }
