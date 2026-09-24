@@ -182,21 +182,15 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           // that were nowhere, and they fill the page with figures rather
           // than air.
           const SizedBox(height: JotaGrid.gapXL),
-          _FactsBlock(note: _note),
-
-          // The one destructive thing, under the card rather than in it:
-          // inside, it floated in a band of empty card. One quiet link in
-          // the signal colour, right-aligned, with the dialog in front of
-          // it. A note with no visible way to delete it is a promise the
-          // privacy story does not get to make.
-          const SizedBox(height: JotaGrid.gapL),
-          Align(
-            alignment: Alignment.centerRight,
-            child: JotaTextLink(
-              label: 'Delete note',
-              danger: true,
-              onTap: () => _confirmDelete(context, notes),
-            ),
+          _FactsBlock(
+            note: _note,
+            // Delete is the card's last row, not a link floating between
+            // the card and the footer: out there it read as a stray and
+            // sat one slip from the tag button. As a row it has the card's
+            // rhythm around it and the dialog in front of it. A note with
+            // no visible way to delete it is a promise the privacy story
+            // does not get to make.
+            onDelete: () => _confirmDelete(context, notes),
           ),
 
           const SizedBox(height: JotaGrid.gapL),
@@ -376,9 +370,10 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
 /// shape as the cards on Home. Only what is known: a note without words has
 /// no word count and no model.
 class _FactsBlock extends StatelessWidget {
-  const _FactsBlock({required this.note});
+  const _FactsBlock({required this.note, required this.onDelete});
 
   final Note note;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -420,6 +415,36 @@ class _FactsBlock extends StatelessWidget {
             ),
           _Fact(name: 'Synced', value: fmtNoteStamp(note.syncedAt)),
           _Fact(name: 'Note', value: note.displayId),
+          const SizedBox(height: JotaGrid.gapS),
+          // The destructive row closes the card the way Erase device closes
+          // Settings: same shape as the facts above it, the label in the
+          // signal colour, the whole row tappable.
+          Semantics(
+            button: true,
+            child: JotaPressable(
+              onTap: onDelete,
+              scale: 0.99,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: JotaGrid.gapS),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        'Delete note',
+                        style: context.type.prose
+                            .copyWith(color: context.ink.signal),
+                      ),
+                    ),
+                    Text(
+                      '→',
+                      style: context.type.reading
+                          .copyWith(color: context.ink.signal),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
