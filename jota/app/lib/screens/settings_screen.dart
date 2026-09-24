@@ -284,12 +284,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Erase the Jota from here: everything on it, and the bond both ways.
   Future<void> _eraseDevice(DeviceController device) async {
-    // The wipe needs a live connection, so say so before asking anything.
-    if (device.pairedAdvertisement == null) {
-      _say(context, 'Bring your Jota close first');
-      return;
-    }
-
     final bool? yes = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -317,9 +311,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (yes != true || !mounted) return;
 
+    // Confirm first, wait second: the Jota sleeps two minutes after a
+    // wake, so demanding it be awake BEFORE the dialog made erasing a
+    // race the person always lost. Now the app waits and the one
+    // instruction is on screen while it does.
+    _say(context, 'Waiting for your Jota — press a button on it');
     try {
-      await device.eraseDevice();
+      final bool seen = await device.eraseWhenSeen();
       if (!mounted) return;
+      if (!seen) {
+        _say(context, 'No Jota nearby');
+        return;
+      }
       setState(() {});
       _say(context, 'Jota erased');
     } on EraseUnsupported {

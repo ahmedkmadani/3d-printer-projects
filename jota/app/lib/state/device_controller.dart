@@ -233,6 +233,37 @@ class DeviceController extends ChangeNotifier {
   /// Throws what the engine throws — [EraseUnsupported] on old firmware,
   /// [SyncException] when the device is unreachable. On success the device
   /// has already forgotten this phone, so the local record is cleared too.
+  /// Wait for the paired Jota to advertise, then erase it. The wait is the
+  /// point: a Jota sleeps two minutes after a wake, so "erase" and "the
+  /// device is awake" almost never coincide unless the app does the
+  /// waiting. Restarts the scan first — Android quietly downgrades a scan
+  /// that has run for half an hour, and a dead scan looks exactly like an
+  /// absent device.
+  Future<bool> eraseWhenSeen({
+    Duration timeout = const Duration(seconds: 90),
+  }) async {
+    await _scanner.stop();
+    await _scanner.start(timeout: null);
+    // waitFor lives on the concrete scanner, not the interface; do the
+    // small wait here so the fakes need nothing new.
+    final String? id = pairedId;
+    JotaAdvertisement? seen;
+    final Stopwatch clock = Stopwatch()..start();
+    while (clock.elapsed < timeout) {
+      for (final JotaAdvertisement ad in inRange) {
+        if (id == null || ad.remoteId == id) {
+          seen = ad;
+          break;
+        }
+      }
+      if (seen != null) break;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    if (seen == null) return false;
+    await eraseDevice();
+    return true;
+  }
+
   Future<void> eraseDevice() async {
     final String? id = pairedId;
     if (id == null) return;
