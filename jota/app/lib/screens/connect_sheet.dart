@@ -103,6 +103,12 @@ class _ConnectSheetState extends State<ConnectSheet> {
 
   /// The success state: the card fills and draws its check, then [onDone].
   String? _doneId;
+
+  /// True when the success belongs to a re-sync of the already-paired Jota.
+  /// Pairing hands over to Home; a re-sync settles back to the quiet SYNCED
+  /// card and the sheet stays until it is swiped away — closing itself a
+  /// second after opening read as a glitch, not a confirmation.
+  bool _settleAfterDone = false;
   bool _finished = false;
 
   /// Bumped to shake the code row once.
@@ -138,12 +144,15 @@ class _ConnectSheetState extends State<ConnectSheet> {
 
   void _tap(DeviceController device, JotaAdvertisement ad) {
     if (_tappedId != null || _doneId != null) return;
+    final bool resync =
+        device.hasPairedDevice && device.pairedId == ad.remoteId;
     setState(() {
       _tappedId = ad.remoteId;
       _asleep.remove(ad.remoteId);
       _codeSent = false;
+      _settleAfterDone = resync;
     });
-    if (device.hasPairedDevice && device.pairedId == ad.remoteId) {
+    if (resync) {
       unawaited(device.syncNow(ad: ad));
     } else {
       unawaited(device.pairWith(ad));
@@ -167,6 +176,10 @@ class _ConnectSheetState extends State<ConnectSheet> {
     // moment reads before the screen moves on.
     Timer(const Duration(milliseconds: 950), () {
       if (!mounted || _finished) return;
+      if (_settleAfterDone) {
+        setState(() => _doneId = null);
+        return;
+      }
       _finished = true;
       widget.onDone();
     });
