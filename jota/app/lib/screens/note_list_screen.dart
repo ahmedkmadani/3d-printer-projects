@@ -24,7 +24,6 @@ import 'package:provider/provider.dart';
 
 import '../data/note.dart';
 import '../design/format.dart';
-import '../design/marks.dart';
 import '../design/script.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
@@ -717,7 +716,6 @@ class _NoMatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return JotaEmpty(
-      mark: const JotaEmptyMarkView(EmptyMark.noMatch),
       message: 'No notes match',
       action: SizedBox(
         width: 160,

@@ -17,7 +17,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../design/script.dart';
-import '../design/marks.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../insights/insights.dart';
@@ -58,7 +57,6 @@ class PatternsScreen extends StatelessWidget {
       rule: false,
       child: week.topics.isEmpty
           ? const JotaEmpty(
-              mark: JotaEmptyMarkView(EmptyMark.noPatterns),
               message: 'No patterns yet',
             )
           : ListView(
