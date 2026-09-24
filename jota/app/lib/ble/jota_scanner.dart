@@ -31,6 +31,18 @@ class JotaScanner implements DeviceScanner {
       StreamController<AdapterStatus>.broadcast();
 
   StreamSubscription<List<ScanResult>>? _sub;
+
+  // The last list actually delivered, as a signature, plus when. Android in
+  // low-latency mode hands the results list back on EVERY advertisement
+  // packet — 20 to 50 times a second with one Jota nearby — and every
+  // delivery used to fan out through the controller as a notifyListeners,
+  // rebuilding Home, the archive and the connect sheet at packet rate. That
+  // was the app's felt lag. Nothing on screen changes packet-to-packet
+  // except rssi jitter, so: deliver immediately when the list MEANS
+  // something new (devices, pending, flags, battery), and otherwise at most
+  // twice a second so rssi ordering still drifts through.
+  String _lastSig = '';
+  DateTime _lastEmit = DateTime.fromMillisecondsSinceEpoch(0);
   StreamSubscription<BluetoothAdapterState>? _adapterSub;
 
   AdapterStatus _adapterNow = AdapterStatus.unavailable;
@@ -75,7 +87,10 @@ class JotaScanner implements DeviceScanner {
       // showPowerAlert lets iOS raise its own "Turn On Bluetooth" system alert
       // when we try to use the radio while it is off — the closest iOS allows to
       // enabling it from the app.
-      await FlutterBluePlus.setOptions(restoreState: true, showPowerAlert: true);
+      await FlutterBluePlus.setOptions(
+        restoreState: true,
+        showPowerAlert: true,
+      );
     }
   }
 
@@ -125,20 +140,35 @@ class JotaScanner implements DeviceScanner {
       ads.sort(
         (JotaAdvertisement a, JotaAdvertisement b) => b.rssi.compareTo(a.rssi),
       );
-      // "Jota is not in range" is a claim about the radio, and it was being
-      // made with nothing written down. Log what the scan actually saw, so an
-      // empty list can be told apart from a scan that never ran and from a
-      // Jota whose advertisement did not parse.
-      if (ads.isEmpty) {
-        debugPrint(
-          'jota/ble  scan  ${results.length} device(s), no Jota among them',
-        );
-      } else {
-        final String seen = ads.map((JotaAdvertisement a) {
-          return '${a.remoteId} rssi=${a.rssi} pending=${a.pending} '
-              'paired=${a.paired}';
-        }).join(' | ');
-        debugPrint('jota/ble  scan  $seen');
+      final String sig = ads
+          .map(
+            (JotaAdvertisement a) => '${a.remoteId}:${a.pending}:'
+                '${a.paired}:${a.owned}:${a.battery}',
+          )
+          .join('|');
+      final DateTime now = DateTime.now();
+      final bool changed = sig != _lastSig;
+      if (!changed &&
+          now.difference(_lastEmit) < const Duration(milliseconds: 500)) {
+        return;
+      }
+      _lastEmit = now;
+      if (changed) {
+        _lastSig = sig;
+        // "Jota is not in range" is a claim about the radio, and it was
+        // being made with nothing written down. Log what the scan actually
+        // saw — once per change, not once per packet.
+        if (ads.isEmpty) {
+          debugPrint(
+            'jota/ble  scan  ${results.length} device(s), no Jota among them',
+          );
+        } else {
+          final String seen = ads.map((JotaAdvertisement a) {
+            return '${a.remoteId} rssi=${a.rssi} pending=${a.pending} '
+                'paired=${a.paired}';
+          }).join(' | ');
+          debugPrint('jota/ble  scan  $seen');
+        }
       }
       if (!_found.isClosed) _found.add(ads);
     });
@@ -175,6 +205,8 @@ class JotaScanner implements DeviceScanner {
   Future<void> stop() async {
     await _sub?.cancel();
     _sub = null;
+    _lastSig = '';
+    _lastEmit = DateTime.fromMillisecondsSinceEpoch(0);
     if (FlutterBluePlus.isScanningNow) {
       await FlutterBluePlus.stopScan();
     }

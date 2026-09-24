@@ -43,8 +43,15 @@ Future<Services> bootPreview(WidgetTester tester) async {
 /// beat before routing, so the clock is advanced past that first.
 Future<void> pumpAwake(WidgetTester tester) async {
   await tester.pump(); // splash first frame
-  await tester.pump(const Duration(seconds: 1)); // hold elapses, route to notes
-  await tester.pump(); // note list builds, kicks off its refresh
+  await tester.pump(const Duration(seconds: 1)); // hold elapses, route
+  await tester.pump();
+  // Unpaired, the app now leads with the Connect page; these tests walk the
+  // shell, so they take the skip the way a person without a device would.
+  if (find.text('Not now').evaluate().isNotEmpty) {
+    await tester.tap(find.text('Not now'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+  }
   await tester.pump(const Duration(milliseconds: 900)); // refresh + first ad
   await tester.pump();
 }
