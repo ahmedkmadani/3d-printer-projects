@@ -55,7 +55,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkRadio());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkRadio();
+      // Presence is a live fact on every tab, not only the archive: Home's
+      // card said ASLEEP while the Jota sat there advertising, because only
+      // the Notes tab and the connect sheet ever started a scan.
+      context.read<DeviceController>().startScan(timeout: null);
+    });
     // One line when notes arrive, whichever tab is open and whichever path
     // fetched them: the answer to "did that just sync?".
     _syncedSub = context.read<DeviceController>().syncedNotes.listen((int n) {
@@ -86,7 +92,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       // than while it is in front of you — usually in the same swipe down that
       // turned on something else.
       _radioNoticeShown = false;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _checkRadio());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkRadio();
+        if (mounted) device.startScan(timeout: null);
+      });
     }
   }
 

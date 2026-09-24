@@ -25,6 +25,7 @@ import 'package:provider/provider.dart';
 import '../data/note.dart';
 import '../design/format.dart';
 import '../design/script.dart';
+import '../design/marks.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../insights/insights.dart';
@@ -120,6 +121,7 @@ class HomeScreen extends StatelessWidget {
               padding: EdgeInsets.symmetric(vertical: JotaGrid.gapXL),
               child: JotaEmpty(
                 message: 'Nothing recorded yet',
+                mark: JotaEmptyMarkView(EmptyMark.nothing),
               ),
             )
           // Hidden until there are enough notes for a count to mean
