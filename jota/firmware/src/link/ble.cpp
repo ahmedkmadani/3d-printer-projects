@@ -14,6 +14,7 @@
 #include "app/identity.h"
 #include "app/tags.h"
 #include "util/clock.h"
+#include "util/diag.h"
 
 namespace jota {
 
@@ -27,6 +28,8 @@ static const char *CH_DATA     = "4a6f7461-1e5f-4b2a-9c33-000000000005";
 static const char *CH_ACK      = "4a6f7461-1e5f-4b2a-9c33-000000000006";
 static const char *CH_TAGS     = "4a6f7461-1e5f-4b2a-9c33-000000000007";
 static const char *CH_CLOCK    = "4a6f7461-1e5f-4b2a-9c33-000000000008";
+static const char *CH_DIAG     = "4a6f7461-1e5f-4b2a-9c33-000000000009";
+static const char *CH_ERASE    = "4a6f7461-1e5f-4b2a-9c33-00000000000a";
 
 static const uint32_t ADV_FAST_MS   = 60000;  // after a recording or SYNC
 static const uint8_t  MAX_AUTH_FAIL = 3;
@@ -58,6 +61,7 @@ static uint8_t  g_advFlags   = 0xFF;
 static uint8_t  g_advBattery = 0xFE;  // never a real value; forces the first
 static char     g_pairCode[8] = {0};
 static uint8_t  g_battery    = 0xFF;  // 0xFF = no sense pin, unknown
+static bool     g_eraseAsked = false; // owner wrote a valid `erase`
 
 // ---- tags ----------------------------------------------------------------
 // The phone owns the list and writes it whole; Jota stores it and the TAGS
@@ -323,6 +327,7 @@ class IndexCB : public NimBLECharacteristicCallbacks {
     }
     Serial.printf("[ble] index read, %u pending\n",
                   (unsigned)g_store->pending());
+    diagCountSync();
     char buf[512];
     const size_t n = g_store->indexJson(buf, sizeof(buf));
     // The exact bytes the phone receives. A malformed or unexpected index is
@@ -458,6 +463,46 @@ class TagsCB : public NimBLECharacteristicCallbacks {
   }
 };
 
+class DiagCB : public NimBLECharacteristicCallbacks {
+  void onRead(NimBLECharacteristic *c) override {
+    // Gated like `index`: what a device has been through is the owner's
+    // business, not the room's.
+    if (!g_authed) {
+      c->setValue("{}");
+      return;
+    }
+    char buf[192];
+    const size_t n = diagJson(buf, sizeof(buf));
+    c->setValue((uint8_t *)buf, n);
+  }
+};
+
+class EraseCB : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic *c) override {
+    // Owner only. `authed` implies owner here — a code-holder became the
+    // owner the moment auth passed — but say which refusal it was.
+    if (!g_authed) {
+      statusError("auth");
+      return;
+    }
+    // The request must echo this device's own id. A stray or replayed write
+    // aimed at the wrong Jota then does nothing, the same reason the ack
+    // must echo a CRC.
+    char confirm[16];
+    jsonStr(c->getValue().c_str(), "\"confirm\"", confirm, sizeof(confirm));
+    if (strcmp(confirm, deviceId()) != 0) {
+      Serial.printf("[ble] erase refused: confirm '%s' is not '%s'\n",
+                    confirm, deviceId());
+      statusError("confirm");
+      return;
+    }
+    Serial.println("[ble] owner asked for an erase");
+    // The wipe runs from main's loop: deleting every note is seconds of file
+    // I/O, far more than a callback on the host stack's task may spend.
+    g_eraseAsked = true;
+  }
+};
+
 class ClockCB : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic *c) override {
     if (!g_authed || !g_store) return;
@@ -519,6 +564,12 @@ void Link::begin(NoteStore &store, AppModel &model) {
   svc->createCharacteristic(NimBLEUUID(CH_CLOCK), NIMBLE_PROPERTY::WRITE)
       ->setCallbacks(new ClockCB());
 
+  svc->createCharacteristic(NimBLEUUID(CH_DIAG), NIMBLE_PROPERTY::READ)
+      ->setCallbacks(new DiagCB());
+
+  svc->createCharacteristic(NimBLEUUID(CH_ERASE), NIMBLE_PROPERTY::WRITE)
+      ->setCallbacks(new EraseCB());
+
   svc->start();
 
   NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
@@ -559,6 +610,14 @@ void Link::setPairCode(const char *code) {
 
 bool Link::connected() const { return g_connected; }
 bool Link::authed() const { return g_authed; }
+
+bool Link::takeEraseRequested() {
+  const bool v = g_eraseAsked;
+  g_eraseAsked = false;
+  return v;
+}
+
+void Link::confirmErased() { statusError("erased"); }
 
 bool Link::takeTagsChanged() {
   const bool v  = g_tagsChanged;

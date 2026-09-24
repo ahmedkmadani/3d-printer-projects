@@ -27,6 +27,7 @@
 #include "hal/mic.h"
 #include "hal/sdcard.h"
 #include "util/clock.h"
+#include "util/diag.h"
 #include <esp_system.h>
 #include "link/ble.h"
 #include "ui/screens.h"
@@ -183,6 +184,26 @@ static void enterDeepSleep() {
   esp_deep_sleep_start();
 }
 
+// Erase everything and start over: notes, owner, tags, the lot. Two callers
+// only — the two-button gesture, and the owner asking over BLE — and they
+// must stay one code path, or the two kinds of erase drift into meaning
+// different things.
+static void wipeEverything(uint32_t now) {
+  Serial.println("[jota] ERASE: wiping notes, owner and tags");
+  notes.eraseAll();
+  bleLink.forgetOwner();
+  tagsSetDefaults(model.tags);
+  model.noteCount = notes.lastId();
+  model.pending   = notes.pending();
+  model.paired    = false;
+  model.authed    = false;
+  model.note      = {0, "--:--", nullptr, 0, nullptr};
+  model.tagSel    = 0;
+  // Straight back to the unowned state, which puts PAIR up by itself.
+  nav.go(Screen::Ready, now);
+  nav.markDirty(/*full=*/true);
+}
+
 static void paint() {
   const bool ghostDue =
       partialsSinceFull >= FULL_EVERY && quietScreen(nav.screen());
@@ -238,6 +259,7 @@ void setup() {
   delay(200);
   Serial.printf("\n[jota] booting%s\n", fromSleep ? " (woken by a button)" : "...");
 
+  diagBegin();
   buttons.begin();
 
   SPI.begin(EPD_SCK, /*MISO=*/-1, EPD_MOSI, EPD_CS);
@@ -358,6 +380,8 @@ void loop() {
       const char *tag = (model.note.id == rr.id) ? model.note.tag : nullptr;
       if (!notes.add(rr.id, rr.secs, rr.bytes, rr.crc, tag)) {
         Serial.println("[jota] note recorded but NOT indexed");
+      } else {
+        diagCountNote();
       }
     } else {
       Serial.println("[jota] recording lost");
@@ -432,20 +456,16 @@ void loop() {
   // The user held both buttons twice: erase everything and start over. Nav
   // asks; main does it, because nav owns no storage and no radio.
   if (nav.wipeRequested()) {
-    Serial.println("[jota] ERASE: wiping notes, owner and tags");
     nav.clearWipeRequest();
-    notes.eraseAll();
-    bleLink.forgetOwner();
-    tagsSetDefaults(model.tags);
-    model.noteCount = notes.lastId();
-    model.pending   = notes.pending();
-    model.paired    = false;
-    model.authed    = false;
-    model.note      = {0, "--:--", nullptr, 0, nullptr};
-    model.tagSel    = 0;
-    // Straight back to the unowned state, which puts PAIR up by itself.
-    nav.go(Screen::Ready, now);
-    nav.markDirty(/*full=*/true);
+    wipeEverything(now);
+  }
+
+  // The owner asked for the same thing over BLE. One extra step: tell the
+  // phone it is done, on the connection that asked, so the app can clear its
+  // own side without guessing.
+  if (bleLink.takeEraseRequested()) {
+    wipeEverything(now);
+    bleLink.confirmErased();
   }
 
   if (nav.powerOff()) {
@@ -457,7 +477,10 @@ void loop() {
       recorder.stop();
       RecResult last;
       while (!recorder.takeResult(last)) delay(5);
-      if (last.ok) notes.add(last.id, last.secs, last.bytes, last.crc, model.note.tag);
+      if (last.ok && notes.add(last.id, last.secs, last.bytes, last.crc,
+                               model.note.tag)) {
+        diagCountNote();
+      }
     }
     restingFrame();
     sdcard.end();

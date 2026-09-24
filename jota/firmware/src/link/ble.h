@@ -53,6 +53,15 @@ class Link {
   // device is a stranger to every phone again. ERASE only.
   void forgetOwner();
 
+  // True once, after the owner wrote a valid `erase` request. The wipe itself
+  // happens in main's loop — the same path as the two-button gesture —
+  // because a BLE callback may not spend seconds deleting files.
+  bool takeEraseRequested();
+
+  // Tell the phone the wipe it asked for is done, on the still-open
+  // connection: a `status` notify of {"error":"erased"}.
+  void confirmErased();
+
   /// Does a phone hold the bond? Read at boot so an already-owned device does
   /// not offer a pairing code to the room every time it is switched on.
   bool hasOwner() const;

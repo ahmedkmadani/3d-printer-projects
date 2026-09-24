@@ -59,6 +59,8 @@ All share the service base; only the last field changes.
 | `ack` | `...0006` | write | JSON `{"id":12,"crc":"a1b2c3d4"}` |
 | `tags` | `...0007` | read, write | JSON array of strings |
 | `clock` | `...0008` | write | Unix seconds, decimal string |
+| `diag` | `...0009` | read | JSON, the device's own health |
+| `erase` | `...000a` | write | JSON `{"confirm":"7f3a91c4"}` |
 
 ### auth
 
@@ -193,6 +195,55 @@ press-speak-press.
 Jota has no network, so it cannot learn the time by itself. The app writes
 Unix seconds on every connect; Jota sets its RTC. This is what makes the
 timestamps real rather than counting from boot.
+
+### diag
+
+```json
+{"fw":"c485eee","built":"2026-09-24","reset":"sleep","boots":41,
+ "crashes":0,"notes":17,"syncs":29,"up":118,"heap":214520}
+```
+
+Auth-gated like `index` — an unauthenticated read answers `{}`. What each
+field is:
+
+- `fw` / `built` — the git short sha and date the firmware was built from. A
+  `+` on the sha means the tree was dirty, so the binary only resembles that
+  commit. This is the version the app compares against; a bug report without
+  it starts by rediscovering it.
+- `reset` — why THIS boot happened: `poweron` / `sw` / `panic` / `wdt` /
+  `brownout` / `sleep` / `other`.
+- `boots`, `crashes` — lifetime counters in NVS. A crash is a panic, watchdog
+  or brownout reset; the half-hour sleep tick does not count as a boot.
+- `notes`, `syncs` — notes recorded, and index reads served to an
+  authenticated phone. Recovered orphans do not count as new notes.
+- `up` — seconds since this boot. `heap` — free bytes right now.
+
+Old firmware simply does not have the characteristic. The app must treat
+that as "no diagnostics", never as an error: a missing `diag` still syncs
+notes, and that is the part that cannot wait.
+
+### erase
+
+Everything the two-button gesture does, asked for by the owner over BLE:
+every note (indexed or not) is deleted, the tag list returns to the factory
+five, and the bond is cleared — the Jota forgets the phone that asked, drops
+to unowned and shows its PAIR screen.
+
+```json
+{"confirm":"7f3a91c4"}
+```
+
+`confirm` must be the device's own id, exactly as `status` reports it. A
+write with anything else is refused with a `status` notify of
+`{"error":"confirm"}` — echoing the id is what makes a stray or replayed
+write against the wrong Jota do nothing. Owner-only: the link must be
+authenticated, or the answer is `{"error":"auth"}`.
+
+The wipe takes a few seconds (it is file I/O over every note). When it is
+done the device notifies `status` with `{"error":"erased"}` on the still-open
+connection. **The bond died with the wipe**, so after that notify the phone
+must clear its own record of the device too — the next pairing needs six
+fresh digits off the panel, from whoever is holding it.
 
 ## Sequence, end to end
 
