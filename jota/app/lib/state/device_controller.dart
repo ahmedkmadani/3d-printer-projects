@@ -159,9 +159,32 @@ class DeviceController extends ChangeNotifier {
 
   // ---- scanning ------------------------------------------------------------
 
+  /// Android quietly downgrades a BLE scan that has run for about half an
+  /// hour, and a downgraded scan delivers nothing: the paired Jota then
+  /// reads as ASLEEP while it sits there advertising a pending note. This
+  /// has now bitten three different features. So an open-ended scan is
+  /// restarted on a timer, well inside the downgrade window, for as long
+  /// as one is wanted.
+  static const Duration _scanFreshEvery = Duration(minutes: 8);
+  Timer? _scanRefresh;
+
   Future<void> startScan({Duration? timeout}) async {
     _lastError = null;
     notifyListeners();
+    final bool openEnded = timeout == null;
+    _scanRefresh?.cancel();
+    if (openEnded) {
+      _scanRefresh = Timer.periodic(_scanFreshEvery, (_) async {
+        if (_disposed) return;
+        try {
+          await _scanner.stop();
+          await _scanner.start(timeout: null);
+        } on Exception {
+          // The next tick tries again; a scan that cannot start now is
+          // usually the radio mid-toggle.
+        }
+      });
+    }
     try {
       await _scanner.start(timeout: timeout ?? const Duration(seconds: 15));
     } on Exception catch (e) {
@@ -171,6 +194,8 @@ class DeviceController extends ChangeNotifier {
   }
 
   Future<void> stopScan() async {
+    _scanRefresh?.cancel();
+    _scanRefresh = null;
     await _scanner.stop();
     notifyListeners();
   }
@@ -552,6 +577,7 @@ class DeviceController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _scanRefresh?.cancel();
     _progressSub?.cancel();
     _adapterSub?.cancel();
     _scanSub?.cancel();
