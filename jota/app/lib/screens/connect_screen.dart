@@ -65,27 +65,41 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final bool wantsCode = device.needsPairCode;
 
     return JotaScreen(
-      label: context.l10n.connect,
+      // No word in the status slot: the serif title below already names the
+      // screen, and 'Connect' in the corner was saying it twice.
+      label: '',
       upcase: false,
       rule: false,
       onBack: widget.onboarding ? null : () => Navigator.of(context).pop(),
       // Hidden while the keyboard is up for the code.
+      // A quiet link, not a second stadium: with Connect filled above it,
+      // two full-width pills read as two equal choices, and skipping is not
+      // the equal of connecting.
       footer: wantsCode
           ? null
-          : JotaButton(
-              label: widget.onboarding
-                  ? context.l10n.setUpLater
-                  : context.l10n.notNow,
-              upcase: false,
-              onTap: _onwards,
+          : Center(
+              child: JotaTextLink(
+                label: widget.onboarding
+                    ? context.l10n.setUpLater
+                    : context.l10n.notNow,
+                onTap: _onwards,
+              ),
             ),
-      child: SingleChildScrollView(
-        // Scrollable, because the keyboard is up on this screen by definition.
-        child: Padding(
-          padding: const EdgeInsets.only(top: JotaGrid.gapM),
-          child: ConnectSheet(onDone: _onwards),
-        ),
-      ),
+      // Centred in the page's height while searching, so the drawing owns
+      // the paper instead of hanging under the title with a void below;
+      // scrollable the moment the keyboard needs the room.
+      child: wantsCode
+          ? SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.only(top: JotaGrid.gapM),
+                child: ConnectSheet(onDone: _onwards),
+              ),
+            )
+          : Center(
+              child: SingleChildScrollView(
+                child: ConnectSheet(onDone: _onwards),
+              ),
+            ),
     );
   }
 }
