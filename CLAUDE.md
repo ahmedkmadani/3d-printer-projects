@@ -110,6 +110,18 @@ Pala and Waveshare use; their `codec_board` wrapper is not used because it
 needs IDF 5. The synthetic notes are gone. The card must be FAT32: this
 core's FAT driver has exFAT off, and a card over 32 GB ships exFAT.
 
+**Firmware 2026-09-24:** boots print a `[diag]` line (git rev, reset
+reason, boot/crash counters in NVS); `diag` (…09, read) and `erase` (…0a,
+write, echoes the device id) joined the BLE contract — Settings' Erase
+device is real now, erase-over-BLE untested on hardware. Asleep, the chip
+timer-wakes every 30 min (verified 15:58 2026-09-24): battery read, OFF
+frame redrawn (arc now ENDS at 12 o'clock, gap grows clockwise), one
+`tick` line in `/sdcard/jota/battery.log`, no BLE. PAIR screen sleeps
+after 10 min; READY keeps 2. The `!` serial reboot hook is gone — it made
+every serial attach a power cut. App-side: an advertisement is a Jota
+only with the FFFF marker and plausible fields (a neighbour's gadget once
+appeared as "JOTA-01C9").
+
 **Power cut mid-note is survivable, verified 2026-09-23.** The recorder
 fsyncs the WAV every ~4 s; at boot the note store rebuilds any un-indexed
 `NNNN.wav` (header patched, `.ima` re-encoded) and indexes it as pending.
