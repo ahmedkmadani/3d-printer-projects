@@ -429,53 +429,6 @@ class _DayHeader extends StatelessWidget {
   }
 }
 
-/// Record, bring it close, read. One card, three numbered lines, on the
-/// same field colour as Home's cards.
-class _HowItWorks extends StatelessWidget {
-  const _HowItWorks();
-
-  @override
-  Widget build(BuildContext context) {
-    final JotaType t = context.type;
-    final JotaColors c = context.ink;
-    Widget step(String n, String text) => Padding(
-          padding: const EdgeInsets.only(top: JotaGrid.gapM),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: <Widget>[
-              Text(n, style: t.meta.copyWith(color: c.inkMuted)),
-              const SizedBox(width: JotaGrid.gapM),
-              Expanded(child: Text(text, style: t.prose)),
-            ],
-          ),
-        );
-    return Padding(
-      padding: const EdgeInsets.all(JotaGrid.margin),
-      child: Container(
-        padding: const EdgeInsets.all(JotaGrid.gapL),
-        decoration: BoxDecoration(
-          color: c.field,
-          borderRadius:
-              const BorderRadius.all(Radius.circular(JotaCards.radius)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              'HOW IT WORKS',
-              style: t.cardLabel.copyWith(color: c.inkMuted),
-            ),
-            step('01', 'Record on the Jota'),
-            step('02', 'Bring it near'),
-            step('03', 'Read it here'),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _EmptyArchive extends StatelessWidget {
   const _EmptyArchive({required this.hasDevice});
 
@@ -483,10 +436,11 @@ class _EmptyArchive extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // With a device and no notes yet, the three steps rather than a bare
-    // "no notes": the first empty screen is where the product explains
-    // itself or does not.
-    if (hasDevice) return const _HowItWorks();
+    if (hasDevice) {
+      // A paired device and no notes yet: say the one thing that starts
+      // everything, in the product's own voice, and stop.
+      return const JotaEmpty(message: 'Press the button on your Jota');
+    }
     return JotaEmpty(
       message: 'No device paired',
       action: SizedBox(
