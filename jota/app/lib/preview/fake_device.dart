@@ -16,6 +16,7 @@ import 'dart:typed_data';
 
 import '../audio/crc32.dart';
 import '../ble/background_sync.dart';
+import '../ble/device_diag.dart';
 import '../ble/device_scanner.dart';
 import '../ble/jota_protocol.dart';
 import '../ble/sync_service.dart';
@@ -56,6 +57,20 @@ class FakeJota {
   /// What a Jota holds before a phone has ever written to it — the same three
   /// the firmware seeds in `tagsSetDefaults`.
   List<String> tags = List<String>.of(kDefaultTags);
+
+  /// What the `diag` characteristic would answer. The counters move with the
+  /// fake's state so the Firmware sheet shows something alive in the preview.
+  DeviceDiag get diag => DeviceDiag(
+        fw: 'preview',
+        built: '2026-01-01',
+        reset: 'poweron',
+        boots: 12,
+        crashes: 0,
+        notes: pendingCount,
+        syncs: 3,
+        upSeconds: 90,
+        freeHeap: 214520,
+      );
 
   int get pendingCount => pending.length;
 
@@ -184,6 +199,11 @@ class FakeSyncService implements SyncService {
   @override
   bool get isRunning => _running;
 
+  DeviceDiag? _lastDiag;
+
+  @override
+  DeviceDiag? get lastDiag => _lastDiag;
+
   void _emit(SyncProgress p) {
     _last = p;
     if (!_progress.isClosed) _progress.add(p);
@@ -267,6 +287,8 @@ class FakeSyncService implements SyncService {
           error: authError,
         );
       }
+      // Once per authenticated connection, exactly as the engine does.
+      _lastDiag = _device.diag;
 
       _emit(
         const SyncProgress(
@@ -386,6 +408,22 @@ class FakeSyncService implements SyncService {
     } finally {
       _running = false;
     }
+  }
+
+  @override
+  Future<void> eraseDevice(String remoteId) async {
+    if (_running) throw const SyncException('a sync is using the connection');
+    await _beat(600);
+    // The real device authenticates the link first; the owner check below is
+    // the same gate with the radio steps removed.
+    if (_device.ownerAppId != _settings.appId) {
+      throw const SyncException('this phone does not own that Jota');
+    }
+    // Everything the two-button gesture wipes: notes, bond, tags.
+    _device.pending.clear();
+    _device.ownerAppId = null;
+    _device.paired = false;
+    _device.tags = List<String>.of(kDefaultTags);
   }
 
   @override

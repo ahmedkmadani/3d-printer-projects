@@ -20,7 +20,9 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 abstract final class JotaUuid {
   static const String _base = '4a6f7461-1e5f-4b2a-9c33-';
 
-  static Guid _c(int n) => Guid('$_base${n.toString().padLeft(12, '0')}');
+  // Hex, not decimal: characteristic 10 is `...000a` on the wire.
+  static Guid _c(int n) =>
+      Guid('$_base${n.toRadixString(16).padLeft(12, '0')}');
 
   /// The advertised service. Also the filter the OS uses to wake the app.
   static final Guid service = _c(0);
@@ -48,6 +50,12 @@ abstract final class JotaUuid {
 
   /// write — Unix seconds, decimal string
   static final Guid clock = _c(8);
+
+  /// read — JSON, the device's own health. Absent on old firmware.
+  static final Guid diag = _c(9);
+
+  /// write — JSON `{"confirm":"7f3a91c4"}`. Absent on old firmware.
+  static final Guid erase = _c(10);
 }
 
 /// Advertised local name. Used as a secondary filter only — the service UUID is
@@ -453,6 +461,19 @@ abstract final class JotaPayload {
       utf8.encode(
         jsonEncode(<String, Object>{'id': id, 'crc': crcHex.toLowerCase()}),
       ),
+    );
+  }
+
+  /// `erase` — everything the two-button gesture does, over BLE.
+  ///
+  ///     {"confirm":"7f3a91c4"}
+  ///
+  /// [deviceIdHex] must be the device's own id exactly as `status` reports
+  /// it. Echoing it is what makes a stray or replayed write against the
+  /// wrong Jota do nothing — the same reason an ack must echo a CRC.
+  static Uint8List erase(String deviceIdHex) {
+    return Uint8List.fromList(
+      utf8.encode(jsonEncode(<String, String>{'confirm': deviceIdHex})),
     );
   }
 

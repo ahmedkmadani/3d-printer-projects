@@ -10,6 +10,7 @@
 //  BluetoothDevice. The caller already has the id (it is in settings); handing
 //  the engine an opaque platform object bought nothing.
 // ============================================================================
+import 'device_diag.dart';
 
 /// Where a sync run is.
 enum SyncPhase {
@@ -107,6 +108,14 @@ class SyncException implements Exception {
   String toString() => message;
 }
 
+/// Thrown by [SyncService.eraseDevice] when the device's firmware predates
+/// the `erase` characteristic. The caller falls back to telling the user
+/// about the two-button gesture — the device CAN be erased, just not from
+/// here.
+class EraseUnsupported implements Exception {
+  const EraseUnsupported();
+}
+
 /// Asks the user for the six digits on the e-paper. Returns null if they cancel —
 /// the engine then gives up rather than guessing, because three wrong codes cost
 /// a 30-second advertising blackout.
@@ -146,6 +155,21 @@ abstract class SyncService {
     List<String> tags, {
     required PairCodeRequest onPairCodeNeeded,
   });
+
+  /// What the paired device reported about itself on the most recent
+  /// authenticated connection, or null when it never has — old firmware, or
+  /// no connection yet. Read alongside [progress] notifications; there is no
+  /// separate change stream.
+  DeviceDiag? get lastDiag;
+
+  /// Erase the DEVICE: every note on it, its tag list, and the bond.
+  ///
+  /// Resolves once the device has confirmed the wipe. Throws
+  /// [EraseUnsupported] on firmware without the characteristic, and
+  /// [SyncException] when the device cannot be reached or does not confirm.
+  /// The caller still owns the phone-side record and must clear it after
+  /// this resolves — the device has already forgotten the phone.
+  Future<void> eraseDevice(String remoteId);
 
   /// Break the bond on the DEVICE, so the next pairing needs fresh digits.
   ///

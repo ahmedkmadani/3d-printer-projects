@@ -31,6 +31,7 @@ import '../data/note.dart';
 import '../data/note_repository.dart';
 import '../data/partial_store.dart';
 import '../data/settings_store.dart';
+import 'device_diag.dart';
 import 'jota_link.dart';
 import 'jota_protocol.dart';
 import 'jota_scanner.dart';
@@ -77,6 +78,11 @@ class SyncEngine implements SyncService {
 
   @override
   SyncProgress get current => _last;
+
+  DeviceDiag? _lastDiag;
+
+  @override
+  DeviceDiag? get lastDiag => _lastDiag;
 
   bool _running = false;
 
@@ -186,6 +192,16 @@ class SyncEngine implements SyncService {
 
       final JotaStatus status = await _authenticate(link, onPairCodeNeeded);
 
+      // ---- diag -----------------------------------------------------------
+      // One read per connection, never fatal: null is old firmware or a
+      // refusal, and a device that cannot introduce itself still hands over
+      // audio — the part that cannot wait.
+      final DeviceDiag? diag = await link.readDiag();
+      if (diag != null) {
+        _lastDiag = diag;
+        _log('diag', diag);
+      }
+
       // ---- clock --------------------------------------------------------
       // Unconditional, every connect. The device has no other time source, so
       // this is the only thing that makes its timestamps real rather than an
@@ -213,8 +229,7 @@ class SyncEngine implements SyncService {
       // time on a panel that takes two seconds to redraw, so its list is
       // deliberately shorter than the app's — see kDeviceTagSlots.
       try {
-        final List<String> want =
-            _settings.tags.take(kDeviceTagSlots).toList();
+        final List<String> want = _settings.tags.take(kDeviceTagSlots).toList();
         await link.writeTags(want);
         _log('tags', 'pushed ${want.length}: $want');
       } on Exception catch (e) {
@@ -231,8 +246,10 @@ class SyncEngine implements SyncService {
         ),
       );
       final List<JotaNoteIndexEntry> index = await link.readIndex();
-      _log('index', '${index.length} note(s): '
-          '${index.map((JotaNoteIndexEntry e) => '#${e.id}/${e.bytes}b').join(', ')}');
+      _log(
+          'index',
+          '${index.length} note(s): '
+              '${index.map((JotaNoteIndexEntry e) => '#${e.id}/${e.bytes}b').join(', ')}');
       if (index.isEmpty) {
         _log('index', 'EMPTY - nothing to fetch, this run ends here');
       }
@@ -273,7 +290,10 @@ class SyncEngine implements SyncService {
         if (known.contains(entry.id)) {
           final Note? have = await _notes.byId(deviceId, entry.id);
           if (have != null && have.crc == entry.crc) {
-            _log('skip', '#${entry.id} already stored byte-identical, re-acking');
+            _log(
+              'skip',
+              '#${entry.id} already stored byte-identical, re-acking',
+            );
             await link.sendAck(entry.id, entry.crc);
             added++;
             _emit(
@@ -483,8 +503,7 @@ class SyncEngine implements SyncService {
         if (firstBytes.length < 16) {
           firstBytes.addAll(use.take(16 - firstBytes.length));
         }
-        writes = writes
-            .then((_) => _partials.append(deviceId, entry.id, use));
+        writes = writes.then((_) => _partials.append(deviceId, entry.id, use));
 
         _emit(
           SyncProgress(
@@ -523,7 +542,7 @@ class SyncEngine implements SyncService {
       _log(
         'chunks',
         '#${entry.id} $chunks notification(s), sizes=${chunkSizes.toList()..sort()}, '
-        'first16=${firstBytes.map((int b) => b.toRadixString(16).padLeft(2, "0")).join()}',
+            'first16=${firstBytes.map((int b) => b.toRadixString(16).padLeft(2, "0")).join()}',
       );
     } finally {
       stall?.cancel();
@@ -538,7 +557,7 @@ class SyncEngine implements SyncService {
       _log(
         'transfer',
         '#${entry.id} failed after ${received - offset} of ${entry.bytes} '
-        'bytes (mtu=${link.mtu}): ${_humanise(failure!)}',
+            'bytes (mtu=${link.mtu}): ${_humanise(failure!)}',
       );
       // Partial bytes stay on disk. The note stays pending on the device because
       // we never acked, so it stays in the advertisement's count, so the phone
@@ -611,7 +630,7 @@ class SyncEngine implements SyncService {
       _log(
         'verify',
         '#${entry.id} CRC MISMATCH: got ${crc.toRadixString(16).padLeft(8, "0")} '
-        'want ${entry.crc} over $held bytes',
+            'want ${entry.crc} over $held bytes',
       );
       // The bytes are not the note. Throw them away — keeping them would make
       // the next resume ask for the wrong offset — and let the device offer it
@@ -711,6 +730,40 @@ class SyncEngine implements SyncService {
 
   static Future<String?> _neverPromptCode() async => null;
 
+  @override
+  Future<void> eraseDevice(String remoteId) {
+    return _withTagLink(remoteId, _neverPromptCode, (JotaLink link) async {
+      if (!link.supportsErase) throw const EraseUnsupported();
+      final JotaStatus st = await link.readStatus();
+
+      // Subscribe BEFORE the write, or the confirmation can land with nobody
+      // listening — the same rule as `data` before `fetch`.
+      final Completer<void> done = Completer<void>();
+      final StreamSubscription<JotaStatus> sub = link.statusStream.listen(
+        (JotaStatus s) {
+          if (s.error == 'erased' && !done.isCompleted) done.complete();
+        },
+        // The stream closing means the link died; if that happens after the
+        // write, the device may well have wiped and rebooted its radio state.
+        // Treat it as confirmation rather than leaving the phone claiming a
+        // bond the device no longer remembers.
+        onDone: () {
+          if (!done.isCompleted) done.complete();
+        },
+      );
+      try {
+        await link.writeErase(st.device);
+        // The wipe is file I/O over every note; give it room.
+        await done.future.timeout(const Duration(seconds: 15));
+        _log('erase', 'device wiped and confirmed');
+      } on TimeoutException {
+        throw const JotaLinkException('the Jota did not confirm the erase');
+      } finally {
+        await sub.cancel();
+      }
+    });
+  }
+
   Future<T> _withTagLink<T>(
     String remoteId,
     PairCodeRequest onPairCodeNeeded,
@@ -731,6 +784,10 @@ class SyncEngine implements SyncService {
         );
         await _authenticate(link, onPairCodeNeeded);
         result.complete(await body(link));
+      } on EraseUnsupported catch (e, st) {
+        // Typed on purpose: the UI answers it with the two-button fallback,
+        // which is a different sentence from any failure.
+        result.completeError(e, st);
       } on Object catch (e, st) {
         result.completeError(SyncException(_humanise(e)), st);
       } finally {

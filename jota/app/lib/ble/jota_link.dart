@@ -13,6 +13,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
+import 'device_diag.dart';
 import 'jota_protocol.dart';
 
 /// Raised when the device is present but will not do what the contract says.
@@ -168,6 +169,36 @@ class JotaLink {
   Future<List<JotaNoteIndexEntry>> readIndex() async {
     final BluetoothCharacteristic c = _require(JotaUuid.index, 'index');
     return JotaNoteIndexEntry.parseList(await c.read());
+  }
+
+  // ---- diag ---------------------------------------------------------------
+
+  /// The device's own health, or null when it cannot say — old firmware has
+  /// no `diag` characteristic, and an unauthenticated read answers `{}`.
+  /// Never throws for either: a device without diagnostics still syncs.
+  Future<DeviceDiag?> readDiag() async {
+    final BluetoothCharacteristic? c = _chars[JotaUuid.diag];
+    if (c == null) return null;
+    try {
+      return DeviceDiag.parse(await c.read());
+    } on Exception {
+      return null;
+    }
+  }
+
+  // ---- erase --------------------------------------------------------------
+
+  /// Whether this firmware can be erased over BLE at all.
+  bool get supportsErase => _chars.containsKey(JotaUuid.erase);
+
+  /// Ask the device to wipe itself: every note, the tag list, the bond.
+  ///
+  /// [deviceIdHex] is the id from `status`, echoed back as the confirmation.
+  /// The device answers with a `status` notify of `{"error":"erased"}` once
+  /// the wipe is done — the caller watches [statusStream] for it.
+  Future<void> writeErase(String deviceIdHex) async {
+    final BluetoothCharacteristic c = _require(JotaUuid.erase, 'erase');
+    await c.write(JotaPayload.erase(deviceIdHex));
   }
 
   // ---- tags ---------------------------------------------------------------

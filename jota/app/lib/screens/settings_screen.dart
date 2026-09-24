@@ -27,6 +27,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../ble/device_diag.dart';
+import '../ble/sync_service.dart';
 import '../data/note.dart';
 import '../data/settings_store.dart';
 import '../export/backup.dart';
@@ -239,6 +241,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   static const String _auto = 'auto';
+
+  /// The device's own account of itself, in the same key/value voice as the
+  /// note's DETAILS card.
+  Future<void> _showFirmware(DeviceDiag d) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.ink.bg,
+      builder: (BuildContext sheetContext) {
+        final JotaType t = sheetContext.type;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              JotaGrid.margin,
+              JotaGrid.gapL,
+              JotaGrid.margin,
+              JotaGrid.gapL,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text('Firmware', style: t.sheetTitle),
+                const SizedBox(height: JotaGrid.gapL),
+                _DiagRow('Version', d.fw.toUpperCase()),
+                if (d.built.isNotEmpty) _DiagRow('Built', d.built),
+                if (d.reset.isNotEmpty)
+                  _DiagRow('Last reset', _resetWord(d.reset)),
+                _DiagRow('Boots', '${d.boots}'),
+                _DiagRow('Crashes', '${d.crashes}'),
+                _DiagRow('Notes recorded', '${d.notes}'),
+                _DiagRow('Syncs', '${d.syncs}'),
+                _DiagRow('Uptime', _fmtUptime(d.upSeconds)),
+                _DiagRow('Free memory', fmtBytes(d.freeHeap)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Erase the Jota from here: everything on it, and the bond both ways.
+  Future<void> _eraseDevice(DeviceController device) async {
+    // The wipe needs a live connection, so say so before asking anything.
+    if (device.pairedAdvertisement == null) {
+      _say(context, 'Bring your Jota close first');
+      return;
+    }
+
+    final bool? yes = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text('Erase this Jota?', style: context.type.headline),
+          content: Text(
+            'Every note on it is deleted. It forgets this phone.',
+            style: context.type.prose,
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text('Cancel', style: context.type.label),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                'Erase',
+                style: context.type.label.copyWith(color: context.ink.signal),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (yes != true || !mounted) return;
+
+    try {
+      await device.eraseDevice();
+      if (!mounted) return;
+      setState(() {});
+      _say(context, 'Jota erased');
+    } on EraseUnsupported {
+      if (!mounted) return;
+      _say(
+        context,
+        'Not yet — hold both buttons on the Jota for five seconds',
+      );
+    } on Exception catch (e) {
+      if (!mounted) return;
+      _say(context, e is SyncException ? e.message : 'Could not erase');
+    }
+  }
 
   Future<void> _load() async {
     final Services s = context.read<Services>();
@@ -515,6 +609,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ? 'Unknown'
                               : '${device.batteryOnDevice}%',
                         ),
+                        // What the device reported about itself on the last
+                        // connection. Unknown until it has connected once on
+                        // firmware that can say (the `diag` characteristic).
+                        _SettingRow(
+                          label: 'Firmware',
+                          value: device.deviceDiag == null
+                              ? 'Unknown'
+                              : device.deviceDiag!.fw.toUpperCase(),
+                          onTap: device.deviceDiag == null
+                              ? null
+                              : () => _showFirmware(device.deviceDiag!),
+                        ),
                         // The four the design names, in its order.
                         _SettingRow(
                           label: 'Tags',
@@ -546,20 +652,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         // Erase, as a row with the rest of the device's
                         // settings rather than a button pinned under every
-                        // group. PLACEHOLDER still: the firmware can erase
-                        // itself — both buttons, held twice — but there is
-                        // no BLE command for it yet, so this says what it
-                        // cannot do rather than pretending.
+                        // group. Real now: the `erase` characteristic wipes
+                        // notes, tags and the bond on the device, which then
+                        // shows its PAIR screen for the next owner.
                         if (device.hasPairedDevice)
                           _SettingRow(
                             label: 'Erase device',
                             value: '→',
                             danger: true,
-                            onTap: () => _say(
-                              context,
-                              'Not yet — hold both buttons on the Jota for '
-                              'five seconds',
-                            ),
+                            onTap: () => _eraseDevice(device),
                           ),
                         const _Caption('Your data'),
                         _SettingRow(
@@ -864,6 +965,47 @@ Future<void> _shareCorrections(BuildContext context, Services s) async {
       subject: 'Jota corrections $stamp',
     ),
   );
+}
+
+/// `sleep` -> `Sleep`; the wire words are lowercase identifiers.
+String _resetWord(String w) =>
+    w.isEmpty ? w : w[0].toUpperCase() + w.substring(1);
+
+/// Uptime reads as time, not a seconds figure: `4m 38s`, `2h 05m`.
+String _fmtUptime(int secs) {
+  if (secs < 60) return '${secs}s';
+  final int m = secs ~/ 60;
+  if (m < 60) return '${m}m ${(secs % 60).toString().padLeft(2, '0')}s';
+  return '${m ~/ 60}h ${(m % 60).toString().padLeft(2, '0')}m';
+}
+
+/// One fact in the Firmware sheet: the same quiet-name / mono-value pairing
+/// as the note's DETAILS card, so the two read as kin.
+class _DiagRow extends StatelessWidget {
+  const _DiagRow(this.name, this.value);
+
+  final String name;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaType t = context.type;
+    final JotaColors c = context.ink;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: JotaGrid.gapS),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: <Widget>[
+          Expanded(
+            child: Text(name, style: t.prose.copyWith(color: c.inkMuted)),
+          ),
+          const SizedBox(width: JotaGrid.gapM),
+          Text(value, style: t.reading.copyWith(color: c.ink)),
+        ],
+      ),
+    );
+  }
 }
 
 void _say(BuildContext context, String message) {

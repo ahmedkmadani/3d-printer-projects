@@ -13,6 +13,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../ble/background_sync.dart';
+import '../ble/device_diag.dart';
 import '../ble/device_scanner.dart';
 import '../ble/jota_protocol.dart';
 import '../ble/sync_service.dart';
@@ -222,6 +223,24 @@ class DeviceController extends ChangeNotifier {
   /// This phone's own id, shown in Settings so two people can see which phone a
   /// Jota belongs to.
   String get appId => _settings.appId;
+
+  /// What the device said about itself on the last authenticated connection,
+  /// or null when it never has — old firmware, or not connected yet.
+  DeviceDiag? get deviceDiag => _sync.lastDiag;
+
+  /// Erase the paired Jota over BLE: every note on it, its tags, the bond.
+  ///
+  /// Throws what the engine throws — [EraseUnsupported] on old firmware,
+  /// [SyncException] when the device is unreachable. On success the device
+  /// has already forgotten this phone, so the local record is cleared too.
+  Future<void> eraseDevice() async {
+    final String? id = pairedId;
+    if (id == null) return;
+    await _sync.eraseDevice(id);
+    await _settings.setDevice(null);
+    _lastError = null;
+    notifyListeners();
+  }
 
   /// Forget the paired Jota.
   ///
