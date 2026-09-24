@@ -473,14 +473,6 @@ void loop() {
     logBattery("awake");
   }
 
-  // Test hook: '!' on serial is a power cut. esp_restart() closes no file,
-  // which is exactly what a flat battery does mid-note, and it is the only
-  // way to make an orphan without opening the case. Unreachable off USB.
-  if (Serial.available() && Serial.read() == '!') {
-    Serial.println("[jota] serial '!': simulating a power cut");
-    esp_restart();
-  }
-
   if (nav.dirty()) paint();
 
   // Anything that is not "READY with nobody around" counts as activity: a

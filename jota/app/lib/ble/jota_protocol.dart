@@ -174,18 +174,30 @@ class JotaAdvertisement {
   /// The id bytes are optional throughout: a device on older firmware sends
   /// four bytes rather than six, and it is still a perfectly good Jota.
   static List<int>? _manufacturerPayload(AdvertisementData ad) {
+    List<int>? payload;
     for (final List<int> raw in ad.msd) {
       // Raw form: FF FF <pending> <flags> [<id-hi> <id-lo> [<battery>]]
       if (raw.length >= 4 && raw[0] == 0xFF && raw[1] == 0xFF) {
-        return raw.sublist(2);
+        payload = raw.sublist(2);
+        break;
       }
-      // Already-stripped form, with or without the optional tail.
-      if (raw.length == 2 || raw.length == 4 || raw.length == 5) return raw;
     }
-    // Last resort: the map, keyed by the 0xFFFF "no company" id.
-    final List<int>? v = ad.manufacturerData[0xFFFF];
-    if (v != null && v.length >= 2) return v;
-    return null;
+    // The map, keyed by the 0xFFFF "no company" id.
+    payload ??= ad.manufacturerData[0xFFFF];
+    // There used to be a third form here: any manufacturer data two, four
+    // or five bytes long was taken as an already-stripped Jota payload. That
+    // is also the shape of half the gadgets in a room, and one of them sat
+    // in the connect list as "JOTA-01C9" — a ghost made from a stranger's
+    // bytes. Only the FFFF marker counts now, and the fields have to be
+    // plausible: flags use two bits, pending is at most the store's 32,
+    // battery is a percent or the 0xFF "no sense pin".
+    if (payload == null || payload.length < 2) return null;
+    if ((payload[1] & ~0x03) != 0) return null;
+    if (payload[0] > 32) return null;
+    if (payload.length >= 5 && payload[4] > 100 && payload[4] != 0xFF) {
+      return null;
+    }
+    return payload;
   }
 
   @override
@@ -284,8 +296,7 @@ class JotaStatus {
   String get shortName => jotaShortName(device);
 
   /// Charge, or null when the device cannot measure it.
-  int? get batteryPercent =>
-      (battery < 0 || battery > 100) ? null : battery;
+  int? get batteryPercent => (battery < 0 || battery > 100) ? null : battery;
 
   static const JotaStatus unknown = JotaStatus(
     pending: 0,
@@ -363,9 +374,7 @@ class JotaNoteIndexEntry {
           time: _int(e['time']) ?? 0,
           // "" is the device saying "no tag armed", which is a null here, not
           // a tag whose name is the empty string.
-          tag: (e['tag'] as String? ?? '').isEmpty
-              ? null
-              : e['tag'] as String,
+          tag: (e['tag'] as String? ?? '').isEmpty ? null : e['tag'] as String,
         ),
       );
     }
