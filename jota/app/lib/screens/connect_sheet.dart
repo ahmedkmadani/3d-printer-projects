@@ -344,6 +344,8 @@ class _SearchingState extends State<_Searching>
 
   @override
   Widget build(BuildContext context) {
+    final CurvedAnimation breath =
+        CurvedAnimation(parent: _c, curve: Curves.easeInOut);
     return SizedBox(
       height: 220,
       child: Stack(
@@ -351,9 +353,11 @@ class _SearchingState extends State<_Searching>
         children: <Widget>[
           const _Radar(size: 220),
           FadeTransition(
-            opacity: Tween<double>(begin: 0.35, end: 0.55).animate(
-              CurvedAnimation(parent: _c, curve: Curves.easeInOut),
-            ),
+            opacity: Tween<double>(begin: 0.6, end: 1).animate(breath),
+            child: const _Backdrop(size: 190),
+          ),
+          FadeTransition(
+            opacity: Tween<double>(begin: 0.45, end: 0.7).animate(breath),
             child: const JotaDeviceMark(),
           ),
         ],
@@ -378,7 +382,7 @@ class _Radar extends StatefulWidget {
 class _RadarState extends State<_Radar> with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2000),
+    duration: const Duration(milliseconds: 3000),
   )..repeat();
 
   @override
@@ -397,9 +401,9 @@ class _RadarState extends State<_Radar> with SingleTickerProviderStateMixin {
         painter: _RadarPainter(
           t: _c.value,
           ink: c.ink,
-          rings: 3,
-          dot: 78,
-          strength: 0.5,
+          rings: 1,
+          dot: 95,
+          strength: 0.22,
         ),
       ),
     );
@@ -442,6 +446,27 @@ class _RadarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RadarPainter old) => old.t != t || old.ink != ink;
+}
+
+/// One soft circle behind the device — ink at a few percent, no border —
+/// the small colour an earbud case sits on when it pops up.
+class _Backdrop extends StatelessWidget {
+  const _Backdrop({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: c.ink.withValues(alpha: c.brightnessIsDark ? 0.10 : 0.06),
+      ),
+    );
+  }
 }
 
 // ---- found -----------------------------------------------------------------
@@ -496,7 +521,13 @@ class _Found extends StatelessWidget {
           tween: Tween<double>(begin: 0, end: 1),
           duration: JotaMotion.normal,
           curve: Curves.easeOutBack,
-          child: SizedBox(height: 160, child: Center(child: mark)),
+          child: SizedBox(
+            height: 200,
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[const _Backdrop(size: 190), mark],
+            ),
+          ),
           builder: (BuildContext context, double v, Widget? child) => Opacity(
             opacity: v.clamp(0.0, 1.0),
             child: Transform.scale(scale: 0.85 + 0.15 * v, child: child),
