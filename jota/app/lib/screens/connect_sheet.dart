@@ -347,14 +347,14 @@ class _SearchingState extends State<_Searching>
     final CurvedAnimation breath =
         CurvedAnimation(parent: _c, curve: Curves.easeInOut);
     return SizedBox(
-      height: 220,
+      height: 260,
       child: Stack(
         alignment: Alignment.center,
         children: <Widget>[
-          const _Radar(size: 220),
+          const _Radar(size: 260),
           FadeTransition(
             opacity: Tween<double>(begin: 0.6, end: 1).animate(breath),
-            child: const _Backdrop(size: 190),
+            child: const _Backdrop(size: 240),
           ),
           FadeTransition(
             opacity: Tween<double>(begin: 0.45, end: 0.7).animate(breath),
@@ -400,10 +400,10 @@ class _RadarState extends State<_Radar> with SingleTickerProviderStateMixin {
         size: Size.square(widget.size),
         painter: _RadarPainter(
           t: _c.value,
-          ink: c.ink,
-          rings: 1,
-          dot: 95,
-          strength: 0.22,
+          ink: pulseTint(c),
+          rings: 2,
+          dot: 100,
+          strength: 0.18,
         ),
       ),
     );
@@ -429,9 +429,11 @@ class _RadarPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final Offset centre = size.center(Offset.zero);
     final double rMax = size.shortestSide / 2 - 1;
+    // A wide, blurred stroke: a pulse of light, not a target.
     final Paint stroke = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = JotaGrid.hairline;
+      ..strokeWidth = 14
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
     // Rings rise from behind the drawn device (radius ~ its half height)
     // and fade as they reach the edge. No dot: the device is the centre.
     final double r0 = dot;
@@ -448,8 +450,19 @@ class _RadarPainter extends CustomPainter {
   bool shouldRepaint(_RadarPainter old) => old.t != t || old.ink != ink;
 }
 
-/// One soft circle behind the device — ink at a few percent, no border —
-/// the small colour an earbud case sits on when it pops up.
+/// The pulse's colour: the theme's signal, desaturated and lightened to a
+/// faded orange, so the rings are warm without shouting.
+Color pulseTint(JotaColors c) {
+  final HSLColor h = HSLColor.fromColor(c.signal);
+  return h
+      .withSaturation((h.saturation * 0.55).clamp(0.0, 1.0))
+      .withLightness((h.lightness + 0.18).clamp(0.0, 0.85))
+      .toColor();
+}
+
+/// One soft circle behind the device — ink at a few percent with a hint of
+/// the pulse's orange mixed in, no border — the small colour an earbud
+/// case sits on when it pops up.
 class _Backdrop extends StatelessWidget {
   const _Backdrop({required this.size});
 
@@ -458,13 +471,15 @@ class _Backdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final JotaColors c = context.ink;
+    final bool dark = c.brightnessIsDark;
+    final Color tint = Color.alphaBlend(
+      pulseTint(c).withValues(alpha: 0.05),
+      c.ink.withValues(alpha: dark ? 0.10 : 0.06),
+    );
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: c.ink.withValues(alpha: c.brightnessIsDark ? 0.10 : 0.06),
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: tint),
     );
   }
 }
@@ -522,10 +537,10 @@ class _Found extends StatelessWidget {
           duration: JotaMotion.normal,
           curve: Curves.easeOutBack,
           child: SizedBox(
-            height: 200,
+            height: 260,
             child: Stack(
               alignment: Alignment.center,
-              children: <Widget>[const _Backdrop(size: 190), mark],
+              children: <Widget>[const _Backdrop(size: 240), mark],
             ),
           ),
           builder: (BuildContext context, double v, Widget? child) => Opacity(
