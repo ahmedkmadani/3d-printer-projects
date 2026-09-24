@@ -621,13 +621,21 @@ abstract final class JotaTheme {
         ),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: c.ink,
+        // Paper, not a slab of ink: a full-width black stadium shouted on
+        // this palette. The toast is the field colour with ink text and a
+        // hairline, the same voice as every card, floating clear of the
+        // nav bar with a whisper of shadow so it still reads as above the
+        // page.
+        backgroundColor: c.field,
         // Prose, not mono: a snackbar is a sentence, and the brand keeps
         // mono for figures and identifiers.
-        contentTextStyle: type.prose.copyWith(color: c.bg),
+        contentTextStyle: type.prose.copyWith(color: c.ink),
+        actionTextColor: c.ink,
         behavior: SnackBarBehavior.floating,
-        elevation: 0,
-        shape: const StadiumBorder(),
+        elevation: 1,
+        shape: StadiumBorder(
+          side: BorderSide(color: c.rule, width: JotaGrid.hairline),
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

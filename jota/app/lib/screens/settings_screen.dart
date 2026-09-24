@@ -165,22 +165,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: <Widget>[
                 Text('Appearance', style: t.sheetTitle),
                 const SizedBox(height: JotaGrid.gapL),
-                Wrap(
-                  spacing: JotaRows.gap,
-                  runSpacing: JotaRows.gap,
-                  children: <Widget>[
-                    for (final String v in const <String>[
-                      'system',
-                      'light',
-                      'dark',
-                    ])
-                      JotaTagChoice(
-                        label: _appearanceLabel(v),
-                        selected: s.settings.appearance == v,
-                        onTap: () => Navigator.of(sheetContext).pop(v),
-                      ),
-                  ],
-                ),
+                // Full rows, not pills: three tiny stadiums under a serif
+                // title made the sheet read as an afterthought, and the
+                // targets were small for the one setting people toggle at
+                // night.
+                for (final String v in const <String>[
+                  'system',
+                  'light',
+                  'dark',
+                ]) ...<Widget>[
+                  JotaRow(
+                    label: _appearanceLabel(v),
+                    selected: s.settings.appearance == v,
+                    onTap: () => Navigator.of(sheetContext).pop(v),
+                  ),
+                  const SizedBox(height: JotaRows.gap),
+                ],
               ],
             ),
           ),
@@ -213,22 +213,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: <Widget>[
                 Text('Language', style: t.sheetTitle),
                 const SizedBox(height: JotaGrid.gapL),
-                Wrap(
-                  spacing: JotaRows.gap,
-                  runSpacing: JotaRows.gap,
-                  children: <Widget>[
-                    for (final String? code in _languages)
-                      JotaTagChoice(
-                        label: _languageLabel(code),
-                        selected: s.settings.language == code,
-                        // The sheet returns the code; null is a real
-                        // choice (auto), so "dismissed" is told apart by
-                        // a sentinel below.
-                        onTap: () =>
-                            Navigator.of(sheetContext).pop(code ?? _auto),
-                      ),
-                  ],
-                ),
+                for (final String? code in _languages) ...<Widget>[
+                  JotaRow(
+                    label: _languageLabel(code),
+                    selected: s.settings.language == code,
+                    // The sheet returns the code; null is a real choice
+                    // (auto), so "dismissed" is told apart by a sentinel
+                    // below.
+                    onTap: () => Navigator.of(sheetContext).pop(code ?? _auto),
+                  ),
+                  const SizedBox(height: JotaRows.gap),
+                ],
               ],
             ),
           ),
