@@ -947,10 +947,14 @@ class JotaKeyValue extends StatelessWidget {
 // The device says NO TRANSCRIPT in `reading`, centred, and nothing else. No
 // illustration, no call to action, no exclamation mark.
 class JotaEmpty extends StatelessWidget {
-  const JotaEmpty({super.key, required this.message, this.action});
+  const JotaEmpty({super.key, required this.message, this.action, this.mark});
 
   final String message;
   final Widget? action;
+
+  /// A small drawn mark above the line — see JotaEmptyMarkView. Optional, so
+  /// an empty state can still be a sentence alone where a mark would be noise.
+  final Widget? mark;
 
   @override
   Widget build(BuildContext context) {
@@ -960,6 +964,10 @@ class JotaEmpty extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
+          if (mark != null) ...<Widget>[
+            mark!,
+            const SizedBox(height: JotaGrid.gapM),
+          ],
           Text(
             message,
             textAlign: TextAlign.center,

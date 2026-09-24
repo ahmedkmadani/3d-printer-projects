@@ -1,28 +1,25 @@
 // ============================================================================
 //  Jota — onboarding illustrations
 //
-//  Three beats of the one idea, drawn with a single shape: an outline circle.
+//  Three beats of one idea, drawn with the product's one shape, the outline
+//  circle, at the mark's own line weight:
 //
-//    stage 0  the crowd — several circles overlapping, each drifting on its own
-//             slow phase, none of them still, none of them the main one
-//    stage 1  one of them leaves — it travels out of the ring and fades, and a
-//             faint circle is already waiting where it lands
-//    stage 2  what is left — one ring breathing, the rest drifting out of sight
+//    stage 0  the head is full — the ring, crowded: seven thoughts inside it
+//             and pressing at its edge, jostling, none of them in charge
+//    stage 1  say it, let it out — the ring opens on the right, and one
+//             thought is on its way out through the gap
+//    stage 2  feel lighter — the ring alone, room around it, one thought
+//             settled at rest inside and the others small and far away
 //
-//  Ink only. The previous version washed the head in `signal` and drew half the
-//  waves, both dots and the travelling thought in it. `signal` means LIVE or
-//  DANGEROUS (brand.md) — spending it on decoration is exactly what made it
-//  read as random, and an onboarding page has nothing live or dangerous on it.
-//  It also drew a head with waves inside, which is a diagram of a head; the
-//  locked design says a crowd of plain circles, so that is what this draws.
+//  Ink only, one stroke. Everything is composed in the design's 150x92 box and
+//  scaled to fit, so the picture cannot drift with the screen.
 //
-//  Everything is laid out in the design's own 150x92 box and scaled to fit, so
-//  the composition cannot drift from the artifact as the box changes; the 1.5
-//  stroke scales with it and stays the one line weight.
-//
-//  They MOVE, slowly — a crowd is restless, a thought leaving travels, and what
-//  remains breathes. The loops run 3.4-7 s per element and stop dead under
-//  prefers-reduced-motion.
+//  Motion, two kinds, both quiet:
+//  * an ENTRANCE when the page becomes the one on screen — the circles settle
+//    into place from a little way off, 400 ms, staggered, easeOutCubic;
+//  * the ambient LOOP the brand asks for on this one screen (docs/brand.md,
+//    "Motion"): a slow drift, a breath, a thought travelling. 3–7 s.
+//  Both stop dead under prefers-reduced-motion.
 // ============================================================================
 import 'dart:math' as math;
 
@@ -31,59 +28,77 @@ import 'package:flutter/material.dart';
 import '../design/theme.dart';
 
 class MindIllustration extends StatefulWidget {
-  const MindIllustration({super.key, required this.stage});
+  const MindIllustration({super.key, required this.stage, this.active = true});
 
   /// 0 = full, 1 = releasing, 2 = light.
   final int stage;
+
+  /// True while this page is the one on screen. The entrance plays when it
+  /// turns true, not when the page is built out of sight in a PageView.
+  final bool active;
 
   @override
   State<MindIllustration> createState() => _MindIllustrationState();
 }
 
 class _MindIllustrationState extends State<MindIllustration>
-    with SingleTickerProviderStateMixin {
-  /// One turn of the whole page. Each element then runs at a whole number of
-  /// turns inside it, which is what lets five circles keep five different
-  /// periods (5.50, 5.92, 6.42, 7.00 s) and still meet exactly at the seam —
-  /// no jump every time the controller wraps.
+    with TickerProviderStateMixin {
   static const List<Duration> _loop = <Duration>[
     Duration(seconds: 77),
-    Duration(milliseconds: 3400),
+    Duration(milliseconds: 4200),
     Duration(seconds: 10),
   ];
 
-  late final AnimationController _c = AnimationController(
+  late final AnimationController _loopC = AnimationController(
     vsync: this,
     duration: _loop[widget.stage],
+  );
+  late final AnimationController _enter = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 400),
   );
 
   @override
   void initState() {
     super.initState();
-    _c.repeat();
+    _loopC.repeat();
+    if (widget.active) _enter.forward();
+  }
+
+  @override
+  void didUpdateWidget(MindIllustration old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) _enter.forward(from: 0);
   }
 
   @override
   void dispose() {
-    _c.dispose();
+    _loopC.dispose();
+    _enter.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final JotaColors c = context.ink;
-    // Someone who has asked the OS for less motion has asked for less motion.
     final bool still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     if (still) {
       return CustomPaint(
-        painter: _MindPainter(line: c.ink, stage: widget.stage, t: 0),
+        painter: _MindPainter(line: c.ink, stage: widget.stage, t: 0, e: 1),
         child: const SizedBox.expand(),
       );
     }
+    final CurvedAnimation e =
+        CurvedAnimation(parent: _enter, curve: JotaMotion.curve);
     return AnimatedBuilder(
-      animation: _c,
+      animation: Listenable.merge(<Listenable>[_loopC, e]),
       builder: (BuildContext context, Widget? child) => CustomPaint(
-        painter: _MindPainter(line: c.ink, stage: widget.stage, t: _c.value),
+        painter: _MindPainter(
+          line: c.ink,
+          stage: widget.stage,
+          t: _loopC.value,
+          e: e.value,
+        ),
         child: child,
       ),
       child: const SizedBox.expand(),
@@ -91,10 +106,10 @@ class _MindIllustrationState extends State<MindIllustration>
   }
 }
 
-/// A circle in the crowd: where it sits, how present it is, and how it drifts —
-/// `turns` per loop, `delay` in fractions of its own turn, `by` the whole
-/// distance it wanders and comes back from.
-typedef _Drifter = ({
+/// A circle in the picture: where it sits, its size, how present it is, how it
+/// drifts (`turns` per loop, `delay` in fractions of a turn, `by` the whole
+/// wander), and where it comes in from (`from`, an offset it settles from).
+typedef _Circle = ({
   double cx,
   double cy,
   double r,
@@ -102,25 +117,31 @@ typedef _Drifter = ({
   int turns,
   double delay,
   Offset by,
+  Offset from,
+  int order,
 });
 
 class _MindPainter extends CustomPainter {
-  _MindPainter({required this.line, required this.stage, required this.t});
+  _MindPainter({
+    required this.line,
+    required this.stage,
+    required this.t,
+    required this.e,
+  });
 
   final Color line;
   final int stage;
 
-  /// 0..1, wrapping. Every motion below is a function of this and nothing
-  /// else, so the drawing is still pure and still testable at any frame.
+  /// Loop position, 0..1, wrapping.
   final double t;
 
-  /// The box the locked design draws in. Held here rather than derived from
-  /// the widget so the five stage-0 circles keep the spacing they were
-  /// composed with instead of being re-invented per screen size.
-  static const Size _design = Size(150, 92);
+  /// Entrance, 0..1, once.
+  final double e;
 
-  static const Offset _drift = Offset(3, -4);
-  static const Offset _drift2 = Offset(-4, 3);
+  static const Size _design = Size(150, 92);
+  static const Offset _drift = Offset(2.5, -3);
+  static const Offset _drift2 = Offset(-3, 2.5);
+  static const double _stroke = 1.5;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -134,90 +155,263 @@ class _MindPainter extends CustomPainter {
       (size.height - _design.height * k) / 2,
     );
     canvas.scale(k);
-
     switch (stage) {
       case 0:
-        _crowd(canvas);
+        _full(canvas);
       case 1:
         _release(canvas);
       default:
-        _calm(canvas);
+        _light(canvas);
     }
     canvas.restore();
   }
 
   Paint _ink(double alpha) => Paint()
     ..style = PaintingStyle.stroke
-    ..strokeWidth = 1.5
-    ..color = line.withValues(alpha: alpha);
+    ..strokeWidth = _stroke
+    ..strokeCap = StrokeCap.round
+    ..color = line.withValues(alpha: alpha.clamp(0.0, 1.0));
 
-  /// Out and back, 0 → 1 → 0, easing at both ends — the shape of every drift
-  /// and breath here. Whole `turns` keep it continuous across the wrap.
   double _swing(int turns, double delay) =>
       (1 - math.cos(2 * math.pi * (t * turns - delay))) / 2;
 
-  void _drifter(Canvas canvas, _Drifter d) {
-    final double s = _swing(d.turns, d.delay);
-    canvas.drawCircle(
-      Offset(d.cx + d.by.dx * s, d.cy + d.by.dy * s),
-      d.r,
-      _ink(d.alpha),
+  /// The entrance for the n-th circle: staggered by 60 ms each, 0..1.
+  double _arrive(int order) => ((e - order * 0.12) / 0.7).clamp(0.0, 1.0);
+
+  void _circle(Canvas canvas, _Circle c) {
+    final double a = _arrive(c.order);
+    final double s = _swing(c.turns, c.delay);
+    final Offset at =
+        Offset(c.cx + c.by.dx * s, c.cy + c.by.dy * s) + c.from * (1 - a);
+    canvas.drawCircle(at, c.r * (0.6 + 0.4 * a), _ink(c.alpha * a));
+  }
+
+  /// The head: the ring, at the mark's proportion.
+  void _ring(
+    Canvas canvas,
+    Offset at,
+    double r,
+    double alpha, {
+    double gapFrom = 0,
+    double gapTo = 0,
+  }) {
+    final double a = _arrive(0);
+    final double rr = r * (0.9 + 0.1 * a);
+    if (gapTo <= gapFrom) {
+      canvas.drawCircle(at, rr, _ink(alpha * a));
+      return;
+    }
+    // A ring with an opening: drawn as one arc from the end of the gap round
+    // to its start.
+    canvas.drawArc(
+      Rect.fromCircle(center: at, radius: rr),
+      gapTo,
+      2 * math.pi - (gapTo - gapFrom),
+      false,
+      _ink(alpha * a),
     );
   }
 
-  /// The moment: five circles, overlapping, no one of them in charge. They
-  /// never drift together — that is the whole point of the picture.
-  void _crowd(Canvas canvas) {
-    const List<_Drifter> crowd = <_Drifter>[
-      (cx: 58, cy: 38, r: 18, alpha: 1, turns: 14, delay: 0, by: _drift),
-      (cx: 86, cy: 48, r: 22, alpha: 1, turns: 12, delay: 0.06, by: _drift2),
-      (cx: 70, cy: 60, r: 13, alpha: .70, turns: 11, delay: 0.13, by: _drift),
-      (cx: 98, cy: 32, r: 10, alpha: .55, turns: 13, delay: 0.22, by: _drift2),
-      (cx: 46, cy: 58, r: 8, alpha: .40, turns: 12, delay: 0.06, by: _drift2),
+  /// When your head is full: the ring holds more than it can, thoughts
+  /// pressing at its edge and over it, each jostling on its own time.
+  void _full(Canvas canvas) {
+    const Offset head = Offset(75, 46);
+    _ring(canvas, head, 30, 1);
+    const List<_Circle> crowd = <_Circle>[
+      (
+        cx: 68,
+        cy: 40,
+        r: 12,
+        alpha: 1,
+        turns: 14,
+        delay: 0,
+        by: _drift,
+        from: Offset(-6, -4),
+        order: 1
+      ),
+      (
+        cx: 86,
+        cy: 52,
+        r: 9,
+        alpha: 1,
+        turns: 12,
+        delay: .06,
+        by: _drift2,
+        from: Offset(6, 4),
+        order: 2
+      ),
+      (
+        cx: 60,
+        cy: 58,
+        r: 7,
+        alpha: .8,
+        turns: 11,
+        delay: .13,
+        by: _drift,
+        from: Offset(-5, 5),
+        order: 3
+      ),
+      (
+        cx: 92,
+        cy: 32,
+        r: 6,
+        alpha: .8,
+        turns: 13,
+        delay: .22,
+        by: _drift2,
+        from: Offset(5, -5),
+        order: 4
+      ),
+      (
+        cx: 78,
+        cy: 24,
+        r: 5,
+        alpha: .7,
+        turns: 12,
+        delay: .3,
+        by: _drift,
+        from: Offset(0, -6),
+        order: 5
+      ),
+      (
+        cx: 102,
+        cy: 58,
+        r: 6,
+        alpha: .6,
+        turns: 11,
+        delay: .4,
+        by: _drift2,
+        from: Offset(7, 2),
+        order: 6
+      ),
+      (
+        cx: 50,
+        cy: 34,
+        r: 5,
+        alpha: .6,
+        turns: 13,
+        delay: .5,
+        by: _drift,
+        from: Offset(-7, 0),
+        order: 7
+      ),
     ];
-    for (final _Drifter d in crowd) {
-      _drifter(canvas, d);
+    for (final _Circle c in crowd) {
+      _circle(canvas, c);
     }
   }
 
-  /// The answer: one circle leaves the ring, fades on the way, and something
-  /// faint is already holding the place it is going to.
+  /// Say it, let it out: the ring opens on the right — the mouth of the head,
+  /// if you like, though it is only a gap — and one thought goes out through
+  /// it, fading as it goes. The rest stay, calmer than before.
   void _release(Canvas canvas) {
-    _breathe(canvas, const Offset(56, 46), 26, 1);
-
-    // It travels for the first 70% of the loop and then simply is not there:
-    // the pause is what makes it a departure rather than a shuttle.
+    const Offset head = Offset(62, 46);
+    _ring(canvas, head, 30, 1, gapFrom: -0.45, gapTo: 0.45);
+    const List<_Circle> left = <_Circle>[
+      (
+        cx: 56,
+        cy: 38,
+        r: 10,
+        alpha: .9,
+        turns: 1,
+        delay: 0,
+        by: _drift,
+        from: Offset(-4, -3),
+        order: 1
+      ),
+      (
+        cx: 50,
+        cy: 58,
+        r: 6,
+        alpha: .7,
+        turns: 1,
+        delay: .3,
+        by: _drift2,
+        from: Offset(-4, 3),
+        order: 2
+      ),
+      (
+        cx: 70,
+        cy: 62,
+        r: 5,
+        alpha: .6,
+        turns: 1,
+        delay: .6,
+        by: _drift,
+        from: Offset(2, 4),
+        order: 3
+      ),
+    ];
+    for (final _Circle c in left) {
+      _circle(canvas, c);
+    }
+    // The one leaving: out through the gap for the first 70% of the loop,
+    // then simply not there — the pause is what makes it a departure.
     final double p = math.min(t / 0.7, 1.0);
-    final double e = (1 - math.cos(math.pi * p)) / 2;
-    canvas.drawCircle(Offset(56 + 26 * e, 46), 9, _ink(0.9 * (1 - e)));
-
-    canvas.drawCircle(const Offset(112, 46), 12, _ink(0.35));
-  }
-
-  /// Coming back: one ring, calm, and two circles on their way out — still
-  /// drifting, but down to almost nothing.
-  void _calm(Canvas canvas) {
-    _breathe(canvas, const Offset(75, 46), 27, 2);
-
-    final double gone = 0.5 - 0.38 * _swing(1, 0);
-    _drifter(
-      canvas,
-      (cx: 26, cy: 30, r: 7, alpha: gone, turns: 2, delay: 0, by: _drift),
-    );
-    _drifter(
-      canvas,
-      (cx: 128, cy: 58, r: 9, alpha: gone, turns: 1, delay: 0, by: _drift2),
+    final double ease = (1 - math.cos(math.pi * p)) / 2;
+    final double a = _arrive(2);
+    canvas.drawCircle(
+      Offset(78 + 46 * ease, 46 - 2 * ease),
+      7 * a,
+      _ink(0.95 * (1 - ease) * a),
     );
   }
 
-  /// A ring that breathes: 6% wider and a shade lighter at the top of the
-  /// breath. Small enough that you feel it rather than watch it.
-  void _breathe(Canvas canvas, Offset at, double r, int turns) {
-    final double s = _swing(turns, 0);
-    canvas.drawCircle(at, r * (1 + 0.06 * s), _ink(1 - 0.15 * s));
+  /// Feel lighter: the ring, alone, with room round it; one thought at rest
+  /// inside, and what left now small and far off, still drifting away.
+  void _light(Canvas canvas) {
+    const Offset head = Offset(75, 46);
+    final double breath = _swing(2, 0);
+    _ring(canvas, head, 30 * (1 + 0.04 * breath), 1 - 0.12 * breath);
+    canvas.drawCircle(
+      const Offset(72, 44),
+      8 * _arrive(1),
+      _ink(0.9 * _arrive(1)),
+    );
+    final double gone = 0.45 - 0.3 * _swing(1, 0);
+    const List<_Circle> far = <_Circle>[
+      (
+        cx: 20,
+        cy: 26,
+        r: 4,
+        alpha: 1,
+        turns: 2,
+        delay: 0,
+        by: _drift,
+        from: Offset(6, 3),
+        order: 2
+      ),
+      (
+        cx: 134,
+        cy: 66,
+        r: 5,
+        alpha: 1,
+        turns: 1,
+        delay: 0,
+        by: _drift2,
+        from: Offset(-6, -3),
+        order: 3
+      ),
+    ];
+    for (final _Circle c in far) {
+      _circle(
+        canvas,
+        (
+          cx: c.cx,
+          cy: c.cy,
+          r: c.r,
+          alpha: gone,
+          turns: c.turns,
+          delay: c.delay,
+          by: c.by,
+          from: c.from,
+          order: c.order,
+        ),
+      );
+    }
   }
 
   @override
   bool shouldRepaint(_MindPainter old) =>
-      old.stage != stage || old.line != line || old.t != t;
+      old.stage != stage || old.line != line || old.t != t || old.e != e;
 }

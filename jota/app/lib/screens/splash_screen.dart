@@ -1,18 +1,18 @@
 // ============================================================================
 //  Jota — splash
 //
-//  The phone's echo of the device's own splash (renders/ui/01_splash.png): the
-//  Jota wordmark, a strong rule, and the version beneath — on warm paper. Held
-//  for a beat while the service graph settles, then it reads the first-run flag
-//  and routes: a fresh install goes to onboarding, everyone else goes straight
-//  to the notes.
+//  The mark draws itself in above the wordmark — the ring sweeps, the thoughts
+//  arrive — then the app fades in behind it. Under 1.2 s in all: a splash is
+//  paid on every launch, and this one exists to say the name, not to be
+//  watched. It reads the first-run flag and routes: a fresh install goes to
+//  onboarding, everyone else goes straight to the notes.
 // ============================================================================
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../design/mark.dart';
+import '../design/marks.dart';
 import '../design/theme.dart';
 import '../state/services.dart';
 import 'home_shell.dart';
@@ -43,21 +43,10 @@ class _SplashScreenState extends State<SplashScreen>
 
   Timer? _hold;
 
-  @override
-  void initState() {
-    super.initState();
-    // A visual beat, not real work — the graph is already booted before runApp.
-    //
-    // 2.6s, not the 900ms this was. The mark drifts on 9-to-17-second cycles,
-    // and at 900ms it had not visibly moved: the animation was there and no one
-    // ever saw it. This is long enough to register as movement and to let a
-    // person arrive before the app asks anything of them, which is the point —
-    // Jota is for catching a thought, and being hurried is how you lose one.
-    //
-    // It is deliberately NOT long enough to become a toll. If this ever needs
-    // to be longer, speed the drift instead; a splash that outstays its welcome
-    // is paid on every single launch.
-    _hold = Timer(const Duration(milliseconds: 2600), _go);
+  /// The mark takes 600 ms to draw; the whole mark is then held for a beat
+  /// before the app fades in. About 1.1 s from first paint to Home.
+  void _drawn() {
+    _hold = Timer(const Duration(milliseconds: 320), _go);
   }
 
   @override
@@ -72,8 +61,13 @@ class _SplashScreenState extends State<SplashScreen>
     final bool seen = !kForceOnboarding &&
         context.read<Services>().settings.hasSeenOnboarding;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => seen ? const HomeShell() : const OnboardingScreen(),
+      // A fade, not the app's slide: the splash is not a page you came from.
+      PageRouteBuilder<void>(
+        transitionDuration: JotaMotion.normal,
+        pageBuilder: (_, __, ___) =>
+            seen ? const HomeShell() : const OnboardingScreen(),
+        transitionsBuilder: (_, Animation<double> a, __, Widget child) =>
+            FadeTransition(opacity: a, child: child),
       ),
     );
   }
@@ -90,12 +84,9 @@ class _SplashScreenState extends State<SplashScreen>
           opacity: _fade,
           child: Column(
             children: <Widget>[
-              // The mark, drifting, above the wordmark.
-              //
-              // The splash is the one screen with nothing to do, which makes it
-              // the only place the drift can be watched rather than glanced at
-              // — and it is the same mark, and the same five dots, as the icon
-              // the person just tapped to get here.
+              // The mark, drawing itself in, above the wordmark — the same
+              // ring and the same five thoughts as the icon the person just
+              // tapped to get here.
               //
               // `Jota`, not `JOTA`. The serif wordmark is the name and the name
               // is capital-J-lowercase (docs/brand.md); the all-caps form is the
@@ -107,7 +98,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      const JotaMarkDrifting(size: 132),
+                      JotaMarkDrawing(size: 132, onDone: _drawn),
                       const SizedBox(height: JotaGrid.gapL),
                       Text('Jota', style: t.wordmark),
                     ],

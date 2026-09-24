@@ -22,6 +22,7 @@ import 'package:provider/provider.dart';
 
 import '../ble/jota_protocol.dart';
 import '../data/note.dart';
+import '../design/marks.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
 import '../state/device_controller.dart';
@@ -237,6 +238,7 @@ class _TagEditorScreenState extends State<TagEditorScreen> {
                   ? Center(child: Text('Reading Jota…', style: t.label))
                   : _tags.isEmpty
                       ? const JotaEmpty(
+                          mark: JotaEmptyMarkView(EmptyMark.noTags),
                           message: 'No tags yet',
                         )
                       : TagList(
