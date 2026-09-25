@@ -214,12 +214,13 @@ class _ConnectSheetState extends State<ConnectSheet> {
     _codeFocus.unfocus();
     // The check draws for ~350 ms, then the card holds for 600 ms so the
     // moment reads before the screen moves on.
+    // Check draws, holds a beat, then the flow finishes: a first pairing
+    // hands over to Home, a re-sync from the card closes the sheet. It used
+    // to 'settle' open on a re-sync, but the Jota sleeps the instant a sync
+    // ends, so the sheet fell straight back to 'wake it' and the user tapped
+    // Sync again and again — a loop made of successes.
     Timer(const Duration(milliseconds: 950), () {
       if (!mounted || _finished) return;
-      if (_settleAfterDone) {
-        setState(() => _doneId = null);
-        return;
-      }
       _finished = true;
       widget.onDone();
     });
@@ -336,8 +337,7 @@ class _ConnectSheetState extends State<ConnectSheet> {
     if (found.isNotEmpty) _lastShown = _shown(found);
     final JotaAdvertisement? shown =
         found.isNotEmpty ? _shown(found) : _lastShown;
-    // Nothing to draw yet, or the device went quiet and no card is mid-flight.
-    final bool searching = shown == null || (found.isEmpty && _doneId == null);
+    final bool searching = found.isEmpty && _doneId == null;
     // A paired Jota is not being CONNECTED, it is being woken: first-run
     // pairing copy on an owned device read like switching devices. The
     // paired sheet says wake / press a button / Sync instead.
