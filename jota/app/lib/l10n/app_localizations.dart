@@ -605,7 +605,7 @@ abstract class AppLocalizations {
   /// No description provided for @noTag.
   ///
   /// In en, this message translates to:
-  /// **'No tag'**
+  /// **'Remove tag'**
   String get noTag;
 
   /// No description provided for @noTagsYet.

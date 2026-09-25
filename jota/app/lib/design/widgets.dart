@@ -8,6 +8,8 @@
 //  Every one of these draws from lib/design/theme.dart and holds no colours,
 //  sizes or radii of its own.
 // ============================================================================
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -1185,13 +1187,116 @@ class JotaTextLink extends StatelessWidget {
 /// they read as the pill's own voice, and RTL Arabic centres identically.
 /// Snackbars WITH an action (UNDO) keep the stock left-text/right-action
 /// layout — do not route those through here.
+OverlayEntry? _toastEntry;
+
+/// A word above the nav bar, gone before it is chrome: a compact pill in
+/// the field colour that fades in, holds under two seconds and fades out.
+/// It replaced a full-width snackbar that sat for four seconds and read as
+/// a banner. Anything needing an action (UNDO) still uses a SnackBar.
 void jotaToast(BuildContext context, String message) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(content: Text(message, textAlign: TextAlign.center)),
-    );
+  _toastEntry?.remove();
+  _toastEntry = null;
+  final OverlayState overlay = Overlay.of(context, rootOverlay: true);
+  late final OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (BuildContext context) => _JotaToast(
+      message: message,
+      onFinished: () {
+        if (_toastEntry == entry) _toastEntry = null;
+        entry.remove();
+      },
+    ),
+  );
+  _toastEntry = entry;
+  overlay.insert(entry);
 }
+
+class _JotaToast extends StatefulWidget {
+  const _JotaToast({required this.message, required this.onFinished});
+
+  final String message;
+  final VoidCallback onFinished;
+
+  @override
+  State<_JotaToast> createState() => _JotaToastState();
+}
+
+class _JotaToastState extends State<_JotaToast>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 200),
+    reverseDuration: const Duration(milliseconds: 260),
+  );
+  Timer? _hold;
+
+  @override
+  void initState() {
+    super.initState();
+    _c.forward();
+    _hold = Timer(const Duration(milliseconds: 1900), () async {
+      if (!mounted) return;
+      await _c.reverse();
+      widget.onFinished();
+    });
+  }
+
+  @override
+  void dispose() {
+    _hold?.cancel();
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final JotaColors c = context.ink;
+    final JotaType t = context.type;
+    final CurvedAnimation a =
+        CurvedAnimation(parent: _c, curve: JotaMotion.curve);
+    return Positioned(
+      left: JotaGrid.margin,
+      right: JotaGrid.margin,
+      // Above the floating nav bar, not on it.
+      bottom: 110 + MediaQuery.of(context).padding.bottom,
+      child: IgnorePointer(
+        child: FadeTransition(
+          opacity: a,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.25),
+              end: Offset.zero,
+            ).animate(a),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: JotaGrid.gapL,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: c.field,
+                  borderRadius: const BorderRadius.all(Radius.circular(999)),
+                  border: Border.all(color: c.rule, width: JotaGrid.hairline),
+                ),
+                child: Text(
+                  widget.message,
+                  textAlign: TextAlign.center,
+                  style: t.prose.copyWith(color: c.ink, fontSize: 15),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The arrow that points 'onward' in the reading direction: '→' in LTR,
+/// '←' under Arabic. A hard-coded '→' pointed backwards on every mirrored
+/// row.
+String jotaArrow(BuildContext context) =>
+    Directionality.of(context) == TextDirection.rtl ? '←' : '→';
 
 /// Press feedback for every tappable shape: the shape sinks a hair under the
 /// finger and springs back on release. Without it a stadium is a drawing of

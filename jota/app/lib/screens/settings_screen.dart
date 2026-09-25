@@ -690,7 +690,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // The four the design names, in its order.
                         _SettingRow(
                           label: context.l10n.rowTags,
-                          value: '${s.settings.tags.length} →',
+                          value:
+                              '${s.settings.tags.length} ${jotaArrow(context)}',
                           onTap: () async {
                             await Navigator.of(context).push(
                               MaterialPageRoute<void>(
@@ -715,7 +716,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         if (device.hasPairedDevice)
                           _SettingRow(
                             label: context.l10n.forgetThisJota,
-                            value: '→',
+                            value: jotaArrow(context),
                             onTap: () => _forget(device),
                           ),
                         // Erase, as a row with the rest of the device's
@@ -726,7 +727,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         if (device.hasPairedDevice)
                           _SettingRow(
                             label: context.l10n.eraseDevice,
-                            value: '→',
+                            value: jotaArrow(context),
                             danger: true,
                             onTap: () => _eraseDevice(device),
                           ),
@@ -740,7 +741,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // the whole backup story for now.
                         _SettingRow(
                           label: context.l10n.shareAllNotes,
-                          value: '→',
+                          value: jotaArrow(context),
                           onTap: () => _shareBackup(s),
                         ),
                         // Every note corrected by hand, as audio plus both
@@ -748,12 +749,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // this voice. See lib/export/corrections.dart.
                         _SettingRow(
                           label: context.l10n.exportCorrections,
-                          value: '→',
+                          value: jotaArrow(context),
                           onTap: () => _shareCorrections(context, s),
                         ),
                         _SettingRow(
                           label: context.l10n.playbackCache,
-                          value: '${fmtBytes(_cacheBytes)} →',
+                          value:
+                              '${fmtBytes(_cacheBytes)} ${jotaArrow(context)}',
                           onTap: () async {
                             await s.audio.clearCache();
                             await _load();
@@ -799,7 +801,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         _SettingRow(
                           label: context.l10n.replayOnboarding,
-                          value: '→',
+                          value: jotaArrow(context),
                           onTap: () async {
                             await s.settings.setHasSeenOnboarding(false);
                             if (!context.mounted) return;

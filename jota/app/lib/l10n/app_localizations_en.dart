@@ -284,7 +284,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editTags => 'Edit tags';
 
   @override
-  String get noTag => 'No tag';
+  String get noTag => 'Remove tag';
 
   @override
   String get noTagsYet => 'No tags yet';

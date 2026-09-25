@@ -81,7 +81,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get stateTapToConnect => 'انقر للاتصال';
 
   @override
-  String get stateNoJota => 'لا جوتا';
+  String get stateNoJota => 'لا جوطة';
 
   @override
   String get stateNearby => 'قريب';
@@ -132,7 +132,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get pairADevice => 'اقرن جهازًا';
 
   @override
-  String get pressJotaButton => 'اضغط زر جوتا';
+  String get pressJotaButton => 'اضغط زر جوطة';
 
   @override
   String get today => 'اليوم';
@@ -230,7 +230,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get deleteThisNote => 'أتحذف هذه الملاحظة؟';
 
   @override
-  String get deleteNoteBody => 'تخلّت جوتا عن نسختها، فلا رجوع بعد الحذف.';
+  String get deleteNoteBody => 'تخلّت جوطة عن نسختها، فلا رجوع بعد الحذف.';
 
   @override
   String get cancel => 'إلغاء';
@@ -285,7 +285,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get editTags => 'تعديل الوسوم';
 
   @override
-  String get noTag => 'بلا وسم';
+  String get noTag => 'أزل الوسم';
 
   @override
   String get noTagsYet => 'لا وسوم بعد';
@@ -294,7 +294,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get tagsTitle => 'الوسوم';
 
   @override
-  String get onJota => 'على جوتا';
+  String get onJota => 'على جوطة';
 
   @override
   String get sortByUse => 'رتّب بالاستخدام';
@@ -303,7 +303,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get alreadySorted => 'مرتبة أصلًا';
 
   @override
-  String get readingJota => 'يقرأ جوتا…';
+  String get readingJota => 'يقرأ جوطة…';
 
   @override
   String tagRemoved(String tag) {
@@ -317,11 +317,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String maxTags(int max) {
-    return '$max هو أقصى ما تحمله جوتا';
+    return '$max هو أقصى ما تحمله جوطة';
   }
 
   @override
-  String get savedTagsSync => 'حُفظت. تصل جوتا عند المزامنة';
+  String get savedTagsSync => 'حُفظت. تصل جوطة عند المزامنة';
 
   @override
   String get settingsTitle => 'الإعدادات';
@@ -417,26 +417,26 @@ class AppLocalizationsAr extends AppLocalizations {
   String get rowSyncBackground => 'مزامنة في الخلفية';
 
   @override
-  String get forgetThisJota => 'نسيان جوتا';
+  String get forgetThisJota => 'نسيان جوطة';
 
   @override
-  String get jotaNotInRange => 'جوتا خارج النطاق';
+  String get jotaNotInRange => 'جوطة خارج النطاق';
 
   @override
   String get forgetBody =>
-      'قرّب جوتا وحاول مجددًا لتنسى هذا الهاتف أيضًا.\n\nإن أزلتها الآن فستظل تثق بهذا الهاتف حتى تمسحها على الجهاز — اضغط الزرين معًا.';
+      'قرّب جوطة وحاول مجددًا لتنسى هذا الهاتف أيضًا.\n\nإن أزلتها الآن فستظل تثق بهذا الهاتف حتى تمسحها على الجهاز — اضغط الزرين معًا.';
 
   @override
   String get removeAnyway => 'أزلها على أي حال';
 
   @override
-  String get jotaForgotten => 'نُسيت جوتا';
+  String get jotaForgotten => 'نُسيت جوطة';
 
   @override
   String get eraseDevice => 'مسح الجهاز';
 
   @override
-  String get eraseThisJota => 'أتمسح جوتا؟';
+  String get eraseThisJota => 'أتمسح جوطة؟';
 
   @override
   String get eraseBody => 'تُحذف كل ملاحظاتها وتنسى هذا الهاتف.';
@@ -445,19 +445,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get erase => 'مسح';
 
   @override
-  String get waitingForJota => 'في انتظار جوتا — اضغط زرًا عليها';
+  String get waitingForJota => 'في انتظار جوطة — اضغط زرًا عليها';
 
   @override
-  String get noJotaNearby => 'لا جوتا قريبًا';
+  String get noJotaNearby => 'لا جوطة قريبًا';
 
   @override
-  String get jotaErased => 'تم مسح جوتا';
+  String get jotaErased => 'تم مسح جوطة';
 
   @override
   String get couldNotErase => 'تعذر المسح';
 
   @override
-  String get holdBothButtons => 'ليس بعد — اضغط زرّي جوتا معًا خمس ثوانٍ';
+  String get holdBothButtons => 'ليس بعد — اضغط زرّي جوطة معًا خمس ثوانٍ';
 
   @override
   String get rowStorage => 'التخزين';
@@ -514,22 +514,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get replayOnboarding => 'إعادة الجولة';
 
   @override
-  String get connectYourJota => 'وصّل جوتا';
+  String get connectYourJota => 'وصّل جوطة';
 
   @override
-  String get switchOnYourJota => 'شغّل جوتا';
+  String get switchOnYourJota => 'شغّل جوطة';
 
   @override
   String get connect => 'اتصال';
 
   @override
-  String get enterCodeOnJota => 'أدخل الرمز الظاهر على جوتا';
+  String get enterCodeOnJota => 'أدخل الرمز الظاهر على جوطة';
 
   @override
   String get pair => 'اقتران';
 
   @override
-  String get pairWithJota => 'الاقتران بجوتا';
+  String get pairWithJota => 'الاقتران بجوطة';
 
   @override
   String get setUpLater => 'لاحقًا';
@@ -538,7 +538,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get notNow => 'ليس الآن';
 
   @override
-  String get connectMyJota => 'وصّل جوتا';
+  String get connectMyJota => 'وصّل جوطة';
 
   @override
   String get next => 'التالي';
@@ -550,13 +550,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get obHead1 => 'حين يمتلئ\nرأسك.';
 
   @override
-  String get obBody1 => 'الأفكار تتكدس وتتداخل. لهذا جوتا.';
+  String get obBody1 => 'الأفكار تتكدس وتتداخل. لهذا جوطة.';
 
   @override
   String get obHead2 => 'قلها،\nأطلقها.';
 
   @override
-  String get obBody2 => 'اضغط مرة وتكلّم. جوتا تحفظها لك.';
+  String get obBody2 => 'اضغط مرة وتكلّم. جوطة تحفظها لك.';
 
   @override
   String get obHead3 => 'اشعر\nبالخفة.';
@@ -568,7 +568,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bluetoothOff => 'البلوتوث مطفأ';
 
   @override
-  String get jotaNeedsBluetooth => 'جوتا تحتاج البلوتوث';
+  String get jotaNeedsBluetooth => 'جوطة تحتاج البلوتوث';
 
   @override
   String get turnOnBluetooth => 'شغّل البلوتوث';
@@ -577,7 +577,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get allowBluetooth => 'اسمح بالبلوتوث من الإعدادات';
 
   @override
-  String get unlockJota => 'افتح جوتا';
+  String get unlockJota => 'افتح جوطة';
 
   @override
   String get useFaceOrFingerprint => 'استخدم وجهك أو بصمتك';
@@ -640,7 +640,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get back => 'رجوع';
 
   @override
-  String get wakeYourJota => 'أيقظ جوتا';
+  String get wakeYourJota => 'أيقظ جوطة';
 
   @override
   String get pressButtonOnIt => 'اضغط زرًا عليه';

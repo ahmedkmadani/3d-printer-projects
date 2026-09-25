@@ -449,7 +449,7 @@ class _FactsBlock extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '→',
+                      jotaArrow(context),
                       style: context.type.reading
                           .copyWith(color: context.ink.signal),
                     ),
