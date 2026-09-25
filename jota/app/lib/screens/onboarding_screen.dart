@@ -196,13 +196,13 @@ class _OnboardingPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
           const Spacer(),
-          // The drawing's own proportions (150 x 92 in the design lock). A
-          // taller box only padded it with empty space, which pushed the
-          // headline down and made the gap under the picture look uneven
-          // against the gap above it.
+          // The drawing's own proportions (150 x 92 in the design lock),
+          // at a size that owns the page: at 180 wide the ring floated in
+          // the void like an icon, and the whitespace read as missing
+          // content rather than air.
           SizedBox(
-            width: 180,
-            height: 110,
+            width: 264,
+            height: 162,
             child: MindIllustration(stage: page.stage, active: active),
           ),
           const SizedBox(height: JotaGrid.gapXL),
