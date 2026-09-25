@@ -15,6 +15,8 @@
 //  a stroke. No spinner.
 // ============================================================================
 import 'dart:async';
+
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -120,6 +122,13 @@ class _ConnectSheetState extends State<ConnectSheet> {
   /// failure shows the ASLEEP card as before.
   bool _syncOnReturn = false;
 
+  /// How many times a held re-sync has auto-fired and failed. Capped, or a
+  /// device that advertises but will not hold a connection loops forever
+  /// between _observe refiring and _fail re-arming — the exact loop the
+  /// held-sync was meant to end.
+  int _heldRetries = 0;
+  static const int _maxHeldRetries = 2;
+
   /// True when the success belongs to a re-sync of the already-paired Jota.
   /// Pairing hands over to Home; a re-sync settles back to the quiet SYNCED
   /// card and the sheet stays until it is swiped away — closing itself a
@@ -158,16 +167,20 @@ class _ConnectSheetState extends State<ConnectSheet> {
     super.dispose();
   }
 
-  void _tap(DeviceController device, JotaAdvertisement ad) {
+  void _tap(DeviceController device, JotaAdvertisement ad,
+      {bool held = false}) {
     if (_tappedId != null || _doneId != null) return;
     final bool resync =
         device.hasPairedDevice && device.pairedId == ad.remoteId;
+    if (!held) _heldRetries = 0; // a fresh user tap starts the count over
     setState(() {
       _tappedId = ad.remoteId;
       _asleep.remove(ad.remoteId);
       _codeSent = false;
       _settleAfterDone = resync;
     });
+    debugPrint(
+        'jota/flow  SHEET tap resync=\$resync held=\$held retries=\$_heldRetries');
     if (resync) {
       _syncOnReturn = true;
       unawaited(device.syncNow(ad: ad));
@@ -183,8 +196,10 @@ class _ConnectSheetState extends State<ConnectSheet> {
   }
 
   void _succeed(String id) {
+    debugPrint('jota/flow  SHEET succeed');
     if (_doneId != null) return;
     _syncOnReturn = false;
+    _heldRetries = 0;
     setState(() {
       _doneId = id;
       _tappedId = null;
@@ -204,6 +219,8 @@ class _ConnectSheetState extends State<ConnectSheet> {
   }
 
   void _fail(DeviceController device, JotaAdvertisement? ad) {
+    debugPrint(
+        'jota/flow  SHEET fail tapped=\$_tappedId codeSent=\$_codeSent held=\$_syncOnReturn adNull=\${ad == null}');
     final String? id = _tappedId;
     if (id == null) return;
     if (_codeSent && ad != null && _retries < 3) {
@@ -246,12 +263,22 @@ class _ConnectSheetState extends State<ConnectSheet> {
     final String? id = _tappedId;
 
     if (id == null && _syncOnReturn && _doneId == null && !syncing) {
-      // A held re-sync: the device is back on the air — finish the job.
-      for (final JotaAdvertisement a in found) {
-        if (device.hasPairedDevice && device.pairedId == a.remoteId) {
-          _syncOnReturn = false;
-          _tap(device, a);
-          break;
+      if (_heldRetries >= _maxHeldRetries) {
+        // Tried enough. Stop, or the sheet flips between 'wake it' and a
+        // failing sync without end.
+        debugPrint('jota/flow  SHEET held-sync gives up after \$_heldRetries');
+        _syncOnReturn = false;
+        final String? pid = device.pairedId;
+        if (pid != null) setState(() => _asleep.add(pid));
+      } else {
+        for (final JotaAdvertisement a in found) {
+          if (device.hasPairedDevice && device.pairedId == a.remoteId) {
+            _heldRetries++;
+            debugPrint('jota/flow  SHEET held-sync refire #\$_heldRetries');
+            _syncOnReturn = false;
+            _tap(device, a, held: true);
+            break;
+          }
         }
       }
     }
