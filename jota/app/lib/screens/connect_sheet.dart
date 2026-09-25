@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../util_flowlog.dart';
 import '../ble/jota_protocol.dart';
 import '../design/device_mark.dart';
 import '../design/theme.dart';
@@ -127,6 +128,12 @@ class _ConnectSheetState extends State<ConnectSheet> {
   /// between _observe refiring and _fail re-arming — the exact loop the
   /// held-sync was meant to end.
   int _heldRetries = 0;
+
+  /// The last device drawn. When a sync succeeds the Jota goes quiet and
+  /// `found` empties while the done card is still on screen; without a cache
+  /// the build called found.first on an empty list and threw to a white
+  /// screen every frame.
+  JotaAdvertisement? _lastShown;
   static const int _maxHeldRetries = 2;
 
   /// True when the success belongs to a re-sync of the already-paired Jota.
@@ -196,7 +203,7 @@ class _ConnectSheetState extends State<ConnectSheet> {
   }
 
   void _succeed(String id) {
-    debugPrint('jota/flow  SHEET succeed');
+    flow('SHEET succeed');
     if (_doneId != null) return;
     _syncOnReturn = false;
     _heldRetries = 0;
@@ -266,7 +273,7 @@ class _ConnectSheetState extends State<ConnectSheet> {
       if (_heldRetries >= _maxHeldRetries) {
         // Tried enough. Stop, or the sheet flips between 'wake it' and a
         // failing sync without end.
-        debugPrint('jota/flow  SHEET held-sync gives up after \$_heldRetries');
+        flow('SHEET held-sync gives up after \$_heldRetries');
         _syncOnReturn = false;
         final String? pid = device.pairedId;
         if (pid != null) setState(() => _asleep.add(pid));
@@ -274,7 +281,7 @@ class _ConnectSheetState extends State<ConnectSheet> {
         for (final JotaAdvertisement a in found) {
           if (device.hasPairedDevice && device.pairedId == a.remoteId) {
             _heldRetries++;
-            debugPrint('jota/flow  SHEET held-sync refire #\$_heldRetries');
+            flow('SHEET held-sync refire #\$_heldRetries');
             _syncOnReturn = false;
             _tap(device, a, held: true);
             break;
@@ -326,7 +333,11 @@ class _ConnectSheetState extends State<ConnectSheet> {
       }
     });
 
-    final bool searching = found.isEmpty && _doneId == null;
+    if (found.isNotEmpty) _lastShown = _shown(found);
+    final JotaAdvertisement? shown =
+        found.isNotEmpty ? _shown(found) : _lastShown;
+    // Nothing to draw yet, or the device went quiet and no card is mid-flight.
+    final bool searching = shown == null || (found.isEmpty && _doneId == null);
     // A paired Jota is not being CONNECTED, it is being woken: first-run
     // pairing copy on an owned device read like switching devices. The
     // paired sheet says wake / press a button / Sync instead.
@@ -346,26 +357,25 @@ class _ConnectSheetState extends State<ConnectSheet> {
         duration: JotaMotion.normal,
         switchInCurve: JotaMotion.curve,
         switchOutCurve: JotaMotion.curve,
-        child: searching
+        child: (searching || shown == null)
             ? const _Searching(key: ValueKey<String>('searching'))
             : _Found(
                 key: const ValueKey<String>('found'),
-                ad: _shown(found),
+                ad: shown,
                 others: <JotaAdvertisement>[
                   for (final JotaAdvertisement a in found)
-                    if (a.remoteId != _shown(found).remoteId) a,
+                    if (a.remoteId != shown.remoteId) a,
                 ],
-                state: _stateOf(device, _shown(found)),
-                pairedDevice: device.hasPairedDevice &&
-                    device.pairedId == _shown(found).remoteId,
-                connecting:
-                    _tappedId == _shown(found).remoteId && _doneId == null,
-                done: _doneId == _shown(found).remoteId,
+                state: _stateOf(device, shown),
+                pairedDevice:
+                    device.hasPairedDevice && device.pairedId == shown.remoteId,
+                connecting: _tappedId == shown.remoteId && _doneId == null,
+                done: _doneId == shown.remoteId,
                 onConnect: (_tappedId == null && _doneId == null)
-                    ? () => _tap(device, _shown(found))
+                    ? () => _tap(device, shown)
                     : null,
                 onSwitch: (String id) => setState(() => _chosenId = id),
-                code: wantsCode && _tappedId == _shown(found).remoteId
+                code: wantsCode && _tappedId == shown.remoteId
                     ? _CodeRow(
                         controller: _code,
                         focus: _codeFocus,
