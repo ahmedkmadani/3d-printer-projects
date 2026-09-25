@@ -1260,28 +1260,33 @@ class _JotaToastState extends State<_JotaToast>
       // Above the floating nav bar, not on it.
       bottom: 110 + MediaQuery.of(context).padding.bottom,
       child: IgnorePointer(
-        child: FadeTransition(
-          opacity: a,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.25),
-              end: Offset.zero,
-            ).animate(a),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: JotaGrid.gapL,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: c.field,
-                  borderRadius: const BorderRadius.all(Radius.circular(999)),
-                  border: Border.all(color: c.rule, width: JotaGrid.hairline),
-                ),
-                child: Text(
-                  widget.message,
-                  textAlign: TextAlign.center,
-                  style: t.prose.copyWith(color: c.ink, fontSize: 15),
+        // Material, because this lives in the raw overlay: text without a
+        // Material ancestor renders with the yellow debug underline.
+        child: Material(
+          type: MaterialType.transparency,
+          child: FadeTransition(
+            opacity: a,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.25),
+                end: Offset.zero,
+              ).animate(a),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: JotaGrid.gapL,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: c.field,
+                    borderRadius: const BorderRadius.all(Radius.circular(999)),
+                    border: Border.all(color: c.rule, width: JotaGrid.hairline),
+                  ),
+                  child: Text(
+                    widget.message,
+                    textAlign: TextAlign.center,
+                    style: t.prose.copyWith(color: c.ink, fontSize: 15),
+                  ),
                 ),
               ),
             ),

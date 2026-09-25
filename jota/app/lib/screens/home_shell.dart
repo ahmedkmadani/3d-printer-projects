@@ -25,7 +25,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../util_flowlog.dart';
 import '../ble/device_scanner.dart';
 import '../design/theme.dart';
 import '../design/widgets.dart';
@@ -163,11 +162,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     final ModalRoute<Object?>? route = ModalRoute.of(context);
     if (route != null && !route.isCurrent) return;
     _pairOpen = true;
-    flow('SHELL push PairScreen');
     final String? code = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(builder: (_) => const PairScreen()),
     );
-    flow('SHELL PairScreen popped code=\${code != null}');
     _pairOpen = false;
     device.submitPairCode(code);
   }

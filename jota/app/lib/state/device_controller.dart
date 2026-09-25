@@ -378,7 +378,9 @@ class DeviceController extends ChangeNotifier {
     // On real hardware that looked like a device that read its index and then
     // hung up without fetching anything — with nothing in either log saying
     // why. A synchronous flag closes the window the await opens.
-    if (_sync.isRunning || _syncStarting) return null;
+    if (_sync.isRunning || _syncStarting) {
+      return null;
+    }
     _syncStarting = true;
 
     _lastError = null;

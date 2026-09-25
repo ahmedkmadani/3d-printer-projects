@@ -23,7 +23,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../util_flowlog.dart';
 import '../ble/jota_protocol.dart';
 import '../design/device_mark.dart';
 import '../design/theme.dart';
@@ -203,7 +202,6 @@ class _ConnectSheetState extends State<ConnectSheet> {
   }
 
   void _succeed(String id) {
-    flow('SHEET succeed');
     if (_doneId != null) return;
     _syncOnReturn = false;
     _heldRetries = 0;
@@ -274,7 +272,6 @@ class _ConnectSheetState extends State<ConnectSheet> {
       if (_heldRetries >= _maxHeldRetries) {
         // Tried enough. Stop, or the sheet flips between 'wake it' and a
         // failing sync without end.
-        flow('SHEET held-sync gives up after \$_heldRetries');
         _syncOnReturn = false;
         final String? pid = device.pairedId;
         if (pid != null) setState(() => _asleep.add(pid));
@@ -282,7 +279,6 @@ class _ConnectSheetState extends State<ConnectSheet> {
         for (final JotaAdvertisement a in found) {
           if (device.hasPairedDevice && device.pairedId == a.remoteId) {
             _heldRetries++;
-            flow('SHEET held-sync refire #\$_heldRetries');
             _syncOnReturn = false;
             _tap(device, a, held: true);
             break;
