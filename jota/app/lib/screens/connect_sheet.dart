@@ -113,6 +113,13 @@ class _ConnectSheetState extends State<ConnectSheet> {
   /// The success state: the card fills and draws its check, then [onDone].
   String? _doneId;
 
+  /// A re-sync the user asked for that the device slept through. The tap is
+  /// remembered: when the Jota next advertises, the sync fires by itself, so
+  /// "tap Sync, press the button" finishes the job instead of looping
+  /// through wake → tap → asleep → wake. One automatic retry; a second
+  /// failure shows the ASLEEP card as before.
+  bool _syncOnReturn = false;
+
   /// True when the success belongs to a re-sync of the already-paired Jota.
   /// Pairing hands over to Home; a re-sync settles back to the quiet SYNCED
   /// card and the sheet stays until it is swiped away — closing itself a
@@ -162,6 +169,7 @@ class _ConnectSheetState extends State<ConnectSheet> {
       _settleAfterDone = resync;
     });
     if (resync) {
+      _syncOnReturn = true;
       unawaited(device.syncNow(ad: ad));
     } else {
       unawaited(device.pairWith(ad));
@@ -176,6 +184,7 @@ class _ConnectSheetState extends State<ConnectSheet> {
 
   void _succeed(String id) {
     if (_doneId != null) return;
+    _syncOnReturn = false;
     setState(() {
       _doneId = id;
       _tappedId = null;
@@ -209,6 +218,17 @@ class _ConnectSheetState extends State<ConnectSheet> {
       unawaited(device.pairWith(ad));
       return;
     }
+    if (_settleAfterDone && _syncOnReturn) {
+      // The paired Jota slept through the attempt. Fall back to the wake
+      // state and hold the intention; _observe re-fires the sync when the
+      // device comes back.
+      setState(() {
+        _tappedId = null;
+        _code.clear();
+        _codeSent = false;
+      });
+      return;
+    }
     setState(() {
       _asleep.add(id);
       _tappedId = null;
@@ -224,6 +244,17 @@ class _ConnectSheetState extends State<ConnectSheet> {
     final bool pairing = device.isPairing;
     final bool syncing = device.isSyncing;
     final String? id = _tappedId;
+
+    if (id == null && _syncOnReturn && _doneId == null && !syncing) {
+      // A held re-sync: the device is back on the air — finish the job.
+      for (final JotaAdvertisement a in found) {
+        if (device.hasPairedDevice && device.pairedId == a.remoteId) {
+          _syncOnReturn = false;
+          _tap(device, a);
+          break;
+        }
+      }
+    }
 
     if (id != null) {
       JotaAdvertisement? ad;
